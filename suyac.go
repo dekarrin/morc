@@ -1,6 +1,7 @@
 package suyac
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -128,6 +129,8 @@ type RESTClient struct {
 	Vars      map[string]string
 	VarPrefix string
 
+	Scrapers []VarScraper
+
 	// cookie jar that records all SetCookies calls; this is a pointer to the
 	// same jar that is passed to HTTP
 	jar *timedCookieJar
@@ -147,6 +150,7 @@ func NewRESTClient(cookieLifetime time.Duration) *RESTClient {
 		},
 		Vars:      make(map[string]string),
 		VarPrefix: "$",
+		Scrapers:  make([]VarScraper, 0),
 		jar:       cookies,
 	}
 }
@@ -175,7 +179,29 @@ func (r *RESTClient) Request(method string, url string, data []byte) (*http.Resp
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 
-	return r.HTTP.Do(req)
+	resp, err := r.HTTP.Do(req)
+	if err != nil {
+		return resp, err
+	}
+
+	// we need to load the entire response body into memory so we can scrape it
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return resp, fmt.Errorf("read response body: %w", err)
+	}
+	resp.Body.Close()
+	resp.Body = io.NopCloser(bytes.NewBuffer(respBody))
+
+	// scrape vars from response
+	for _, scraper := range r.Scrapers {
+		value, err := scraper.Scrape(respBody)
+		if err != nil {
+			return resp, fmt.Errorf("scrape %s: %w", scraper.Name, err)
+		}
+		r.Vars[scraper.Name] = value
+	}
+
+	return resp, nil
 }
 
 func (r *RESTClient) Substitute(s string) (string, error) {

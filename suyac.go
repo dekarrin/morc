@@ -270,17 +270,17 @@ func (r *RESTClient) ReadState(rd io.Reader) error {
 	return rzr.Close()
 }
 
-type SetCookiesCall struct {
+type setCookiesCall struct {
 	Time    time.Time
 	URL     *url.URL
 	Cookies []*http.Cookie
 }
 
-func (sc SetCookiesCall) String() string {
+func (sc setCookiesCall) String() string {
 	return fmt.Sprintf("SetCookiesCall{Time: %s, URL: %s, Cookies: %v}", sc.Time, sc.URL, sc.Cookies)
 }
 
-func (sc SetCookiesCall) MarshalBinary() ([]byte, error) {
+func (sc setCookiesCall) MarshalBinary() ([]byte, error) {
 	var enc []byte
 
 	enc = append(enc, rezi.MustEnc(sc.Time)...)
@@ -290,11 +290,11 @@ func (sc SetCookiesCall) MarshalBinary() ([]byte, error) {
 	return enc, nil
 }
 
-func (sc *SetCookiesCall) UnmarshalBinary(data []byte) error {
+func (sc *setCookiesCall) UnmarshalBinary(data []byte) error {
 	var n, offset int
 	var err error
 
-	var decoded SetCookiesCall
+	var decoded setCookiesCall
 
 	// Time
 	n, err = rezi.Dec(data[offset:], &decoded.Time)
@@ -351,7 +351,7 @@ type timedCookieJar struct {
 	lifetime time.Duration
 	wrapped  http.CookieJar
 
-	calls               []SetCookiesCall
+	calls               []setCookiesCall
 	numCalls            int
 	callsBeforeEviction int
 	mx                  *sync.Mutex
@@ -376,7 +376,7 @@ func newTimedCookieJar(wrapped http.CookieJar, lifetime time.Duration) *timedCoo
 	return &timedCookieJar{
 		lifetime:            lifetime,
 		wrapped:             wrapped,
-		calls:               make([]SetCookiesCall, 0),
+		calls:               make([]setCookiesCall, 0),
 		numCalls:            0,
 		callsBeforeEviction: 20,
 		mx:                  &sync.Mutex{},
@@ -388,7 +388,7 @@ func (j *timedCookieJar) SetCookies(u *url.URL, cookies []*http.Cookie) {
 
 	j.mx.Lock()
 	defer j.mx.Unlock()
-	j.calls = append(j.calls, SetCookiesCall{
+	j.calls = append(j.calls, setCookiesCall{
 		Time:    time.Now(),
 		URL:     u,
 		Cookies: cookies,

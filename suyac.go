@@ -316,7 +316,7 @@ func (sc *setCookiesCall) UnmarshalBinary(data []byte) error {
 	offset += n
 
 	// Cookies
-	n, err = rezi.Dec(data[offset:], &decoded.Cookies)
+	_, err = rezi.Dec(data[offset:], &decoded.Cookies)
 	if err != nil {
 		return rezi.Wrapf(offset, "cookies: %w", err)
 	}
@@ -427,7 +427,7 @@ func (j *timedCookieJar) UnmarshalBinary(data []byte) error {
 	offset += n
 
 	// Calls
-	n, err = rezi.Dec(data[offset:], &j.calls)
+	_, err = rezi.Dec(data[offset:], &j.calls)
 	if err != nil {
 		return rezi.Wrapf(offset, "calls: %w", err)
 	}

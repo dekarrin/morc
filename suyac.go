@@ -130,13 +130,13 @@ type RESTClient struct {
 
 	// cookie jar that records all SetCookies calls; this is a pointer to the
 	// same jar that is passed to HTTP
-	jar *TimedCookieJar
+	jar *timedCookieJar
 }
 
 // NewRESTClient creates a new RESTClient. 0 for cookie lifetime will default it
 // to 24 hours.
 func NewRESTClient(cookieLifetime time.Duration) *RESTClient {
-	cookies := NewTimedCookieJar(nil, cookieLifetime)
+	cookies := newTimedCookieJar(nil, cookieLifetime)
 
 	return &RESTClient{
 		HTTP: &http.Client{
@@ -245,7 +245,29 @@ func (r *RESTClient) WriteState(w io.Writer) error {
 }
 
 func (r *RESTClient) ReadState(rd io.Reader) error {
+	rzr, err := rezi.NewReader(rd, nil)
+	if err != nil {
+		return fmt.Errorf("create REZI reader: %w", err)
+	}
 
+	// first, create the cookie jar
+	jar := newTimedCookieJar(nil, 0)
+
+	if err := rzr.Dec(&jar); err != nil {
+		return fmt.Errorf("decode cookie jar: %w", err)
+	}
+
+	// now, read the vars
+	vars := make(map[string]string)
+	if err := rzr.Dec(&vars); err != nil {
+		return fmt.Errorf("decode vars: %w", err)
+	}
+
+	r.jar = jar
+	r.HTTP.Jar = jar
+	r.Vars = vars
+
+	return rzr.Close()
 }
 
 type SetCookiesCall struct {
@@ -304,7 +326,7 @@ func (sc *SetCookiesCall) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
-// TimedCookieJar wraps a net/http.CookieJar implementation and does quick and
+// timedCookieJar wraps a net/http.CookieJar implementation and does quick and
 // dirty recording of all cookies that are received. Because it cannot examine
 // the policy of the wrapped jar, it simply records calls to SetCookies and
 // stores enough information to reproduce all said calls, and additionally
@@ -318,11 +340,14 @@ func (sc *SetCookiesCall) UnmarshalBinary(data []byte) error {
 // The time of each call is used for record eviction. At load time and
 // periodically during calls to other methods, the jar will remove any records
 // that are older than a certain threshold. This threshold is stored in the
-// Lifetime member of the TimedCookieJar.
+// Lifetime member of the timedCookieJar.
 //
-// The zero value of TimedCookieJar is not valid. Use NewTimedCookieJar to
+// The zero value of timedCookieJar is not valid. Use NewTimedCookieJar to
 // create one.
-type TimedCookieJar struct {
+//
+// It uses trickiness inside of unmarshal that relies on assumption that it is
+// being called on a valid one whose wrapped cookiejar hasn't yet been called.
+type timedCookieJar struct {
 	lifetime time.Duration
 	wrapped  http.CookieJar
 
@@ -332,11 +357,11 @@ type TimedCookieJar struct {
 	mx                  *sync.Mutex
 }
 
-// NewTimedCookieJar creates a new TimedCookieJar with the given lifetime. If
+// newTimedCookieJar creates a new TimedCookieJar with the given lifetime. If
 // lifetime is 0, the default lifetime of 24 hours is used. If wrapped is nil,
 // a new net/http/cookiejar.Jar is created with default options and used as
 // wrapped.
-func NewTimedCookieJar(wrapped http.CookieJar, lifetime time.Duration) *TimedCookieJar {
+func newTimedCookieJar(wrapped http.CookieJar, lifetime time.Duration) *timedCookieJar {
 	if lifetime <= 0 {
 		lifetime = 24 * time.Hour
 	}
@@ -348,7 +373,7 @@ func NewTimedCookieJar(wrapped http.CookieJar, lifetime time.Duration) *TimedCoo
 		}
 	}
 
-	return &TimedCookieJar{
+	return &timedCookieJar{
 		lifetime:            lifetime,
 		wrapped:             wrapped,
 		calls:               make([]SetCookiesCall, 0),
@@ -358,7 +383,7 @@ func NewTimedCookieJar(wrapped http.CookieJar, lifetime time.Duration) *TimedCoo
 	}
 }
 
-func (j *TimedCookieJar) SetCookies(u *url.URL, cookies []*http.Cookie) {
+func (j *timedCookieJar) SetCookies(u *url.URL, cookies []*http.Cookie) {
 	j.wrapped.SetCookies(u, cookies)
 
 	j.mx.Lock()
@@ -372,12 +397,12 @@ func (j *TimedCookieJar) SetCookies(u *url.URL, cookies []*http.Cookie) {
 	j.checkEviction()
 }
 
-func (j *TimedCookieJar) Cookies(u *url.URL) []*http.Cookie {
+func (j *timedCookieJar) Cookies(u *url.URL) []*http.Cookie {
 	return j.wrapped.Cookies(u)
 }
 
 // MarshalBinary uses the rezi library to serialize the TimedCookieJar to bytes.
-func (j *TimedCookieJar) MarshalBinary() ([]byte, error) {
+func (j *timedCookieJar) MarshalBinary() ([]byte, error) {
 	var enc []byte
 
 	j.evictOld()
@@ -390,31 +415,32 @@ func (j *TimedCookieJar) MarshalBinary() ([]byte, error) {
 
 // UnmarshalBinary uses the rezi library to deserialize the TimedCookieJar from
 // bytes.
-func (j *TimedCookieJar) UnmarshalBinary(data []byte) error {
+func (j *timedCookieJar) UnmarshalBinary(data []byte) error {
 	var n, offset int
 	var err error
 
-	var decoded TimedCookieJar
-
 	// Lifetime
-	n, err = rezi.Dec(data[offset:], &decoded.lifetime)
+	n, err = rezi.Dec(data[offset:], &j.lifetime)
 	if err != nil {
 		return rezi.Wrapf(offset, "lifetime: %w", err)
 	}
 	offset += n
 
 	// Calls
-	n, err = rezi.Dec(data[offset:], &decoded.calls)
+	n, err = rezi.Dec(data[offset:], &j.calls)
 	if err != nil {
 		return rezi.Wrapf(offset, "calls: %w", err)
 	}
 
-	*j = decoded
+	j.evictOld()
+	for _, call := range j.calls {
+		j.wrapped.SetCookies(call.URL, call.Cookies)
+	}
 
 	return nil
 }
 
-func (j *TimedCookieJar) evictOld() {
+func (j *timedCookieJar) evictOld() {
 	// remove any calls that are older than Lifetime
 	oldestTime := time.Now().Add(-j.lifetime)
 	startIdx := -1
@@ -429,7 +455,7 @@ func (j *TimedCookieJar) evictOld() {
 	}
 }
 
-func (j *TimedCookieJar) checkEviction() {
+func (j *timedCookieJar) checkEviction() {
 	if j.numCalls == 0 {
 		j.evictOld()
 	}

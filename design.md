@@ -29,3 +29,7 @@ to do a lot of shell escaping. '@' is reserved and may not be supplied as arg.
 
 --output-headers - include headers in output
 
+
+
+* suyac state read path/to/filename
+- read state data and what is in it without actually doing anyfin

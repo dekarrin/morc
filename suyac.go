@@ -122,18 +122,21 @@ func (v VarScraper) Scrape(data []byte) (string, error) {
 	}
 }
 
+// Do not use default RESTClient, call NewRESTClient instead.
 type RESTClient struct {
 	HTTP      *http.Client
 	Vars      map[string]string
 	VarPrefix string
+
+	// cookie jar that records all SetCookies calls; this is a pointer to the
+	// same jar that is passed to HTTP
+	jar *TimedCookieJar
 }
 
-// NewRESTClient creates a new RESTClient.
-func NewRESTClient() *RESTClient {
-	cookies, cookieErr := cookiejar.New(nil)
-	if cookieErr != nil {
-		panic(cookieErr)
-	}
+// NewRESTClient creates a new RESTClient. 0 for cookie lifetime will default it
+// to 24 hours.
+func NewRESTClient(cookieLifetime time.Duration) *RESTClient {
+	cookies := NewTimedCookieJar(nil, cookieLifetime)
 
 	return &RESTClient{
 		HTTP: &http.Client{
@@ -144,6 +147,7 @@ func NewRESTClient() *RESTClient {
 		},
 		Vars:      make(map[string]string),
 		VarPrefix: "$",
+		jar:       cookies,
 	}
 }
 
@@ -223,11 +227,24 @@ func (r *RESTClient) Substitute(s string) (string, error) {
 	return updated.String(), nil
 }
 
-type StateInfo struct {
-	Variables map[string]string
+func (r *RESTClient) WriteState(w io.Writer) error {
+	rzw, err := rezi.NewWriter(w, nil)
+	if err != nil {
+		return fmt.Errorf("create REZI writer: %w", err)
+	}
+
+	if err := rzw.Enc(r.jar); err != nil {
+		return fmt.Errorf("encode cookie jar: %w", err)
+	}
+
+	if err := rzw.Enc(r.Vars); err != nil {
+		return fmt.Errorf("encode vars: %w", err)
+	}
+
+	return rzw.Close()
 }
 
-func (r *RESTClient) WriteState(w io.Writer) error {
+func (r *RESTClient) ReadState(rd io.Reader) error {
 
 }
 
@@ -324,7 +341,11 @@ func NewTimedCookieJar(wrapped http.CookieJar, lifetime time.Duration) *TimedCoo
 		lifetime = 24 * time.Hour
 	}
 	if wrapped == nil {
-		wrapped, _ = cookiejar.New(nil)
+		var err error
+		wrapped, err = cookiejar.New(nil)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	return &TimedCookieJar{

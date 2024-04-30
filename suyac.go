@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 	"unicode"
+
+	"github.com/dekarrin/rezi/v2"
 )
 
 type TraversalStep struct {
@@ -235,6 +237,56 @@ type SetCookiesCall struct {
 	Cookies []*http.Cookie
 }
 
+func (sc SetCookiesCall) String() string {
+	return fmt.Sprintf("SetCookiesCall{Time: %s, URL: %s, Cookies: %v}", sc.Time, sc.URL, sc.Cookies)
+}
+
+func (sc SetCookiesCall) MarshalBinary() ([]byte, error) {
+	var enc []byte
+
+	enc = append(enc, rezi.MustEnc(sc.Time)...)
+	enc = append(enc, rezi.MustEnc(sc.URL.String())...)
+	enc = append(enc, rezi.MustEnc(sc.Cookies)...)
+
+	return enc, nil
+}
+
+func (sc *SetCookiesCall) UnmarshalBinary(data []byte) error {
+	var n, offset int
+	var err error
+
+	var decoded SetCookiesCall
+
+	// Time
+	n, err = rezi.Dec(data[offset:], &decoded.Time)
+	if err != nil {
+		return rezi.Wrapf(offset, "time: %w", err)
+	}
+	offset += n
+
+	// URL
+	var urlString string
+	n, err = rezi.Dec(data[offset:], &urlString)
+	if err != nil {
+		return rezi.Wrapf(offset, "url: %w", err)
+	}
+	decoded.URL, err = url.Parse(urlString)
+	if err != nil {
+		return rezi.Wrapf(offset, "parse URL at offset: %w", err)
+	}
+	offset += n
+
+	// Cookies
+	n, err = rezi.Dec(data[offset:], &decoded.Cookies)
+	if err != nil {
+		return rezi.Wrapf(offset, "cookies: %w", err)
+	}
+
+	*sc = decoded
+
+	return nil
+}
+
 // TimedCookieJar wraps a net/http.CookieJar implementation and does quick and
 // dirty recording of all cookies that are received. Because it cannot examine
 // the policy of the wrapped jar, it simply records calls to SetCookies and
@@ -303,19 +355,61 @@ func (j *TimedCookieJar) Cookies(u *url.URL) []*http.Cookie {
 	return j.wrapped.Cookies(u)
 }
 
+// MarshalBinary uses the rezi library to serialize the TimedCookieJar to bytes.
+func (j *TimedCookieJar) MarshalBinary() ([]byte, error) {
+	var enc []byte
+
+	j.evictOld()
+
+	enc = append(enc, rezi.MustEnc(j.lifetime)...)
+	enc = append(enc, rezi.MustEnc(j.calls)...)
+
+	return enc, nil
+}
+
+// UnmarshalBinary uses the rezi library to deserialize the TimedCookieJar from
+// bytes.
+func (j *TimedCookieJar) UnmarshalBinary(data []byte) error {
+	var n, offset int
+	var err error
+
+	var decoded TimedCookieJar
+
+	// Lifetime
+	n, err = rezi.Dec(data[offset:], &decoded.lifetime)
+	if err != nil {
+		return rezi.Wrapf(offset, "lifetime: %w", err)
+	}
+	offset += n
+
+	// Calls
+	n, err = rezi.Dec(data[offset:], &decoded.calls)
+	if err != nil {
+		return rezi.Wrapf(offset, "calls: %w", err)
+	}
+
+	*j = decoded
+
+	return nil
+}
+
+func (j *TimedCookieJar) evictOld() {
+	// remove any calls that are older than Lifetime
+	oldestTime := time.Now().Add(-j.lifetime)
+	startIdx := -1
+	for idx, call := range j.calls {
+		if !call.Time.Before(oldestTime) {
+			startIdx = idx
+			break
+		}
+	}
+	if startIdx >= 0 {
+		j.calls = j.calls[startIdx:]
+	}
+}
+
 func (j *TimedCookieJar) checkEviction() {
 	if j.numCalls == 0 {
-		// remove any calls that are older than Lifetime
-		oldestTime := time.Now().Add(-j.lifetime)
-		startIdx := -1
-		for idx, call := range j.calls {
-			if !call.Time.Before(oldestTime) {
-				startIdx = idx
-				break
-			}
-		}
-		if startIdx >= 0 {
-			j.calls = j.calls[startIdx:]
-		}
+		j.evictOld()
 	}
 }

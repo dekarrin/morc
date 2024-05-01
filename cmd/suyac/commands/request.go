@@ -1,10 +1,10 @@
 package commands
 
-import "github.com/spf13/cobra"
+import (
+	"fmt"
 
-func init() {
-	rootCmd.AddCommand(requestCmd)
-}
+	"github.com/spf13/cobra"
+)
 
 var (
 	flagWriteStateFile string
@@ -21,22 +21,38 @@ var requestCmd = &cobra.Command{
 	Long:  "Creates a new request and sends it using the specified method. The method may be non-standard.",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		options := requestOptions{
-			Method: args[0],
-			URL:    args[1],
+		// check flags and populate a requestOptions struct
+		opts := requestOptions{
+			stateFileOut: flagWriteStateFile,
+			stateFileIn:  flagReadStateFile,
 		}
 
-		options.WriteStateFile, _ = cmd.Flags().GetString("write-state")
-		options.ReadStateFile, _ = cmd.Flags().GetString("read-state")
-		options.Headers, _ = cmd.Flags().GetStringSlice("header")
-		options.BodyData, _ = cmd.Flags().GetString("data")
-		options.VarSymbol, _ = cmd.Flags().GetString("var")
-		options.OutputHeaders, _ = cmd.Flags().GetBool("output-headers")
-
-		return request(options)
+		return invokeRequest(args[0], args[1])
 	},
 }
 
-func invokeRequest(method, url string) error {
-	return nil
+func init() {
+	requestCmd.PersistentFlags().StringVarP(&flagWriteStateFile, "write-state", "b", "", "Write collected cookies and captured vars to the given file")
+	requestCmd.PersistentFlags().StringVarP(&flagReadStateFile, "read-state", "c", "", "Read and use the cookies and vars from the given file")
+	requestCmd.PersistentFlags().StringArrayVarP(&flagHeaders, "header", "H", []string{}, "Add a header to the request")
+	requestCmd.PersistentFlags().StringVarP(&flagBodyData, "data", "d", "", "Add the given data as a body to the request; prefix with @ to read data from a file")
+	requestCmd.PersistentFlags().StringVarP(&flagVarSymbol, "var-symbol", "v", "$", "The symbol to use for variable substitution")
+	requestCmd.PersistentFlags().BoolVarP(&flagOutputHeaders, "output-headers", "o", false, "Output the headers of the response")
+
+	rootCmd.AddCommand(requestCmd)
+}
+
+type requestOptions struct {
+	stateFileOut  string
+	stateFileIn   string
+	headers       []string
+	bodyData      string
+	outputHeaders bool
+}
+
+// invokeRequest receives named vars and checked/defaulted requestOptions.
+func invokeRequest(method, url, varSymbol string, opts requestOptions) error {
+	if opts.varSymbol == "" {
+		return fmt.Errorf("variable symbol cannot be empty")
+	}
 }

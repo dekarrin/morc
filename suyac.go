@@ -155,15 +155,15 @@ func NewRESTClient(cookieLifetime time.Duration) *RESTClient {
 	}
 }
 
-func (r *RESTClient) Request(method string, url string, data []byte) (*http.Response, error) {
-	// find every variable in url of  and replace it with the value from r.Vars (or return error if not)
+func (r *RESTClient) Request(method string, url string, data []byte, hdrs http.Header) (*http.Response, error) {
+	// find every variable in url of  and replace it with the value from r.Vars (or return error if encountering invalid var)
 	url, err := r.Substitute(url)
 	if err != nil {
 		return nil, fmt.Errorf("substitute vars in URL: %w", err)
 	}
 
 	var payload io.Reader
-	// find every variable in data and replace it with the value from r.Vars (or return error if not)
+	// find every variable in data and replace it with the value from r.Vars (or return error if encountering invalid var)
 	if data != nil {
 		dataStr := string(data)
 		dataStr, err = r.Substitute(dataStr)
@@ -177,6 +177,25 @@ func (r *RESTClient) Request(method string, url string, data []byte) (*http.Resp
 	req, err := http.NewRequest(method, url, payload)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	// find every variable in headers and replace it with the value from r.Vars (or return error if encountering invalid var)
+	if len(hdrs) > 0 {
+		req.Header = make(http.Header)
+		for key, values := range hdrs {
+			newKey, err := r.Substitute(key)
+			if err != nil {
+				return nil, fmt.Errorf("substitute header key %q: %w", key, err)
+			}
+
+			for _, value := range values {
+				newValue, err := r.Substitute(value)
+				if err != nil {
+					return nil, fmt.Errorf("substitute header value %q: %w", value, err)
+				}
+				req.Header.Add(newKey, newValue)
+			}
+		}
 	}
 
 	resp, err := r.HTTP.Do(req)

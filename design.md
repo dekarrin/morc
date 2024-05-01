@@ -31,5 +31,15 @@ to do a lot of shell escaping. '@' is reserved and may not be supplied as arg.
 
 
 
-* suyac state read path/to/filename
+### Main Things
+FIRST just copy curl with var capture and cookie capture.
+
+
+A `project` includes named routes with consistent flow and is built much like in
+Postman or Insomnia. That is the only place capture vars are stored (but they
+can be set on a one-time basis with flags).
+A `session` includes active cookies and current vars. It is something of an
+invocation of either a project or a CLI one-time. If using a project, a default
+session location is specified 
+* suyac env read path/to/filename
 - read state data and what is in it without actually doing anyfin

@@ -27,52 +27,18 @@ var requestCmd = &cobra.Command{
 	Long:  "Creates a new request and sends it using the specified method. The method may be non-standard.",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// check flags while populating opts
-		opts := requestOptions{
-			stateFileIn:   flagReadStateFile,
-			stateFileOut:  flagWriteStateFile,
-			outputHeaders: flagOutputResponseHeaders,
+		opts, err := requestFlagsToOptions()
+		if err != nil {
+			return err
 		}
 
-		if flagVarSymbol == "" {
-			return fmt.Errorf("variable symbol cannot be empty")
-		}
+		// make sure that the method is upper case
+		args[0] = strings.ToUpper(args[0])
 
-		// check headers and load into an http.Header
-		if len(flagHeaders) > 0 {
-			headers := make(http.Header)
-			for idx, h := range flagHeaders {
-
-				// split the header into key and value
-				parts := strings.SplitN(h, ":", 2)
-				if len(parts) != 2 {
-					return fmt.Errorf("header %d (%q) is not in format key: value", idx, h)
-				}
-				canonKey := http.CanonicalHeaderKey(strings.TrimSpace(parts[0]))
-				if canonKey == "" {
-					return fmt.Errorf("header %d (%q) does not have a valid header key", idx, h)
-				}
-				value := strings.TrimSpace(parts[1])
-				headers.Add(canonKey, value)
-			}
-			opts.headers = headers
-		}
-
-		// check body data; load it immediately if it refers to a file
-		if strings.HasPrefix(flagBodyData, "@") {
-			// read entire file now
-			fRaw, err := os.Open(flagBodyData[1:])
-			if err != nil {
-				return fmt.Errorf("open %q: %w", flagBodyData[1:], err)
-			}
-			defer fRaw.Close()
-			bodyData, err := io.ReadAll(fRaw)
-			if err != nil {
-				return fmt.Errorf("read %q: %w", flagBodyData[1:], err)
-			}
-			opts.bodyData = bodyData
-		} else {
-			opts.bodyData = []byte(flagBodyData)
+		// make sure the URL has a scheme
+		lowerURL := strings.ToLower(args[1])
+		if !strings.HasPrefix(lowerURL, "http://") && !strings.HasPrefix(lowerURL, "https://") {
+			args[1] = "http://" + args[1]
 		}
 
 		return invokeRequest(args[0], args[1], flagVarSymbol, opts)
@@ -80,14 +46,107 @@ var requestCmd = &cobra.Command{
 }
 
 func init() {
-	requestCmd.PersistentFlags().StringVarP(&flagWriteStateFile, "write-state", "b", "", "Write collected cookies and captured vars to the given file")
-	requestCmd.PersistentFlags().StringVarP(&flagReadStateFile, "read-state", "c", "", "Read and use the cookies and vars from the given file")
-	requestCmd.PersistentFlags().StringArrayVarP(&flagHeaders, "header", "H", []string{}, "Add a header to the request")
-	requestCmd.PersistentFlags().StringVarP(&flagBodyData, "data", "d", "", "Add the given data as a body to the request; prefix with @ to read data from a file")
-	requestCmd.PersistentFlags().StringVarP(&flagVarSymbol, "var-symbol", "v", "$", "The symbol to use for variable substitution")
-	requestCmd.PersistentFlags().BoolVarP(&flagOutputResponseHeaders, "output-headers", "o", false, "Output the headers of the response")
-
+	addRequestFlags(requestCmd)
 	rootCmd.AddCommand(requestCmd)
+
+	quickMethods := []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE"}
+	for _, meth := range quickMethods {
+		addQuickMethodCommand(meth)
+	}
+}
+
+func addQuickMethodCommand(method string) {
+	upperMeth := strings.ToUpper(method)
+	lowerMeth := strings.ToLower(method)
+
+	n := ""
+	if upperMeth[0] == 'A' || upperMeth[0] == 'E' || upperMeth[0] == 'I' || upperMeth[0] == 'O' || upperMeth[0] == 'U' {
+		n = "n"
+	}
+
+	var quickCmd = &cobra.Command{
+		Use:   lowerMeth,
+		Short: "Make a" + n + " " + upperMeth + " request",
+		Long:  "Creates a new " + upperMeth + " request and immediately sends it",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts, err := requestFlagsToOptions()
+			if err != nil {
+				return err
+			}
+
+			// make sure the URL has a scheme
+			lowerURL := strings.ToLower(args[0])
+			if !strings.HasPrefix(lowerURL, "http://") && !strings.HasPrefix(lowerURL, "https://") {
+				args[0] = "http://" + args[0]
+			}
+
+			return invokeRequest(upperMeth, args[0], flagVarSymbol, opts)
+		},
+	}
+
+	addRequestFlags(quickCmd)
+	rootCmd.AddCommand(quickCmd)
+}
+
+func addRequestFlags(cmd *cobra.Command) {
+	cmd.PersistentFlags().StringVarP(&flagWriteStateFile, "write-state", "b", "", "Write collected cookies and captured vars to the given file")
+	cmd.PersistentFlags().StringVarP(&flagReadStateFile, "read-state", "c", "", "Read and use the cookies and vars from the given file")
+	cmd.PersistentFlags().StringArrayVarP(&flagHeaders, "header", "H", []string{}, "Add a header to the request")
+	cmd.PersistentFlags().StringVarP(&flagBodyData, "data", "d", "", "Add the given data as a body to the request; prefix with @ to read data from a file")
+	cmd.PersistentFlags().StringVarP(&flagVarSymbol, "var-symbol", "v", "$", "The symbol to use for variable substitution")
+	cmd.PersistentFlags().BoolVarP(&flagOutputResponseHeaders, "output-headers", "o", false, "Output the headers of the response")
+}
+
+func requestFlagsToOptions() (requestOptions, error) {
+	opts := requestOptions{
+		stateFileIn:   flagReadStateFile,
+		stateFileOut:  flagWriteStateFile,
+		outputHeaders: flagOutputResponseHeaders,
+	}
+
+	if flagVarSymbol == "" {
+		return opts, fmt.Errorf("variable symbol cannot be empty")
+	}
+
+	// check headers and load into an http.Header
+	if len(flagHeaders) > 0 {
+		headers := make(http.Header)
+		for idx, h := range flagHeaders {
+
+			// split the header into key and value
+			parts := strings.SplitN(h, ":", 2)
+			if len(parts) != 2 {
+				return opts, fmt.Errorf("header %d (%q) is not in format key: value", idx, h)
+			}
+			canonKey := http.CanonicalHeaderKey(strings.TrimSpace(parts[0]))
+			if canonKey == "" {
+				return opts, fmt.Errorf("header %d (%q) does not have a valid header key", idx, h)
+			}
+			value := strings.TrimSpace(parts[1])
+			headers.Add(canonKey, value)
+		}
+		opts.headers = headers
+	}
+
+	// check body data; load it immediately if it refers to a file
+	if strings.HasPrefix(flagBodyData, "@") {
+		// read entire file now
+		fRaw, err := os.Open(flagBodyData[1:])
+		if err != nil {
+			return opts, fmt.Errorf("open %q: %w", flagBodyData[1:], err)
+		}
+		defer fRaw.Close()
+		bodyData, err := io.ReadAll(fRaw)
+		if err != nil {
+			return opts, fmt.Errorf("read %q: %w", flagBodyData[1:], err)
+		}
+		opts.bodyData = bodyData
+	} else {
+		opts.bodyData = []byte(flagBodyData)
+	}
+
+	return opts, nil
 }
 
 type requestOptions struct {

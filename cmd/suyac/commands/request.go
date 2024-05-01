@@ -46,11 +46,11 @@ var requestCmd = &cobra.Command{
 				// split the header into key and value
 				parts := strings.SplitN(h, ":", 2)
 				if len(parts) != 2 {
-					return fmt.Errorf("header %d is not in the format key: value", idx)
+					return fmt.Errorf("header %d (%q) is not in format key: value", idx, h)
 				}
 				canonKey := http.CanonicalHeaderKey(strings.TrimSpace(parts[0]))
 				if canonKey == "" {
-					return fmt.Errorf("header %d (%q) does not have a valid header key", idx)
+					return fmt.Errorf("header %d (%q) does not have a valid header key", idx, h)
 				}
 				value := strings.TrimSpace(parts[1])
 				headers.Add(canonKey, value)

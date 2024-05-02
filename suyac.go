@@ -341,9 +341,9 @@ func NewRESTClient(cookieLifetime time.Duration) *RESTClient {
 	}
 }
 
-// MakeRequest creates a request to the given endpoint. Values set in Vars and
+// CreateRequest creates a request to the given endpoint. Values set in Vars and
 // VarOverrides are used to fill any variables in the URL, data, and headers.
-func (r *RESTClient) MakeRequest(method string, url string, data []byte, hdrs http.Header) (*http.Request, error) {
+func (r *RESTClient) CreateRequest(method string, url string, data []byte, hdrs http.Header) (*http.Request, error) {
 	// find every variable in url of  and replace it with the value from r.Vars (or return error if encountering invalid var)
 	url, err := r.Substitute(url)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httputil"
 	"os"
 	"sort"
 	"strings"
@@ -20,6 +21,7 @@ var (
 	flagVarSymbol             string
 	flagOutputResponseHeaders bool
 	flagOutputCaptures        bool
+	flagOutputRequest         bool
 	flagGetVars               []string
 	flagVars                  []string
 )
@@ -100,6 +102,7 @@ func addRequestFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVarP(&flagVarSymbol, "var-symbol", "V", "$", "The symbol to use for variable substitution")
 	cmd.PersistentFlags().BoolVarP(&flagOutputResponseHeaders, "headers", "o", false, "Output the headers of the response")
 	cmd.PersistentFlags().BoolVarP(&flagOutputCaptures, "captures", "C", false, "Output the captures from the response")
+	cmd.PersistentFlags().BoolVarP(&flagOutputRequest, "request", "r", false, "Output the filled request prior to sending it")
 	cmd.PersistentFlags().StringArrayVarP(&flagGetVars, "get-var", "G", []string{}, "Get a variable's value from the response. Format is name::start,end for byte offset or name:path[0].to.value (jq-ish syntax)")
 	cmd.PersistentFlags().StringArrayVarP(&flagVars, "var", "v", []string{}, "Temporarily set a variable's value for the current request only. Format is name:value")
 }
@@ -110,6 +113,7 @@ func requestFlagsToOptions() (requestOptions, error) {
 		stateFileOut:   flagWriteStateFile,
 		outputHeaders:  flagOutputResponseHeaders,
 		outputCaptures: flagOutputCaptures,
+		outputRequest:  flagOutputRequest,
 	}
 
 	if flagVarSymbol == "" {
@@ -128,7 +132,7 @@ func requestFlagsToOptions() (requestOptions, error) {
 			scrapers = append(scrapers, scraper)
 		}
 
-		opts.captures = scrapers
+		opts.scrapers = scrapers
 	}
 
 	// check vars
@@ -191,8 +195,9 @@ type requestOptions struct {
 	bodyData       []byte
 	outputHeaders  bool
 	outputCaptures bool
+	outputRequest  bool
 	oneTimeVars    map[string]string
-	captures       []suyac.VarScraper
+	scrapers       []suyac.VarScraper
 }
 
 // invokeRequest receives named vars and checked/defaulted requestOptions.
@@ -203,6 +208,9 @@ func invokeRequest(method, url, varSymbol string, opts requestOptions) error {
 
 	// create the client
 	client := suyac.NewRESTClient(0) // TODO: allow cookie settings
+	client.VarOverrides = opts.oneTimeVars
+	client.VarPrefix = varSymbol
+	client.Scrapers = opts.scrapers
 
 	// if we have been asked to load state, do that now
 	if opts.stateFileIn != "" {
@@ -218,9 +226,20 @@ func invokeRequest(method, url, varSymbol string, opts requestOptions) error {
 		}
 	}
 
-	req, err := client.MakeRequest(method, url, opts.bodyData, opts.headers)
+	req, err := client.CreateRequest(method, url, opts.bodyData, opts.headers)
 	if err != nil {
-		return fmt.Errorf("make request: %w", err)
+		return fmt.Errorf("create request: %w", err)
+	}
+
+	if opts.outputRequest {
+		reqBytes, err := httputil.DumpRequestOut(req, true)
+		if err != nil {
+			return fmt.Errorf("dump request: %w", err)
+		}
+
+		fmt.Println("------------------- REQUEST -------------------")
+		fmt.Println(string(reqBytes))
+		fmt.Println("----------------- END REQUEST -----------------")
 	}
 
 	resp, caps, err := client.SendRequest(req)

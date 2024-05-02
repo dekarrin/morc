@@ -1,41 +1,31 @@
-This file has some notes on what the program should look like.
-
-Example executions:
-
-* suyac get https://www.example.com - get the URL
-* suyac post https://www.example.com -d '{text}' (or -d @file)
-* suyac request custom https://www.example.com
-
--b - request state-file. Use cookies and other captured data items from here
--c - save state-file. Store cookies and other captured data to this file,
-updating only the items that the server sends back. File is created if not
-exists. Overrides any defaults.
-
--S - read data in the given path/offset and store it in the State file in a var.
-Combine with --output-captures to see the ones obtained.
-Form is "name::2,4" for a byte offset (from 2-4 in example)
-or "name:/path[3]" for json object path using jq-ish syntax but supporting only
-indexes or exact object names.capture
-
--v - supply a variable in key:value format.
-
--H - include a header with the given value. form is "Header-name: value".
-Multiple headers with the same name may be specified. Use $ sign to reference a
-stored variable in a file referred to by -b. Use double $$ to escape it.
-
--d - include a data payload. Use '@' followed by file name to read data payload
-from file. Within a data payload, use $ sign to reference a stored variable in a
-file referred to by -b, or use double $$ to escape it.
-
---var-symbol - change the var symbol from '$' to something else to avoid having
-to do a lot of shell escaping. '@' is reserved and may not be supplied as arg.
-
---output-headers - include headers in output
+This file has some notes on what the program should look like and upcoming
+planned work at a high level.
 
 
 
-### Main Things
-FIRST just copy curl with var capture and cookie capture.
+## Main Things
+
+
+## Output Control
+Need to be able to specify exactly what is shown.
+
+Options:
+* human - current state
+* line-based - takes same extra output/suppress options but puts special separator between each (probably line-based).
+* json - everything is in JSON
+
+
+SHORT-STATUS - contains 'small' things in response like status, code, etc as specified by cli flags.
+Whatever else there is, short-status comes first, everything else next, then response body at
+each item that is not short status starts with a line that has a one-word desc of what is next and unambiguously starts
+with a thing that will not be in a line of the request, user-settable, and ends with a similar thing
+
+
+* json - everything is contained in JSON.
+
+
+
+## project vs sessions:
 
 
 A `project` includes named routes with consistent flow and is built much like in
@@ -43,6 +33,7 @@ Postman or Insomnia. That is the only place capture vars are stored (but they
 can be set on a one-time basis with flags).
 A `session` includes active cookies and current vars. It is something of an
 invocation of either a project or a CLI one-time. If using a project, a default
-session location is specified 
+session location is specified. Sessions should also include request/response
+history.
 * suyac env read path/to/filename
 - read state data and what is in it without actually doing anyfin

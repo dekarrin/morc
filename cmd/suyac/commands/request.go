@@ -13,6 +13,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type format int
+
+const (
+	formatPretty format = iota
+	formatLine
+)
+
 var (
 	flagWriteStateFile        string
 	flagReadStateFile         string
@@ -25,6 +32,7 @@ var (
 	flagSuppressResponseBody  bool
 	flagGetVars               []string
 	flagVars                  []string
+	flagFormat                string
 )
 
 func addRequestFlags(cmd *cobra.Command) {
@@ -39,6 +47,7 @@ func addRequestFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().BoolVarP(&flagOutputRequest, "request", "", false, "Output the filled request prior to sending it")
 	cmd.PersistentFlags().StringArrayVarP(&flagGetVars, "capture-var", "C", []string{}, "Get a variable's value from the response. Format is name::start,end for byte offset or name:path[0].to.value (jq-ish syntax)")
 	cmd.PersistentFlags().StringArrayVarP(&flagVars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Format is name:value")
+	cmd.PersistentFlags().StringVarP(&flagFormat, "format", "f", "pretty", "Output format (pretty, line, sr)")
 }
 
 type requestOptions struct {
@@ -52,6 +61,7 @@ type requestOptions struct {
 	suppressResponseBody bool
 	oneTimeVars          map[string]string
 	scrapers             []suyac.VarScraper
+	format               format
 }
 
 var requestCmd = &cobra.Command{
@@ -136,6 +146,23 @@ func requestFlagsToOptions() (requestOptions, error) {
 		return opts, fmt.Errorf("variable symbol cannot be empty")
 	}
 
+	// check format
+	switch strings.ToLower(flagFormat) {
+	case "pretty":
+		opts.format = formatPretty
+	case "sr":
+		opts.format = formatLine
+
+		// check if user is trying to turn on things that aren't allowed
+		if flagOutputRequest || flagOutputResponseHeaders || flagSuppressResponseBody || flagOutputCaptures {
+			return opts, fmt.Errorf("format 'sr' only allows status line and response body; use format 'line' for control over output")
+		}
+	case "line":
+		opts.format = formatLine
+	default:
+		return opts, fmt.Errorf("invalid format %q; must be one of pretty, line, or sr", flagFormat)
+	}
+
 	// check get vars
 	if len(flagGetVars) > 0 {
 		scrapers := []suyac.VarScraper{}
@@ -206,6 +233,11 @@ func requestFlagsToOptions() (requestOptions, error) {
 
 // invokeRequest receives named vars and checked/defaulted requestOptions.
 func invokeRequest(method, url, varSymbol string, opts requestOptions) error {
+	const (
+		lineDelimStart = ">>>"
+		lineDelimEnd   = "<<<"
+	)
+
 	if varSymbol == "" {
 		return fmt.Errorf("variable symbol cannot be empty")
 	}
@@ -241,12 +273,23 @@ func invokeRequest(method, url, varSymbol string, opts requestOptions) error {
 			return fmt.Errorf("dump request: %w", err)
 		}
 
-		fmt.Println("------------------- REQUEST -------------------")
+		if opts.format == formatPretty {
+			fmt.Println("------------------- REQUEST -------------------")
+		} else if opts.format == formatLine {
+			fmt.Println(lineDelimStart + " REQUEST")
+		}
+
 		fmt.Println(string(reqBytes))
-		if req.Body == nil || req.Body == http.NoBody {
+
+		if opts.format == formatPretty && req.Body == nil || req.Body == http.NoBody {
 			fmt.Println("(no request body)")
 		}
-		fmt.Println("----------------- END REQUEST -----------------")
+
+		if opts.format == formatPretty {
+			fmt.Println("----------------- END REQUEST -----------------")
+		} else if opts.format == formatLine {
+			fmt.Println(lineDelimEnd)
+		}
 	}
 
 	resp, caps, err := client.SendRequest(req)
@@ -270,11 +313,25 @@ func invokeRequest(method, url, varSymbol string, opts requestOptions) error {
 
 	// output the captures if requested
 	if opts.outputCaptures {
-		fmt.Println("----------------- VAR CAPTURES ----------------")
-		for k, v := range caps {
-			fmt.Printf("%s: %s\n", k, v)
+		if opts.format == formatPretty {
+			fmt.Println("----------------- VAR CAPTURES ----------------")
+		} else if opts.format == formatLine {
+			fmt.Println(lineDelimStart + " VARS")
 		}
-		fmt.Println("-----------------------------------------------")
+
+		for k, v := range caps {
+			if opts.format == formatPretty {
+				fmt.Printf("%s: %s\n", k, v)
+			} else if opts.format == formatLine {
+				fmt.Printf("%s %s\n", k, v)
+			}
+		}
+
+		if opts.format == formatPretty {
+			fmt.Println("-----------------------------------------------")
+		} else if opts.format == formatLine {
+			fmt.Println(lineDelimEnd)
+		}
 	}
 
 	// output the status line
@@ -282,7 +339,11 @@ func invokeRequest(method, url, varSymbol string, opts requestOptions) error {
 
 	// output the response headers if requested
 	if opts.outputHeaders {
-		fmt.Println("------------------- HEADERS -------------------")
+		if opts.format == formatPretty {
+			fmt.Println("------------------- HEADERS -------------------")
+		} else if opts.format == formatLine {
+			fmt.Println(lineDelimStart + " HEADERS")
+		}
 
 		// alphabetize the headers
 		keys := make([]string, 0, len(resp.Header))
@@ -294,11 +355,16 @@ func invokeRequest(method, url, varSymbol string, opts requestOptions) error {
 		for _, k := range keys {
 			vals := resp.Header[k]
 			for _, v := range vals {
+				// works for both pretty and line formats
 				fmt.Printf("%s: %s\n", k, v)
 			}
 		}
 
-		fmt.Println("-----------------------------------------------")
+		if opts.format == formatPretty {
+			fmt.Println("-----------------------------------------------")
+		} else if opts.format == formatLine {
+			fmt.Println(lineDelimEnd)
+		}
 	}
 
 	// output the response body, if any
@@ -308,11 +374,13 @@ func invokeRequest(method, url, varSymbol string, opts requestOptions) error {
 			if err != nil {
 				return fmt.Errorf("read response body: %w", err)
 			}
-			if len(entireBody) > 0 {
-				fmt.Println(string(entireBody))
-			}
+
+			// works for both pretty and line formats
+			fmt.Println(string(entireBody))
 		} else {
-			fmt.Println("(no response body)")
+			if opts.format == formatPretty {
+				fmt.Println("(no response body)")
+			}
 		}
 	}
 

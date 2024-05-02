@@ -368,7 +368,7 @@ func (r *RESTClient) CreateRequest(method string, url string, data []byte, hdrs 
 
 	req, err := http.NewRequest(method, url, payload)
 	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
+		return nil, err
 	}
 
 	// find every variable in headers and replace it with the value from r.Vars (or return error if encountering invalid var)
@@ -430,9 +430,10 @@ func (r *RESTClient) SendRequest(req *http.Request) (*http.Response, map[string]
 
 func (r *RESTClient) Substitute(s string) (string, error) {
 	// find every variable in s and replace it with the value from r.Vars (or return error if not)
-	expr := regexp.QuoteMeta(r.VarPrefix) + `{[a-zA-Z0-9_]+}`
+	expr := regexp.QuoteMeta(r.VarPrefix + "{")
 	expr += `([a-zA-Z0-9_]+)`
 	expr += regexp.QuoteMeta("}")
+
 	rx, err := regexp.Compile(expr)
 	if err != nil {
 		return "", fmt.Errorf("compile regular expression: %w", err)

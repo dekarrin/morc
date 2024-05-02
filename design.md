@@ -11,10 +11,13 @@ Example executions:
 updating only the items that the server sends back. File is created if not
 exists. Overrides any defaults.
 
--V - read data in the given path/offset and store it in the state file in a var.
-Useless without -c. form is "name::2,4" for a byte offset (from 2-4 in example)
+-S - read data in the given path/offset and store it in the State file in a var.
+Combine with --output-captures to see the ones obtained.
+Form is "name::2,4" for a byte offset (from 2-4 in example)
 or "name:/path[3]" for json object path using jq-ish syntax but supporting only
 indexes or exact object names.capture
+
+-v - supply a variable in key:value format.
 
 -H - include a header with the given value. form is "Header-name: value".
 Multiple headers with the same name may be specified. Use $ sign to reference a

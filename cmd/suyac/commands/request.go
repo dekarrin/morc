@@ -19,6 +19,9 @@ var (
 	flagBodyData              string
 	flagVarSymbol             string
 	flagOutputResponseHeaders bool
+	flagOutputCaptures        bool
+	flagGetVars               []string
+	flagVars                  []string
 )
 
 var requestCmd = &cobra.Command{
@@ -94,19 +97,51 @@ func addRequestFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVarP(&flagReadStateFile, "read-state", "c", "", "Read and use the cookies and vars from the given file")
 	cmd.PersistentFlags().StringArrayVarP(&flagHeaders, "header", "H", []string{}, "Add a header to the request")
 	cmd.PersistentFlags().StringVarP(&flagBodyData, "data", "d", "", "Add the given data as a body to the request; prefix with @ to read data from a file")
-	cmd.PersistentFlags().StringVarP(&flagVarSymbol, "var-symbol", "v", "$", "The symbol to use for variable substitution")
-	cmd.PersistentFlags().BoolVarP(&flagOutputResponseHeaders, "output-headers", "o", false, "Output the headers of the response")
+	cmd.PersistentFlags().StringVarP(&flagVarSymbol, "var-symbol", "V", "$", "The symbol to use for variable substitution")
+	cmd.PersistentFlags().BoolVarP(&flagOutputResponseHeaders, "headers", "o", false, "Output the headers of the response")
+	cmd.PersistentFlags().BoolVarP(&flagOutputCaptures, "captures", "C", false, "Output the captures from the response")
+	cmd.PersistentFlags().StringArrayVarP(&flagGetVars, "get-var", "G", []string{}, "Get a variable's value from the response. Format is name::start,end for byte offset or name:path[0].to.value (jq-ish syntax)")
+	cmd.PersistentFlags().StringArrayVarP(&flagVars, "var", "v", []string{}, "Temporarily set a variable's value for the current request only. Format is name:value")
 }
 
 func requestFlagsToOptions() (requestOptions, error) {
 	opts := requestOptions{
-		stateFileIn:   flagReadStateFile,
-		stateFileOut:  flagWriteStateFile,
-		outputHeaders: flagOutputResponseHeaders,
+		stateFileIn:    flagReadStateFile,
+		stateFileOut:   flagWriteStateFile,
+		outputHeaders:  flagOutputResponseHeaders,
+		outputCaptures: flagOutputCaptures,
 	}
 
 	if flagVarSymbol == "" {
 		return opts, fmt.Errorf("variable symbol cannot be empty")
+	}
+
+	// check get vars
+	if len(flagGetVars) > 0 {
+		scrapers := []suyac.VarScraper{}
+
+		for idx, gv := range flagGetVars {
+			scraper, err := suyac.ParseVarScraper(gv)
+			if err != nil {
+				return opts, fmt.Errorf("get-var #%d (%q): %w", idx+1, gv, err)
+			}
+			scrapers = append(scrapers, scraper)
+		}
+
+		opts.captures = scrapers
+	}
+
+	// check vars
+	if len(flagVars) > 0 {
+		oneTimeVars := make(map[string]string)
+		for idx, v := range flagVars {
+			parts := strings.SplitN(v, ":", 2)
+			if len(parts) != 2 {
+				return opts, fmt.Errorf("var #%d (%q) is not in format key: value", idx+1, v)
+			}
+			oneTimeVars[parts[0]] = parts[1]
+		}
+		opts.oneTimeVars = oneTimeVars
 	}
 
 	// check headers and load into an http.Header
@@ -117,11 +152,11 @@ func requestFlagsToOptions() (requestOptions, error) {
 			// split the header into key and value
 			parts := strings.SplitN(h, ":", 2)
 			if len(parts) != 2 {
-				return opts, fmt.Errorf("header %d (%q) is not in format key: value", idx, h)
+				return opts, fmt.Errorf("header #%d (%q) is not in format key: value", idx+1, h)
 			}
 			canonKey := http.CanonicalHeaderKey(strings.TrimSpace(parts[0]))
 			if canonKey == "" {
-				return opts, fmt.Errorf("header %d (%q) does not have a valid header key", idx, h)
+				return opts, fmt.Errorf("header #%d (%q) does not have a valid header key", idx+1, h)
 			}
 			value := strings.TrimSpace(parts[1])
 			headers.Add(canonKey, value)
@@ -150,11 +185,14 @@ func requestFlagsToOptions() (requestOptions, error) {
 }
 
 type requestOptions struct {
-	stateFileOut  string
-	stateFileIn   string
-	headers       http.Header
-	bodyData      []byte
-	outputHeaders bool
+	stateFileOut   string
+	stateFileIn    string
+	headers        http.Header
+	bodyData       []byte
+	outputHeaders  bool
+	outputCaptures bool
+	oneTimeVars    map[string]string
+	captures       []suyac.VarScraper
 }
 
 // invokeRequest receives named vars and checked/defaulted requestOptions.
@@ -180,7 +218,12 @@ func invokeRequest(method, url, varSymbol string, opts requestOptions) error {
 		}
 	}
 
-	resp, err := client.Request(method, url, opts.bodyData, opts.headers)
+	req, err := client.MakeRequest(method, url, opts.bodyData, opts.headers)
+	if err != nil {
+		return fmt.Errorf("make request: %w", err)
+	}
+
+	resp, caps, err := client.SendRequest(req)
 	if err != nil {
 		return fmt.Errorf("send request: %w", err)
 	}
@@ -197,6 +240,15 @@ func invokeRequest(method, url, varSymbol string, opts requestOptions) error {
 		if err := client.WriteState(stateOut); err != nil {
 			return fmt.Errorf("write state file: %w", err)
 		}
+	}
+
+	// output the captures if requested
+	if opts.outputCaptures {
+		fmt.Println("----------------- VAR CAPTURES ----------------")
+		for k, v := range caps {
+			fmt.Printf("%s: %s\n", k, v)
+		}
+		fmt.Println("-----------------------------------------------")
 	}
 
 	// output the status line

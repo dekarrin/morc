@@ -9,6 +9,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -38,6 +39,190 @@ func (t TraversalStep) Traverse(data interface{}) (interface{}, error) {
 	default:
 		return nil, fmt.Errorf("can't traverse %T", data)
 	}
+}
+
+func ParseVarScraper(s string) (VarScraper, error) {
+	// Parse var scraper specification strings of the form "NAME::START,END" for
+	// byte offsets and "NAME:key1.key2[index1]...keyN" for JSON traversal with array
+	// indexes and object keys in a syntax similar to jq.
+
+	// first, split name from spec:
+	parts := strings.SplitN(s, ":", 2)
+	if len(parts) != 2 {
+		return VarScraper{}, fmt.Errorf("not in NAME:SPEC format")
+	}
+
+	name := parts[0]
+
+	// validate that name does not contain any invalid characters; it must be
+	// alphanumeric or underscore
+	if !regexp.MustCompile(`^[a-zA-Z0-9_]+$`).MatchString(name) {
+		return VarScraper{}, fmt.Errorf("name %q contains invalid characters", name)
+	}
+
+	spec := parts[1]
+
+	// okay, are we looking at a byte offset or a JSON traversal?
+	if strings.HasPrefix(spec, ":") {
+		// it is a byte offset of the form ":START,END"
+		offsets := strings.SplitN(spec[1:], ",", 2)
+		if len(offsets) != 2 {
+			return VarScraper{}, fmt.Errorf("%q is not in :START,END format", spec)
+		}
+
+		start, err := strconv.Atoi(offsets[0])
+		if err != nil {
+			return VarScraper{}, fmt.Errorf("%q: start offset: %w", spec, err)
+		}
+
+		end, err := strconv.Atoi(offsets[1])
+		if err != nil {
+			return VarScraper{}, fmt.Errorf("%q: end offset: %w", spec, err)
+		}
+
+		return VarScraper{
+			Name:        name,
+			OffsetStart: start,
+			OffsetEnd:   end,
+		}, nil
+	}
+
+	// otherwise, it must be a JSON traversal. Use . as the path separator, and
+	// [index] to for array indexes. Space chars and dots in keys are only
+	// allowed if key is quoted with double-quotes. Unquoted keys can contain
+	// any other character. Indexes must be integers. Quoted keys may contain a
+	// backslash to escape a quote or backslash.
+
+	// to make it easier, ensure that spec starts with a dot.
+	if !strings.HasPrefix(spec, ".") {
+		spec = "." + spec
+	}
+
+	steps := []TraversalStep{}
+	var currentStep TraversalStep
+
+	type mode int64
+
+	const (
+		none mode = iota
+		inKey
+		inQuotedKey
+		inIndex
+	)
+
+	var curMode mode
+
+	var curSymbol strings.Builder
+
+	specR := []rune(spec)
+	for i := 0; i < len(specR); i++ {
+		ch := specR[i]
+
+		switch curMode {
+		case none:
+			if ch == '.' {
+				// lookahead to see if in quote
+				if i+1 < len(specR) && specR[i+1] == '"' {
+					curMode = inQuotedKey
+					i++
+				} else {
+					curMode = inKey
+				}
+			} else if ch == '[' {
+				curMode = inIndex
+			} else {
+				return VarScraper{}, fmt.Errorf("invalid character %q at position %d; should be either '.' to specify a key or '[' to specify an index", ch, i)
+			}
+		case inKey:
+			if ch == '.' || ch == '[' {
+				// at end of the key, add it to the steps, reset mode, and continue
+				// parsing at this index
+				symStr := curSymbol.String()
+				if symStr == "" {
+					return VarScraper{}, fmt.Errorf("missing key at position %d", i)
+				}
+				currentStep.Key = symStr
+				steps = append(steps, currentStep)
+				currentStep = TraversalStep{}
+				curSymbol.Reset()
+				curMode = none
+				i--
+			} else if ch == '\\' {
+				// escape character; consume next character
+				i++
+				if i >= len(specR) {
+					return VarScraper{}, fmt.Errorf("escape character at end of string")
+				}
+				curSymbol.WriteRune(specR[i])
+			} else if unicode.IsSpace(ch) {
+				return VarScraper{}, fmt.Errorf("unescaped whitespace character in key at position %d; quote key name or escape whitespace with '\\'", i)
+			} else {
+				curSymbol.WriteRune(ch)
+			}
+		case inQuotedKey:
+			if ch == '"' {
+				// end of quoted key
+				symStr := curSymbol.String()
+				if symStr == "" {
+					return VarScraper{}, fmt.Errorf("missing key at position %d", i)
+				}
+				currentStep.Key = symStr
+				steps = append(steps, currentStep)
+				currentStep = TraversalStep{}
+				curSymbol.Reset()
+				curMode = none
+			} else if ch == '\\' {
+				// escape character; consume next character
+				i++
+				if i >= len(specR) {
+					return VarScraper{}, fmt.Errorf("escape character at end of string")
+				}
+				curSymbol.WriteRune(specR[i])
+			} else {
+				curSymbol.WriteRune(ch)
+			}
+		case inIndex:
+			if ch == ']' {
+				// end of index
+				symStr := curSymbol.String()
+				if symStr == "" {
+					return VarScraper{}, fmt.Errorf("missing index at position %d", i)
+				}
+				index, err := strconv.Atoi(symStr)
+				if err != nil {
+					return VarScraper{}, fmt.Errorf("invalid index %q: %w", symStr, err)
+				}
+				currentStep.Index = index
+				steps = append(steps, currentStep)
+				currentStep = TraversalStep{}
+				curSymbol.Reset()
+				curMode = none
+			}
+		default:
+			// should never happen
+			return VarScraper{}, fmt.Errorf("invalid mode %d", curMode)
+		}
+	}
+
+	// we should be in mode none at the end, but it is valid to be in mode inKey
+	// as well
+	if curMode == inKey {
+		symStr := curSymbol.String()
+		if symStr == "" {
+			return VarScraper{}, fmt.Errorf("missing key at end of string")
+		}
+		currentStep.Key = symStr
+		steps = append(steps, currentStep)
+	} else if curMode == inQuotedKey {
+		return VarScraper{}, fmt.Errorf("unterminated quoted key at end of string")
+	} else if curMode == inIndex {
+		return VarScraper{}, fmt.Errorf("unterminated index at end of string")
+	}
+
+	return VarScraper{
+		Name:  name,
+		Steps: steps,
+	}, nil
 }
 
 type VarScraper struct {
@@ -125,9 +310,10 @@ func (v VarScraper) Scrape(data []byte) (string, error) {
 
 // Do not use default RESTClient, call NewRESTClient instead.
 type RESTClient struct {
-	HTTP      *http.Client
-	Vars      map[string]string
-	VarPrefix string
+	HTTP         *http.Client
+	Vars         map[string]string
+	VarOverrides map[string]string // Cleared after every call to SendRequest.
+	VarPrefix    string
 
 	Scrapers []VarScraper
 
@@ -155,7 +341,9 @@ func NewRESTClient(cookieLifetime time.Duration) *RESTClient {
 	}
 }
 
-func (r *RESTClient) Request(method string, url string, data []byte, hdrs http.Header) (*http.Response, error) {
+// MakeRequest creates a request to the given endpoint. Values set in Vars and
+// VarOverrides are used to fill any variables in the URL, data, and headers.
+func (r *RESTClient) MakeRequest(method string, url string, data []byte, hdrs http.Header) (*http.Request, error) {
 	// find every variable in url of  and replace it with the value from r.Vars (or return error if encountering invalid var)
 	url, err := r.Substitute(url)
 	if err != nil {
@@ -198,29 +386,42 @@ func (r *RESTClient) Request(method string, url string, data []byte, hdrs http.H
 		}
 	}
 
+	return req, err
+}
+
+// SendRequest sends the given request and returns the response. VarOverrides
+// will be cleared after this is called. Prior to returning, the response is
+// scanned for var captures and those that are captured are stored in Vars and
+// re
+func (r *RESTClient) SendRequest(req *http.Request) (*http.Response, map[string]string, error) {
 	resp, err := r.HTTP.Do(req)
 	if err != nil {
-		return resp, err
+		return resp, nil, err
 	}
 
 	// we need to load the entire response body into memory so we can scrape it
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return resp, fmt.Errorf("read response body: %w", err)
+		return resp, nil, fmt.Errorf("read response body: %w", err)
 	}
 	resp.Body.Close()
 	resp.Body = io.NopCloser(bytes.NewBuffer(respBody))
 
 	// scrape vars from response
+	capturedVars := make(map[string]string)
 	for _, scraper := range r.Scrapers {
 		value, err := scraper.Scrape(respBody)
 		if err != nil {
-			return resp, fmt.Errorf("scrape %s: %w", scraper.Name, err)
+			return resp, nil, fmt.Errorf("scrape %s: %w", scraper.Name, err)
 		}
+		capturedVars[scraper.Name] = value
 		r.Vars[scraper.Name] = value
 	}
 
-	return resp, nil
+	// clear var overrides
+	r.VarOverrides = map[string]string{}
+
+	return resp, capturedVars, nil
 }
 
 func (r *RESTClient) Substitute(s string) (string, error) {
@@ -252,10 +453,15 @@ func (r *RESTClient) Substitute(s string) (string, error) {
 
 		// get the variable name
 		varName := s[pair[0]+prefixLen+1 : pair[1]-1]
-		// get the value from r.Vars
-		varValue, ok := r.Vars[varName]
-		if !ok {
-			return "", fmt.Errorf("variable %s not found", varName)
+
+		// get the value from r.VarOverrides followed by r.Vars
+		var varValue string
+		var ok bool
+		if varValue, ok = r.VarOverrides[varName]; !ok {
+			varValue, ok = r.Vars[varName]
+			if !ok {
+				return "", fmt.Errorf("variable %s not found", varName)
+			}
 		}
 
 		// add replaced value and any prior content to updated

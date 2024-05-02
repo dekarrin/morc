@@ -45,12 +45,23 @@ func stateShow(filename string) error {
 
 	fmt.Printf("State data file %s:\n", filename)
 	fmt.Printf("Cookies:\n")
-	for _, v := range state.Cookies {
-		fmt.Printf(" * %s\n", v.String())
+	if len(state.Cookies) == 0 {
+		fmt.Printf("(none)\n")
+	} else {
+		for _, v := range state.Cookies {
+			fmt.Printf(" * %s:\n", v.URL)
+			for _, cook := range v.Cookies {
+				fmt.Printf("   * %s\n", cook.String())
+			}
+		}
 	}
 	fmt.Printf("Variables:\n")
-	for k, v := range state.Vars {
-		fmt.Printf(" * %s: %s\n", k, v)
+	if len(state.Vars) == 0 {
+		fmt.Printf("(none)\n")
+	} else {
+		for k, v := range state.Vars {
+			fmt.Printf(" * %s: %s\n", k, v)
+		}
 	}
 
 	return nil

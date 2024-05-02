@@ -100,10 +100,10 @@ func addRequestFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringArrayVarP(&flagHeaders, "header", "H", []string{}, "Add a header to the request")
 	cmd.PersistentFlags().StringVarP(&flagBodyData, "data", "d", "", "Add the given data as a body to the request; prefix with @ to read data from a file")
 	cmd.PersistentFlags().StringVarP(&flagVarSymbol, "var-symbol", "V", "$", "The symbol to use for variable substitution")
-	cmd.PersistentFlags().BoolVarP(&flagOutputResponseHeaders, "headers", "o", false, "Output the headers of the response")
-	cmd.PersistentFlags().BoolVarP(&flagOutputCaptures, "captures", "C", false, "Output the captures from the response")
-	cmd.PersistentFlags().BoolVarP(&flagOutputRequest, "request", "r", false, "Output the filled request prior to sending it")
-	cmd.PersistentFlags().StringArrayVarP(&flagGetVars, "get-var", "G", []string{}, "Get a variable's value from the response. Format is name::start,end for byte offset or name:path[0].to.value (jq-ish syntax)")
+	cmd.PersistentFlags().BoolVarP(&flagOutputResponseHeaders, "headers", "", false, "Output the headers of the response")
+	cmd.PersistentFlags().BoolVarP(&flagOutputCaptures, "captures", "", false, "Output the captures from the response")
+	cmd.PersistentFlags().BoolVarP(&flagOutputRequest, "request", "", false, "Output the filled request prior to sending it")
+	cmd.PersistentFlags().StringArrayVarP(&flagGetVars, "capture-var", "C", []string{}, "Get a variable's value from the response. Format is name::start,end for byte offset or name:path[0].to.value (jq-ish syntax)")
 	cmd.PersistentFlags().StringArrayVarP(&flagVars, "var", "v", []string{}, "Temporarily set a variable's value for the current request only. Format is name:value")
 }
 

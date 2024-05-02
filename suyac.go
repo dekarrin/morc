@@ -80,6 +80,10 @@ func ParseVarScraper(s string) (VarScraper, error) {
 			return VarScraper{}, fmt.Errorf("%q: end offset: %w", spec, err)
 		}
 
+		if end <= start {
+			return VarScraper{}, fmt.Errorf("end offset %d is less than or equal to start offset %d", end, start)
+		}
+
 		return VarScraper{
 			Name:        name,
 			OffsetStart: start,

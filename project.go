@@ -48,13 +48,57 @@ type marshaledProject struct {
 	Config    Settings                   `json:"config"`
 }
 
+func (p Project) PersistHistoryToDisk() error {
+	histDataBytes, err := json.Marshal(p.History)
+	if err != nil {
+		return fmt.Errorf("marshal history data: %w", err)
+	}
+
+	histPath := p.Config.HistFile
+	if histPath == "" {
+		histPath = DefaultHistoryPath
+	}
+
+	if err := os.MkdirAll(filepath.Dir(histPath), 0755); err != nil {
+		return fmt.Errorf("create dir for history file: %w", err)
+	}
+
+	if err := os.WriteFile(histPath, histDataBytes, 0644); err != nil {
+		return fmt.Errorf("write history file: %w", err)
+	}
+
+	return nil
+}
+
+func (p Project) PersistSessionToDisk() error {
+	seshDataBytes, err := json.Marshal(p.Session)
+	if err != nil {
+		return fmt.Errorf("marshal session data: %w", err)
+	}
+
+	seshPath := p.Config.SeshFile
+	if seshPath == "" {
+		seshPath = DefaultSessionPath
+	}
+
+	if err := os.MkdirAll(filepath.Dir(seshPath), 0755); err != nil {
+		return fmt.Errorf("create dir for session file: %w", err)
+	}
+
+	if err := os.WriteFile(seshPath, seshDataBytes, 0644); err != nil {
+		return fmt.Errorf("write session file: %w", err)
+	}
+
+	return nil
+}
+
 // PersistToDisk writes up to 3 files; one for the project, one for the session,
 // and one for the history. If p.ProjFile is empty, it will be written to the
 // current working directory at path .suyac/project.json. If p.SeshFile is
 // empty, it will be written to the current working directory at path
 // .suyac/session.json. If p.HistFile is empty, it will be written to the
 // current working directory at path .suyac/history.json.
-func (p Project) PersistToDisk() error {
+func (p Project) PersistToDisk(all bool) error {
 	// get data to persist
 	m := marshaledProject{
 		Name:      p.Name,
@@ -68,52 +112,96 @@ func (p Project) PersistToDisk() error {
 	if err != nil {
 		return fmt.Errorf("marshal project data: %w", err)
 	}
-	seshDataBytes, err := json.Marshal(p.Session)
-	if err != nil {
-		return fmt.Errorf("marshal session data: %w", err)
-	}
-	histDataBytes, err := json.Marshal(p.History)
-	if err != nil {
-		return fmt.Errorf("marshal history data: %w", err)
-	}
 
 	// check file paths and see if they need to be defaulted
 	projPath := p.Config.ProjFile
 	if projPath == "" {
 		projPath = DefaultProjectPath
 	}
-	seshPath := p.Config.SeshFile
-	if seshPath == "" {
-		seshPath = DefaultSessionPath
-	}
-	histPath := p.Config.HistFile
-	if histPath == "" {
-		histPath = DefaultHistoryPath
-	}
 
 	// call mkdir -p on the paths
 	if err := os.MkdirAll(filepath.Dir(projPath), 0755); err != nil {
 		return fmt.Errorf("create dir for project file: %w", err)
-	}
-	if err := os.MkdirAll(filepath.Dir(seshPath), 0755); err != nil {
-		return fmt.Errorf("create dir for session file: %w", err)
-	}
-	if err := os.MkdirAll(filepath.Dir(histPath), 0755); err != nil {
-		return fmt.Errorf("create dir for history file: %w", err)
 	}
 
 	// write out the data for project, session, and history
 	if err := os.WriteFile(projPath, projDataBytes, 0644); err != nil {
 		return fmt.Errorf("write project file: %w", err)
 	}
-	if err := os.WriteFile(seshPath, seshDataBytes, 0644); err != nil {
-		return fmt.Errorf("write session file: %w", err)
-	}
-	if err := os.WriteFile(histPath, histDataBytes, 0644); err != nil {
-		return fmt.Errorf("write history file: %w", err)
+
+	if all {
+		if err := p.PersistSessionToDisk(); err != nil {
+			return fmt.Errorf("persist session: %w", err)
+		}
+
+		if err := p.PersistHistoryToDisk(); err != nil {
+			return fmt.Errorf("persist history: %w", err)
+		}
 	}
 
 	return nil
+}
+
+func LoadProjectFromDisk(projFilename string, all bool) (Project, error) {
+	projData, err := os.ReadFile(projFilename)
+	if err != nil {
+		return Project{}, fmt.Errorf("read project file: %w", err)
+	}
+
+	var m marshaledProject
+	if err := json.Unmarshal(projData, &m); err != nil {
+		return Project{}, fmt.Errorf("unmarshal project data: %w", err)
+	}
+
+	p := Project{
+		Name:      m.Name,
+		Templates: m.Templates,
+		Flows:     m.Flows,
+		Vars:      m.Vars,
+		Config:    m.Config,
+	}
+
+	if all {
+		p.Session, err = LoadSessionFromDisk(p.Config.SeshFile)
+		if err != nil {
+			return Project{}, fmt.Errorf("load session: %w", err)
+		}
+
+		p.History, err = LoadHistoryFromDisk(p.Config.HistFile)
+		if err != nil {
+			return Project{}, fmt.Errorf("load history: %w", err)
+		}
+	}
+
+	return p, nil
+}
+
+func LoadSessionFromDisk(seshFilename string) (Session, error) {
+	seshData, err := os.ReadFile(seshFilename)
+	if err != nil {
+		return Session{}, fmt.Errorf("read session file: %w", err)
+	}
+
+	var s Session
+	if err := json.Unmarshal(seshData, &s); err != nil {
+		return Session{}, fmt.Errorf("unmarshal session data: %w", err)
+	}
+
+	return s, nil
+}
+
+func LoadHistoryFromDisk(histFilename string) ([]HistoryEntry, error) {
+	histData, err := os.ReadFile(histFilename)
+	if err != nil {
+		return nil, fmt.Errorf("read history file: %w", err)
+	}
+
+	var h []HistoryEntry
+	if err := json.Unmarshal(histData, &h); err != nil {
+		return nil, fmt.Errorf("unmarshal history data: %w", err)
+	}
+
+	return h, nil
 }
 
 type Session struct {

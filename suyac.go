@@ -541,9 +541,9 @@ func (r *RESTClient) ReadState(rd io.Reader) error {
 }
 
 type SetCookiesCall struct {
-	Time    time.Time
-	URL     *url.URL
-	Cookies []*http.Cookie
+	Time    time.Time      `json:"time"`
+	URL     *url.URL       `json:"url"`
+	Cookies []*http.Cookie `json:"cookies"`
 }
 
 func (sc SetCookiesCall) String() string {

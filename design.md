@@ -3,27 +3,6 @@ planned work at a high level.
 
 
 
-## Main Things
-
-
-## Output Control
-Need to be able to specify exactly what is shown.
-
-Options:
-* human - current state
-* line-based - takes same extra output/suppress options but puts special separator between each (probably line-based).
-* json - everything is in JSON
-
-
-SHORT-STATUS - contains 'small' things in response like status, code, etc as specified by cli flags.
-Whatever else there is, short-status comes first, everything else next, then response body at
-each item that is not short status starts with a line that has a one-word desc of what is next and unambiguously starts
-with a thing that will not be in a line of the request, user-settable, and ends with a similar thing
-
-
-* json - everything is contained in JSON.
-
-
 
 ## project vs sessions:
 
@@ -37,3 +16,24 @@ session location is specified. Sessions should also include request/response
 history.
 * suyac env read path/to/filename
 - read state data and what is in it without actually doing anyfin
+
+
+PROJECT:
+contains:
+- request entries
+  - captures
+  - name
+  - body
+  - url
+  - headers
+  - auth-flow (pre-call flow done to do any auth required)
+- flows
+  - reqentrys
+- environments
+  - variables
+- current env
+- history
+- sesh-file
+
+When a PROJECT is referenced, `suyac send ENTRYNAME` can be used to fire a
+request off.

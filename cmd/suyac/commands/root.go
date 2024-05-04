@@ -4,8 +4,15 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/dekarrin/suyac/cmd/suyac/commands/proj"
+	"github.com/dekarrin/suyac/cmd/suyac/commands/req"
 	"github.com/spf13/cobra"
 )
+
+func init() {
+	rootCmd.AddCommand(proj.RootCmd)
+	rootCmd.AddCommand(req.RootCmd)
+}
 
 var rootCmd = &cobra.Command{
 	Use:   "suyac",

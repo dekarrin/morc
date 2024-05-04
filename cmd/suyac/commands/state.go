@@ -21,11 +21,11 @@ var stateCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		filename := args[0]
-		return stateShow(filename)
+		return invokeStateShow(filename)
 	},
 }
 
-func stateShow(filename string) error {
+func invokeStateShow(filename string) error {
 	// open a buffered reader on the file
 	fRaw, err := os.Open(filename)
 	if err != nil {

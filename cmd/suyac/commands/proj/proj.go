@@ -1,4 +1,4 @@
-package commands
+package proj
 
 import (
 	"fmt"
@@ -12,12 +12,10 @@ var (
 )
 
 func init() {
-	projCmd.PersistentFlags().StringVarP(&flagProjectFile, "file", "F", suyac.DefaultProjectPath, "Use the specified file for project data instead of "+suyac.DefaultProjectPath)
-
-	rootCmd.AddCommand(projCmd)
+	RootCmd.PersistentFlags().StringVarP(&flagProjectFile, "file", "F", suyac.DefaultProjectPath, "Use the specified file for project data instead of "+suyac.DefaultProjectPath)
 }
 
-var projCmd = &cobra.Command{
+var RootCmd = &cobra.Command{
 	Use:   "proj",
 	Short: "Show contents of current project",
 	Long:  "Show the contents of the suyac project referred to in the .suyac dir in the current directory, or use -F to read a file in another location.",
@@ -28,11 +26,11 @@ var projCmd = &cobra.Command{
 		if filename == "" {
 			return fmt.Errorf("project file is set to empty string")
 		}
-		return projShow(filename)
+		return invokeShow(filename)
 	},
 }
 
-func projShow(filename string) error {
+func invokeShow(filename string) error {
 	proj, err := suyac.LoadProjectFromDisk(filename, true)
 	if err != nil {
 		return err

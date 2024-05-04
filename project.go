@@ -304,10 +304,23 @@ type RequestTemplate struct {
 	AuthFlow string
 }
 
+func (r RequestTemplate) Sendable() bool {
+	return r.URL != "" && r.Method != ""
+}
+
+// VarStore is a collection of variables that can be accessed by name within
+// multiple environments. The zero value of this type is not valid; create a
+// new VarStore with NewVarStore().
 type VarStore struct {
 	Environment string
 
 	envs map[string]map[string]string
+}
+
+func NewVarStore() VarStore {
+	return VarStore{
+		envs: make(map[string]map[string]string),
+	}
 }
 
 type marshaledVarStore struct {

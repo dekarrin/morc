@@ -237,7 +237,7 @@ type VarScraper struct {
 }
 
 func (v VarScraper) String() string {
-	s := fmt.Sprintf("VarScraper{%s from ", v.Name)
+	s := fmt.Sprintf("%s from ", v.Name)
 	if len(v.Steps) > 0 {
 		for _, step := range v.Steps {
 			s += step.String()
@@ -245,7 +245,7 @@ func (v VarScraper) String() string {
 	} else {
 		s += fmt.Sprintf("offset %d,%d", v.OffsetStart, v.OffsetEnd)
 	}
-	return s + "}"
+	return s
 }
 
 func (v VarScraper) Scrape(data []byte) (string, error) {

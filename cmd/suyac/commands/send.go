@@ -24,7 +24,6 @@ func init() {
 	sendCmd.PersistentFlags().BoolVarP(&flagOutputCaptures, "captures", "", false, "Output the captures from the response")
 	sendCmd.PersistentFlags().BoolVarP(&flagSuppressResponseBody, "no-body", "", false, "Suppress the output of the response body")
 	sendCmd.PersistentFlags().BoolVarP(&flagOutputRequest, "request", "", false, "Output the filled request prior to sending it")
-	sendCmd.PersistentFlags().BoolVarP(&flagSuppressResponseBody, "no-body", "", false, "Suppress the output of the response body")
 
 	rootCmd.AddCommand(sendCmd)
 }

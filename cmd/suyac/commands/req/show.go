@@ -19,12 +19,12 @@ var (
 )
 
 func init() {
-	showCmd.LocalFlags().BoolVarP(&flagBodyOnly, "body", "", false, "Show only the body of the request")
-	showCmd.LocalFlags().BoolVarP(&flagMethodOnly, "method", "", false, "Show only the method of the request")
-	showCmd.LocalFlags().BoolVarP(&flagURLOnly, "url", "", false, "Show only the URL of the request")
-	showCmd.LocalFlags().BoolVarP(&flagHeadersOnly, "headers", "", false, "Show only the headers of the request")
-	showCmd.LocalFlags().BoolVarP(&flagCapturesOnly, "captures", "", false, "Show only the var captures of the request")
-	showCmd.LocalFlags().BoolVarP(&flagAuthFlowOnly, "auth", "", false, "Show only the auth flow of the request")
+	showCmd.PersistentFlags().BoolVarP(&flagBodyOnly, "body", "", false, "Show only the body of the request")
+	showCmd.PersistentFlags().BoolVarP(&flagMethodOnly, "method", "", false, "Show only the method of the request")
+	showCmd.PersistentFlags().BoolVarP(&flagURLOnly, "url", "", false, "Show only the URL of the request")
+	showCmd.PersistentFlags().BoolVarP(&flagHeadersOnly, "headers", "", false, "Show only the headers of the request")
+	showCmd.PersistentFlags().BoolVarP(&flagCapturesOnly, "captures", "", false, "Show only the var captures of the request")
+	showCmd.PersistentFlags().BoolVarP(&flagAuthFlowOnly, "auth", "", false, "Show only the auth flow of the request")
 	showCmd.MarkFlagsMutuallyExclusive("body", "method", "url", "headers", "captures", "auth")
 
 	RootCmd.AddCommand(showCmd)

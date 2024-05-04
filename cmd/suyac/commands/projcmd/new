@@ -1,0 +1,22 @@
+package projcmd
+
+import (
+	"fmt"
+
+	"github.com/spf13/cobra"
+)
+
+var newCmd = &cobra.Command{
+	Use:   "new",
+	Short: "Create a new suyac project file",
+	Long:  "Create a new suyac project file. Only the project file is created, not a session or history file",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		filename := flagProjectFile
+
+		if filename == "" {
+			return fmt.Errorf("project file is set to empty string")
+		}
+		return projShow(filename)
+	},
+}

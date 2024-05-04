@@ -21,6 +21,10 @@ const (
 	DefaultProjectPath = ".suyac/project.json"
 	DefaultSessionPath = ".suyac/session.json"
 	DefaultHistoryPath = ".suyac/history.json"
+
+	FiletypeProject = "SUYAC/PROJECT"
+	FiletypeSession = "SUYAC/SESSION"
+	FiletypeHistory = "SUYAC/HISTORY"
 )
 
 type Settings struct {
@@ -46,10 +50,16 @@ type marshaledProject struct {
 	Flows     map[string]Flow            `json:"flows"`
 	Vars      VarStore                   `json:"vars"`
 	Config    Settings                   `json:"config"`
+	Filetype  string                     `json:"filetype"`
 }
 
 func (p Project) PersistHistoryToDisk() error {
-	histDataBytes, err := json.Marshal(p.History)
+	m := marshaledHistory{
+		Filetype: FiletypeHistory,
+		Entries:  p.History,
+	}
+
+	histDataBytes, err := json.Marshal(m)
 	if err != nil {
 		return fmt.Errorf("marshal history data: %w", err)
 	}
@@ -92,15 +102,16 @@ func (p Project) PersistSessionToDisk() error {
 	return nil
 }
 
-// PersistToDisk writes up to 3 files; one for the project, one for the session,
+// PersistToDisk writes up to 3 files; one for the suite, one for the session,
 // and one for the history. If p.ProjFile is empty, it will be written to the
-// current working directory at path .suyac/project.json. If p.SeshFile is
+// current working directory at path .suyac/suite.json. If p.SeshFile is
 // empty, it will be written to the current working directory at path
 // .suyac/session.json. If p.HistFile is empty, it will be written to the
 // current working directory at path .suyac/history.json.
 func (p Project) PersistToDisk(all bool) error {
 	// get data to persist
 	m := marshaledProject{
+		Filetype:  FiletypeProject,
 		Name:      p.Name,
 		Templates: p.Templates,
 		Flows:     p.Flows,
@@ -110,7 +121,7 @@ func (p Project) PersistToDisk(all bool) error {
 
 	projDataBytes, err := json.Marshal(m)
 	if err != nil {
-		return fmt.Errorf("marshal project data: %w", err)
+		return fmt.Errorf("marshal suite data: %w", err)
 	}
 
 	// check file paths and see if they need to be defaulted
@@ -121,12 +132,12 @@ func (p Project) PersistToDisk(all bool) error {
 
 	// call mkdir -p on the paths
 	if err := os.MkdirAll(filepath.Dir(projPath), 0755); err != nil {
-		return fmt.Errorf("create dir for project file: %w", err)
+		return fmt.Errorf("create dir for suite file: %w", err)
 	}
 
 	// write out the data for project, session, and history
 	if err := os.WriteFile(projPath, projDataBytes, 0644); err != nil {
-		return fmt.Errorf("write project file: %w", err)
+		return fmt.Errorf("write suite file: %w", err)
 	}
 
 	if all {
@@ -208,12 +219,26 @@ type Session struct {
 	Cookies []SetCookiesCall
 }
 
+// TotalCookieSets returns the total number of individual cookies that this
+// Session has a record of being set across all URLs. This may include the same
+// cookie being set multiple times.
+func (s *Session) TotalCookieSets() int {
+	total := 0
+	for _, c := range s.Cookies {
+		total += len(c.Cookies)
+	}
+	return total
+}
+
 type marshaledSession struct {
-	Cookies []string
+	Filetype string   `json:"filetype"`
+	Cookies  []string `json:"cookies"`
 }
 
 func (s Session) MarshalJSON() ([]byte, error) {
-	var ms marshaledSession
+	ms := marshaledSession{
+		Filetype: FiletypeSession,
+	}
 	for _, c := range s.Cookies {
 		buf := &bytes.Buffer{}
 		rzw, err := rezi.NewWriter(buf, &rezi.Format{Compression: true})
@@ -285,6 +310,32 @@ type VarStore struct {
 	envs map[string]map[string]string
 }
 
+type marshaledVarStore struct {
+	Current string                       `json:"current_environment"`
+	Envs    map[string]map[string]string `json:"environments"`
+}
+
+func (v VarStore) MarshalJSON() ([]byte, error) {
+	m := marshaledVarStore{
+		Current: v.Environment,
+		Envs:    v.envs,
+	}
+
+	return json.Marshal(m)
+}
+
+func (v *VarStore) UnmarshalJSON(data []byte) error {
+	var m marshaledVarStore
+	if err := json.Unmarshal(data, &m); err != nil {
+		return err
+	}
+
+	v.Environment = m.Current
+	v.envs = m.Envs
+
+	return nil
+}
+
 func (v *VarStore) Get(key string) string {
 	if v.envs == nil {
 		v.envs = make(map[string]map[string]string)
@@ -311,6 +362,138 @@ func (v *VarStore) Get(key string) string {
 	return ""
 }
 
+// Count returns the number of variables accessible from the current
+// environment. This includes any in the default environment that are not
+// overridden by the current environment. This will match the number of elements
+// returned by All().
+func (v *VarStore) Count() int {
+	if v.envs == nil {
+		return 0
+	}
+
+	env := v.envs[""]
+	if env != nil {
+		return len(env)
+	}
+
+	return 0
+}
+
+func (v *VarStore) EnvCount() int {
+	if v.envs == nil {
+		return 1 // default env is always considered to exist
+	}
+
+	return len(v.envs)
+}
+
+func (v *VarStore) EnvNames() []string {
+	if v.envs == nil {
+		return []string{""}
+	}
+
+	var names []string
+	for k := range v.envs {
+		names = append(names, k)
+	}
+
+	if _, ok := v.envs[""]; !ok {
+		names = append(names, "") // default env is always considered to exist
+	}
+
+	return names
+}
+
+// Defined returns the names of all variables defined in the current
+// environment. It does not include any vars that are only defined in the
+// default environment.
+func (v *VarStore) Defined() []string {
+	if v.envs == nil {
+		return nil
+	}
+
+	env := v.envs[v.Environment]
+	if env == nil {
+		return nil
+	}
+
+	var keys []string
+	for k := range env {
+		keys = append(keys, k)
+	}
+
+	return keys
+}
+
+// All returns the names of all variables defined between the current
+// environment and the default environment. If a variable is defined in both
+// environments, it will only be included once.
+func (v *VarStore) All() []string {
+	if v.envs == nil {
+		return nil
+	}
+
+	seenKeys := map[string]struct{}{}
+	keys := []string{}
+
+	if env, ok := v.envs[v.Environment]; ok {
+		for k := range env {
+			seenKeys[k] = struct{}{}
+			keys = append(keys, k)
+		}
+	}
+
+	// now include any missing from the default env, if we didn't just do that
+	if v.Environment != "" {
+		if env, ok := v.envs[""]; ok {
+			for k := range env {
+				if _, ok := seenKeys[k]; !ok {
+					keys = append(keys, k)
+				}
+			}
+		}
+	}
+
+	return keys
+}
+
+// Unset removes the variable from the current environemnt. If the current
+// environment is not the default environment, the variable will not be removed
+// from the default environment. Use Remove to remove the variable from all
+// environments.
+//
+// If the current environment *is* the default environment, calling this method
+// has the same effect as calling Remove, as variables are not allowed to exist
+// in only a non-default environment.
+func (v *VarStore) Unset(key string) {
+	if v.envs == nil {
+		return
+	}
+
+	if v.Environment == "" {
+		v.Remove(key)
+		return
+	}
+
+	env := v.envs[v.Environment]
+	if env != nil {
+		delete(env, key)
+	}
+}
+
+// Remove removes the variable from all environments, including the default one.
+func (v *VarStore) Remove(key string) {
+	if v.envs == nil {
+		return
+	}
+
+	for _, env := range v.envs {
+		if env != nil {
+			delete(env, key)
+		}
+	}
+}
+
 func (v *VarStore) Set(key, value string) {
 	if v.envs == nil {
 		v.envs = make(map[string]map[string]string)
@@ -323,6 +506,17 @@ func (v *VarStore) Set(key, value string) {
 	}
 
 	env[key] = value
+
+	// also make shore var exists in default env
+	if v.Environment != "" {
+		env = v.envs[""]
+		if env == nil {
+			env = make(map[string]string)
+			v.envs[""] = env
+		}
+
+		env[key] = ""
+	}
 }
 
 type Flow struct {
@@ -336,6 +530,11 @@ type HistoryEntry struct {
 	RespTime time.Time
 	Request  http.Request
 	Response http.Response
+}
+
+type marshaledHistory struct {
+	Filetype string         `json:"filetype"`
+	Entries  []HistoryEntry `json:"history"`
 }
 
 func (h HistoryEntry) MarshalJSON() ([]byte, error) {

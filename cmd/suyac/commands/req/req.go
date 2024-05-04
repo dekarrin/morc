@@ -19,7 +19,7 @@ func init() {
 var RootCmd = &cobra.Command{
 	Use:   "req [ -P project_file ]",
 	Short: "List the request templates in the project",
-	Long:  "Print out a listing of the names of the request templates in the project.",
+	Long:  "Print out a listing of the names and methods of the request templates in the project.",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		filename := flagProjectFile
@@ -48,7 +48,11 @@ func listRequests(filename string) error {
 		sort.Strings(sortedNames)
 
 		for _, name := range sortedNames {
-			fmt.Println(name)
+			meth := p.Templates[name].Method
+			if meth == "" {
+				meth = "???"
+			}
+			fmt.Printf("%s %s\n", name, meth)
 		}
 	}
 

@@ -31,7 +31,7 @@ func init() {
 }
 
 var showCmd = &cobra.Command{
-	Use:   "show NAME [-P project_file] [--body | --method | --url | --headers | --captures | --auth]",
+	Use:   "show NAME [-F project_file] [--body | --method | --url | --headers | --captures | --auth]",
 	Short: "Show details on a request template",
 	Long:  "Print out the details of a request template in the project. If no flags are given, prints out all data",
 	Args:  cobra.ExactArgs(1),
@@ -102,7 +102,6 @@ func invokeReqShow(name string, opts showOptions) error {
 	}
 
 	// print out the request details
-
 	if opts.show == showAll {
 		meth := req.Method
 		if meth == "" {
@@ -112,7 +111,7 @@ func invokeReqShow(name string, opts showOptions) error {
 		if url == "" {
 			url = "(NO-URL)"
 		}
-		fmt.Printf("%s - %s %s\n", req.Name, meth, url)
+		fmt.Printf("%s %s\n\n", meth, url)
 	} else if opts.show == showMethod {
 		if req.Method == "" {
 			fmt.Printf("(NONE)\n")
@@ -127,45 +126,6 @@ func invokeReqShow(name string, opts showOptions) error {
 			fmt.Printf("%s\n", req.URL)
 		}
 		return nil
-	}
-
-	if opts.show == showCaptures || opts.show == showAll {
-		if len(req.Captures) > 0 {
-			if opts.show == showAll {
-				fmt.Printf("VAR CAPTURES:\n")
-			}
-			for _, cap := range req.Captures {
-				fmt.Printf("%s\n", cap.String())
-			}
-		} else {
-			if opts.show == showAll {
-				fmt.Printf("VAR CAPTURES: (NONE)\n")
-			} else {
-				fmt.Printf("(NONE)\n")
-			}
-		}
-		if opts.show == showCaptures {
-			return nil
-		}
-	}
-
-	if opts.show == showAuthFlow || opts.show == showAll {
-		if req.AuthFlow == "" {
-			if opts.show == showAll {
-				fmt.Printf("AUTH FLOW: (NONE)\n")
-			} else {
-				fmt.Printf("(NONE)\n")
-			}
-		} else {
-			if opts.show == showAll {
-				fmt.Printf("AUTH FLOW: ")
-			}
-			fmt.Printf("%s\n", req.AuthFlow)
-		}
-
-		if opts.show == showAuthFlow {
-			return nil
-		}
 	}
 
 	// print out headers, if any
@@ -197,6 +157,7 @@ func invokeReqShow(name string, opts showOptions) error {
 		if opts.show == showHeaders {
 			return nil
 		}
+		fmt.Printf("\n")
 	}
 
 	if opts.show == showBody || opts.show == showAll {
@@ -213,6 +174,47 @@ func invokeReqShow(name string, opts showOptions) error {
 			}
 		}
 		if opts.show == showBody {
+			return nil
+		}
+		fmt.Printf("\n")
+	}
+
+	if opts.show == showCaptures || opts.show == showAll {
+		if len(req.Captures) > 0 {
+			if opts.show == showAll {
+				fmt.Printf("VAR CAPTURES:\n")
+			}
+			for _, cap := range req.Captures {
+				fmt.Printf("%s\n", cap.String())
+			}
+		} else {
+			if opts.show == showAll {
+				fmt.Printf("VAR CAPTURES: (NONE)\n")
+			} else {
+				fmt.Printf("(NONE)\n")
+			}
+		}
+		if opts.show == showCaptures {
+			return nil
+		}
+		fmt.Printf("\n")
+	}
+
+	if opts.show == showAuthFlow || opts.show == showAll {
+		if req.AuthFlow == "" {
+			if opts.show == showAll {
+				fmt.Printf("AUTH FLOW: (NONE)\n")
+			} else {
+				fmt.Printf("(NONE)\n")
+			}
+		} else {
+			if opts.show == showAll {
+				fmt.Printf("AUTH FLOW: ")
+			}
+			fmt.Printf("%s\n", req.AuthFlow)
+		}
+
+		if opts.show == showAuthFlow {
 			return nil
 		}
 	}

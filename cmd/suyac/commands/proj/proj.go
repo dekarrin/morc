@@ -67,8 +67,8 @@ func invokeShow(filename string) error {
 		histS = ""
 	}
 
-	fmt.Printf("Project %s\n", proj.Name)
-	fmt.Printf("%d request%s, %d flow%s", len(proj.Templates), requestS, len(proj.Flows), flowS)
+	fmt.Printf("Project: %s\n", proj.Name)
+	fmt.Printf("%d request%s, %d flow%s\n", len(proj.Templates), requestS, len(proj.Flows), flowS)
 	fmt.Printf("%d history item%s\n", len(proj.History), histS)
 	fmt.Printf("%d variable%s across %d environment%s\n", proj.Vars.Count(), varS, proj.Vars.EnvCount(), envS)
 	fmt.Printf("%d cookie%s in active session\n", proj.Session.TotalCookieSets(), cookieS)

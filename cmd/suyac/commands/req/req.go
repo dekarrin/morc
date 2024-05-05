@@ -13,11 +13,11 @@ var (
 )
 
 func init() {
-	RootCmd.PersistentFlags().StringVarP(&flagProjectFile, "project_file", "P", suyac.DefaultProjectPath, "Use the specified file for project data instead of "+suyac.DefaultProjectPath)
+	RootCmd.PersistentFlags().StringVarP(&flagProjectFile, "project_file", "F", suyac.DefaultProjectPath, "Use the specified file for project data instead of "+suyac.DefaultProjectPath)
 }
 
 var RootCmd = &cobra.Command{
-	Use:     "req [ -P project_file ]",
+	Use:     "req [-F project_file]",
 	GroupID: "project",
 	Short:   "Show or manipulate request templates",
 	Long:    "Print out a listing of the names and methods of the request templates in the project.",

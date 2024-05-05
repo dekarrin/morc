@@ -273,12 +273,12 @@ func LoadHistoryFromDisk(histFilename string) ([]HistoryEntry, error) {
 		return nil, fmt.Errorf("read history file: %w", err)
 	}
 
-	var h []HistoryEntry
-	if err := json.Unmarshal(histData, &h); err != nil {
+	var m marshaledHistory
+	if err := json.Unmarshal(histData, &m); err != nil {
 		return nil, fmt.Errorf("unmarshal history data: %w", err)
 	}
 
-	return h, nil
+	return m.Entries, nil
 }
 
 type Session struct {
@@ -461,7 +461,7 @@ func (v *VarStore) Count() int {
 }
 
 func (v *VarStore) EnvCount() int {
-	if v.envs == nil {
+	if len(v.envs) == 0 {
 		return 1 // default env is always considered to exist
 	}
 

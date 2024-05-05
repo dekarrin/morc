@@ -13,7 +13,7 @@ func init() {
 }
 
 var deleteCmd = &cobra.Command{
-	Use:   "delete NAME [-P project_file]",
+	Use:   "delete NAME [-F project_file]",
 	Short: "Delete a request template",
 	Long:  "Delete an existing request template",
 	Args:  cobra.ExactArgs(1),

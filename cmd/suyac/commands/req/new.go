@@ -18,6 +18,7 @@ var (
 	flagURL      string
 )
 
+// TODO: swap all project file references to -P.
 func init() {
 	newCmd.PersistentFlags().StringVarP(&flagBodyData, "data", "d", "", "Add the given data as a body to the request; prefix with @ to read data from a file")
 	newCmd.PersistentFlags().StringArrayVarP(&flagHeaders, "header", "H", []string{}, "Add a header to the request")
@@ -28,7 +29,7 @@ func init() {
 }
 
 var newCmd = &cobra.Command{
-	Use:   "new NAME [-P project_file] [-H header]... [-d body_data | -d @file] [-X method] [-u url]",
+	Use:   "new NAME [-F project_file] [-H header]... [-d body_data | -d @file] [-X method] [-u url]",
 	Short: "Create a new request template",
 	Long:  "Create a new request template with options to specify details of it. The template can later be sent by calling 'suyac send NAME'",
 	Args:  cobra.ExactArgs(1),
@@ -82,8 +83,13 @@ var newCmd = &cobra.Command{
 			opts.body = []byte(flagBodyData)
 		}
 
-		opts.method = flagMethod
+		opts.method = strings.ToUpper(flagMethod)
 		opts.url = flagURL
+
+		// add scheme to url if non empty and not present
+		if opts.url != "" && !strings.HasPrefix(opts.url, "http://") && !strings.HasPrefix(opts.url, "https://") {
+			opts.url = "http://" + opts.url
+		}
 
 		return invokeReqNew(reqName, opts)
 	},

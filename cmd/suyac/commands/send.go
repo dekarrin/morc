@@ -42,7 +42,7 @@ var sendCmd = &cobra.Command{
 	Use:     "send REQ [-F project_file]",
 	Short:   "Send a request defined in a template (req)",
 	Long:    "Send a request by building it from a request template (req) stored in the project.",
-	Args:    cobra.ExactArgs(2),
+	Args:    cobra.ExactArgs(1),
 	GroupID: "sending",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts, err := sendFlagsToOptions()

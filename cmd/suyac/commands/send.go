@@ -17,7 +17,7 @@ var (
 )
 
 func init() {
-	sendCmd.PersistentFlags().StringVarP(&flagProjectFile, "project_file", "P", suyac.DefaultProjectPath, "Use the specified file for project data instead of "+suyac.DefaultProjectPath)
+	sendCmd.PersistentFlags().StringVarP(&flagProjectFile, "project_file", "F", suyac.DefaultProjectPath, "Use the specified file for project data instead of "+suyac.DefaultProjectPath)
 	sendCmd.PersistentFlags().BoolVarP(&flagOutputResponseHeaders, "headers", "", false, "Output the headers of the response")
 	sendCmd.PersistentFlags().StringVarP(&flagFormat, "format", "f", "pretty", "Output format (pretty, line, sr)")
 	sendCmd.PersistentFlags().StringArrayVarP(&flagVars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Format is name:value")
@@ -39,7 +39,7 @@ type sendOptions struct {
 }
 
 var sendCmd = &cobra.Command{
-	Use:   "send REQ [-P project_file]",
+	Use:   "send REQ [-F project_file]",
 	Short: "Send a request defined in a template (req)",
 	Long:  "Send a request by building it from a request template (req) stored in the project.",
 	Args:  cobra.ExactArgs(2),

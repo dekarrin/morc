@@ -17,10 +17,11 @@ func init() {
 }
 
 var RootCmd = &cobra.Command{
-	Use:   "req [ -P project_file ]",
-	Short: "List the request templates in the project",
-	Long:  "Print out a listing of the names and methods of the request templates in the project.",
-	Args:  cobra.NoArgs,
+	Use:     "req [ -P project_file ]",
+	GroupID: "project",
+	Short:   "Show or manipulate request templates",
+	Long:    "Print out a listing of the names and methods of the request templates in the project.",
+	Args:    cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		filename := flagProjectFile
 

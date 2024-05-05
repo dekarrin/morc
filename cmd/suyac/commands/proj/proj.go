@@ -16,10 +16,11 @@ func init() {
 }
 
 var RootCmd = &cobra.Command{
-	Use:   "proj",
-	Short: "Show contents of current project",
-	Long:  "Show the contents of the suyac project referred to in the .suyac dir in the current directory, or use -F to read a file in another location.",
-	Args:  cobra.NoArgs,
+	Use:     "proj",
+	GroupID: "project",
+	Short:   "Show or manipulate project attributes and config",
+	Long:    "Show the contents of the suyac project referred to in the .suyac dir in the current directory, or use -F to read a file in another location.",
+	Args:    cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		filename := flagProjectFile
 

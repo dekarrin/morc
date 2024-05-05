@@ -1,7 +1,9 @@
 package commands
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/dekarrin/suyac"
@@ -13,10 +15,11 @@ func init() {
 }
 
 var initCmd = &cobra.Command{
-	Use:   "init [PROJ_NAME]",
-	Short: "Initialize a new Suyac project in the current directory.",
-	Long:  "Initialize a new Suyac project with a project file, session file, and history file located in .suyac in the current directory. For control over file locations and other initial settings, use 'suyac proj new' instead.",
-	Args:  cobra.MaximumNArgs(1),
+	Use:     "init [PROJ_NAME]",
+	GroupID: "project",
+	Short:   "Initialize a new Suyac project in the current directory.",
+	Long:    "Initialize a new Suyac project with a project file, session file, and history file located in .suyac in the current directory. For control over file locations and other initial settings, use 'suyac proj new' instead.",
+	Args:    cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		projName := "Unnamed Project"
 		if len(args) > 0 {
@@ -45,6 +48,19 @@ func invokeInit(projName string) error {
 			HistFile:       suyac.DefaultHistoryPath,
 			SeshFile:       suyac.DefaultSessionPath,
 		},
+	}
+
+	// actually do a check as to the existence of prior files before writing
+	if _, err := os.Lstat(p.Config.ProjFile); err == nil || !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("init would overwrite an existing project file; remove it first")
+	}
+
+	if _, err := os.Lstat(p.Config.SessionFSPath()); err == nil || !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("init would overwrite an existing session file; remove it first")
+	}
+
+	if _, err := os.Lstat(p.Config.HistoryFSPath()); err == nil || !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("init would overwrite an existing history file; remove it first")
 	}
 
 	return p.PersistToDisk(true)

@@ -9,7 +9,25 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	projMetaCommands = &cobra.Group{
+		Title: "Project Commands",
+		ID:    "project",
+	}
+	sendingCommands = &cobra.Group{
+		Title: "Request Sending",
+		ID:    "sending",
+	}
+	quickreqCommands = &cobra.Group{
+		Title: "Request Quick Commands",
+		ID:    "quickreqs",
+	}
+)
+
 func init() {
+	rootCmd.AddGroup(projMetaCommands)
+	rootCmd.AddGroup(sendingCommands)
+	rootCmd.AddGroup(quickreqCommands)
 	rootCmd.AddCommand(proj.RootCmd)
 	rootCmd.AddCommand(req.RootCmd)
 }

@@ -65,10 +65,11 @@ type requestOptions struct {
 }
 
 var requestCmd = &cobra.Command{
-	Use:   "request",
-	Short: "Make an arbitrary HTTP request",
-	Long:  "Creates a new request and sends it using the specified method. The method may be non-standard.",
-	Args:  cobra.ExactArgs(2),
+	Use:     "request",
+	GroupID: "sending",
+	Short:   "Make an arbitrary HTTP request",
+	Long:    "Creates a new request and sends it using the specified method. The method may be non-standard.",
+	Args:    cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts, err := requestFlagsToOptions()
 		if err != nil {
@@ -102,16 +103,12 @@ func addQuickMethodCommand(method string) {
 	upperMeth := strings.ToUpper(method)
 	lowerMeth := strings.ToLower(method)
 
-	n := ""
-	if upperMeth[0] == 'A' || upperMeth[0] == 'E' || upperMeth[0] == 'I' || upperMeth[0] == 'O' || upperMeth[0] == 'U' {
-		n = "n"
-	}
-
 	var quickCmd = &cobra.Command{
-		Use:   lowerMeth,
-		Short: "Make a" + n + " " + upperMeth + " request",
-		Long:  "Creates a new " + upperMeth + " request and immediately sends it",
-		Args:  cobra.ExactArgs(1),
+		Use:     lowerMeth,
+		GroupID: "quickreqs",
+		Short:   "Make a one-off " + upperMeth + " request",
+		Long:    "Creates a new one-off" + upperMeth + " request and immediately sends it. No project file is consulted, but state files may be read and written.",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts, err := requestFlagsToOptions()
 			if err != nil {

@@ -37,11 +37,11 @@ type Settings struct {
 	CookieLifetime time.Duration `json:"cookie_lifetime"`
 }
 
-// HistoryPath returns the file-system compatible path to the history file. If
+// HistoryFSPath returns the file-system compatible path to the history file. If
 // s.HistFile contains ProjDirVar, it will be replaced with the directory that
 // the project file is in. If s.HistFile is empty, or if s.ProjFile is referred
 // to with ProjDirVar and is itself empty, this will return the empty string.
-func (s Settings) HistoryPath() string {
+func (s Settings) HistoryFSPath() string {
 	if strings.Contains(s.HistFile, ProjDirVar) {
 		if s.ProjFile == "" {
 			return ""
@@ -62,11 +62,11 @@ func (s Settings) HistoryPath() string {
 	return s.HistFile
 }
 
-// SessionPath returns the file-system compatible path to the session file. If
+// SessionFSPath returns the file-system compatible path to the session file. If
 // s.SeshFile contains ProjDirVar, it will be replaced with the directory that
 // the project file is in. If s.SeshFile is empty, or if s.ProjFile is referred
 // to with ProjDirVar and is itself empty, this will return the empty string.
-func (s Settings) SessionPath() string {
+func (s Settings) SessionFSPath() string {
 	if strings.Contains(s.SeshFile, ProjDirVar) {
 		if s.ProjFile == "" {
 			return ""
@@ -107,6 +107,11 @@ type marshaledProject struct {
 }
 
 func (p Project) PersistHistoryToDisk() error {
+	histPath := p.Config.HistoryFSPath()
+	if histPath == "" {
+		return fmt.Errorf("history file path is not set")
+	}
+
 	m := marshaledHistory{
 		Filetype: FiletypeHistory,
 		Entries:  p.History,
@@ -115,11 +120,6 @@ func (p Project) PersistHistoryToDisk() error {
 	histDataBytes, err := json.Marshal(m)
 	if err != nil {
 		return fmt.Errorf("marshal history data: %w", err)
-	}
-
-	histPath := p.Config.HistFile
-	if histPath == "" {
-		histPath = DefaultHistoryPath
 	}
 
 	if err := os.MkdirAll(filepath.Dir(histPath), 0755); err != nil {
@@ -134,14 +134,14 @@ func (p Project) PersistHistoryToDisk() error {
 }
 
 func (p Project) PersistSessionToDisk() error {
+	seshPath := p.Config.HistoryFSPath()
+	if seshPath == "" {
+		return fmt.Errorf("session file path is not set")
+	}
+
 	seshDataBytes, err := json.Marshal(p.Session)
 	if err != nil {
 		return fmt.Errorf("marshal session data: %w", err)
-	}
-
-	seshPath := p.Config.SeshFile
-	if seshPath == "" {
-		seshPath = DefaultSessionPath
 	}
 
 	if err := os.MkdirAll(filepath.Dir(seshPath), 0755); err != nil {
@@ -194,12 +194,16 @@ func (p Project) PersistToDisk(all bool) error {
 	}
 
 	if all {
-		if err := p.PersistSessionToDisk(); err != nil {
-			return fmt.Errorf("persist session: %w", err)
+		if p.Config.SessionFSPath() != "" {
+			if err := p.PersistSessionToDisk(); err != nil {
+				return fmt.Errorf("persist session: %w", err)
+			}
 		}
 
-		if err := p.PersistHistoryToDisk(); err != nil {
-			return fmt.Errorf("persist history: %w", err)
+		if p.Config.HistoryFSPath() != "" {
+			if err := p.PersistHistoryToDisk(); err != nil {
+				return fmt.Errorf("persist history: %w", err)
+			}
 		}
 	}
 
@@ -226,15 +230,15 @@ func LoadProjectFromDisk(projFilename string, all bool) (Project, error) {
 	}
 
 	if all {
-		if p.Config.SeshFile != "" {
-			p.Session, err = LoadSessionFromDisk(p.Config.SeshFile)
+		if p.Config.SessionFSPath() != "" {
+			p.Session, err = LoadSessionFromDisk(p.Config.SessionFSPath())
 			if err != nil && !errors.Is(err, os.ErrNotExist) {
 				return Project{}, fmt.Errorf("load session: %w", err)
 			}
 		}
 
-		if p.Config.HistFile != "" {
-			p.History, err = LoadHistoryFromDisk(p.Config.HistFile)
+		if p.Config.HistoryFSPath() != "" {
+			p.History, err = LoadHistoryFromDisk(p.Config.HistoryFSPath())
 			if err != nil && !errors.Is(err, os.ErrNotExist) {
 				return Project{}, fmt.Errorf("load history: %w", err)
 			}

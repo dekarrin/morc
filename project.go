@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,9 +19,11 @@ import (
 )
 
 const (
+	ProjDirVar = "::PROJ_DIR::"
+
 	DefaultProjectPath = ".suyac/project.json"
-	DefaultSessionPath = ".suyac/session.json"
-	DefaultHistoryPath = ".suyac/history.json"
+	DefaultSessionPath = ProjDirVar + "/session.json"
+	DefaultHistoryPath = ProjDirVar + "/history.json"
 
 	FiletypeProject = "SUYAC/PROJECT"
 	FiletypeSession = "SUYAC/SESSION"
@@ -32,6 +35,56 @@ type Settings struct {
 	HistFile       string        `json:"history_file"`
 	SeshFile       string        `json:"session_file"`
 	CookieLifetime time.Duration `json:"cookie_lifetime"`
+}
+
+// HistoryPath returns the file-system compatible path to the history file. If
+// s.HistFile contains ProjDirVar, it will be replaced with the directory that
+// the project file is in. If s.HistFile is empty, or if s.ProjFile is referred
+// to with ProjDirVar and is itself empty, this will return the empty string.
+func (s Settings) HistoryPath() string {
+	if strings.Contains(s.HistFile, ProjDirVar) {
+		if s.ProjFile == "" {
+			return ""
+		}
+
+		projDir := filepath.Dir(s.ProjFile)
+
+		fullDir := strings.ReplaceAll(s.HistFile, ProjDirVar, projDir)
+		if fullDir == projDir {
+			// if it is ONLY the proj dir, that is not valid. return empty
+			// string
+			return ""
+		}
+
+		return fullDir
+	}
+
+	return s.HistFile
+}
+
+// SessionPath returns the file-system compatible path to the session file. If
+// s.SeshFile contains ProjDirVar, it will be replaced with the directory that
+// the project file is in. If s.SeshFile is empty, or if s.ProjFile is referred
+// to with ProjDirVar and is itself empty, this will return the empty string.
+func (s Settings) SessionPath() string {
+	if strings.Contains(s.SeshFile, ProjDirVar) {
+		if s.ProjFile == "" {
+			return ""
+		}
+
+		projDir := filepath.Dir(s.ProjFile)
+
+		fullDir := strings.ReplaceAll(s.SeshFile, ProjDirVar, projDir)
+		if fullDir == projDir {
+			// if it is ONLY the proj dir, that is not valid. return empty
+			// string
+			return ""
+		}
+
+		return fullDir
+	}
+
+	return s.SeshFile
 }
 
 type Project struct {
@@ -173,14 +226,18 @@ func LoadProjectFromDisk(projFilename string, all bool) (Project, error) {
 	}
 
 	if all {
-		p.Session, err = LoadSessionFromDisk(p.Config.SeshFile)
-		if err != nil {
-			return Project{}, fmt.Errorf("load session: %w", err)
+		if p.Config.SeshFile != "" {
+			p.Session, err = LoadSessionFromDisk(p.Config.SeshFile)
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				return Project{}, fmt.Errorf("load session: %w", err)
+			}
 		}
 
-		p.History, err = LoadHistoryFromDisk(p.Config.HistFile)
-		if err != nil {
-			return Project{}, fmt.Errorf("load history: %w", err)
+		if p.Config.HistFile != "" {
+			p.History, err = LoadHistoryFromDisk(p.Config.HistFile)
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				return Project{}, fmt.Errorf("load history: %w", err)
+			}
 		}
 	}
 

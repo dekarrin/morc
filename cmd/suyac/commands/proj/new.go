@@ -16,8 +16,8 @@ var (
 )
 
 func init() {
-	newCmd.LocalFlags().StringVarP(&flagHistoryFile, "history", "H", "", "Create and save history in the given file")
-	newCmd.LocalFlags().StringVarP(&flagSessionFile, "session", "S", "", "Create and save session in the given file")
+	newCmd.LocalFlags().StringVarP(&flagHistoryFile, "history", "H", suyac.DefaultHistoryPath, "Create and save history in the given file")
+	newCmd.LocalFlags().StringVarP(&flagSessionFile, "session", "S", suyac.DefaultSessionPath, "Create and save session in the given file")
 	newCmd.LocalFlags().StringVarP(&flagCookieLifetime, "cookie-lifetime", "C", "24h", "Set the lifetime of recorded Set-Cookie calls in notation like \"24h\" or \"1h30m\"")
 
 	RootCmd.AddCommand(newCmd)

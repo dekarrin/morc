@@ -9,3 +9,5 @@ suyac
 !suyac/
 state.bin
 .suyac
+
+*.tar.gz

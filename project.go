@@ -28,6 +28,8 @@ const (
 	FiletypeProject = "SUYAC/PROJECT"
 	FiletypeSession = "SUYAC/SESSION"
 	FiletypeHistory = "SUYAC/HISTORY"
+
+	CurFileVersion = 1
 )
 
 type Settings struct {
@@ -98,12 +100,13 @@ type Project struct {
 }
 
 type marshaledProject struct {
+	Filetype  string                     `json:"filetype"`
+	Version   int                        `json:"version"`
 	Name      string                     `json:"name"`
 	Templates map[string]RequestTemplate `json:"templates"`
 	Flows     map[string]Flow            `json:"flows"`
 	Vars      VarStore                   `json:"vars"`
 	Config    Settings                   `json:"config"`
-	Filetype  string                     `json:"filetype"`
 }
 
 func (p Project) PersistHistoryToDisk() error {
@@ -114,6 +117,7 @@ func (p Project) PersistHistoryToDisk() error {
 
 	m := marshaledHistory{
 		Filetype: FiletypeHistory,
+		Version:  CurFileVersion,
 		Entries:  p.History,
 	}
 
@@ -165,6 +169,7 @@ func (p Project) PersistToDisk(all bool) error {
 	// get data to persist
 	m := marshaledProject{
 		Filetype:  FiletypeProject,
+		Version:   CurFileVersion,
 		Name:      p.Name,
 		Templates: p.Templates,
 		Flows:     p.Flows,
@@ -293,12 +298,14 @@ func (s *Session) TotalCookieSets() int {
 
 type marshaledSession struct {
 	Filetype string   `json:"filetype"`
+	Version  int      `json:"version"`
 	Cookies  []string `json:"cookies"`
 }
 
 func (s Session) MarshalJSON() ([]byte, error) {
 	ms := marshaledSession{
 		Filetype: FiletypeSession,
+		Version:  CurFileVersion,
 	}
 	for _, c := range s.Cookies {
 		buf := &bytes.Buffer{}
@@ -608,6 +615,7 @@ type HistoryEntry struct {
 
 type marshaledHistory struct {
 	Filetype string         `json:"filetype"`
+	Version  int            `json:"version"`
 	Entries  []HistoryEntry `json:"history"`
 }
 

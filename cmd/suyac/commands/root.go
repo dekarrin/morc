@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/dekarrin/suyac"
 	"github.com/dekarrin/suyac/cmd/suyac/commands/proj"
 	"github.com/dekarrin/suyac/cmd/suyac/commands/req"
 	"github.com/spf13/cobra"
@@ -33,9 +34,10 @@ func init() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "suyac",
-	Short: "Suyac is a scriptable CLI REST client",
-	Long:  "A CLI REST client that allows you to script HTTP requests and responses",
+	Use:     "suyac",
+	Short:   "Suyac is a scriptable CLI REST client",
+	Long:    "A CLI REST client that allows you to script HTTP requests and responses",
+	Version: suyac.Version,
 }
 
 func Execute() {

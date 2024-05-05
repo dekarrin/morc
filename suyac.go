@@ -1,3 +1,4 @@
+// Package suyac provides a scriptable REST client.
 package suyac
 
 import (

@@ -1,7 +1,7 @@
 v0.0.1 - May 5, 2024
 --------------------
-* Initial release. This version contains a handful of commands useable as a
-minimum persisted set of sessions that can be re-run.
+* Initial release. This version contains a handful of commands usable as a
+minimum persisted set of requests that can be re-run.
 * Added new commands:
   * `suyac request` to send an arbitrary custom request that has a curl-like
   interface for specifying headers, data, etc. Basic variable substitution and

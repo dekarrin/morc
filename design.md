@@ -28,6 +28,9 @@ impelmented. This lists whether the command is implemented.
 - [x] `suyac proj new` - Create a new project file with settable options.
 - [ ] `suyac hist` - Show basic info on the history such as file location and number of entries. Filterable by req.
 - [ ] `suyac hist show` - Show a single history entry.
+- [ ] `suyac hist clear` - Clear history. Filterable.
+- [ ] `suyac hist off` - Disable saving to history while still tracking any existing history file.
+- [ ] `suyac hist on` - Enable saving to history.
 - [ ] `suyac var` - List basic info about the var store.
 - [ ] `suyac var list` - List all vars.
 - [ ] `suyac var set` - Set a variable in the current environment. It will be propagated to the default env as well.
@@ -39,10 +42,18 @@ impelmented. This lists whether the command is implemented.
 - [ ] `suyac flow show` - Show a particular flow's details.
 - [ ] `suyac flow delete` - Delete an existing flow.
 - [ ] `suyac flow edit` - Modify a flow.
+- [ ] `suyac cookies` - Show the cookies that are currently stored.
+- [ ] `suyac cookies clear` - Clear all current cookies.
 
 ### Projectless State Manipulation
 
 - [x] `suyac state` - View/modify project-less state files.
+- [ ] `suyac state cookies` - Show cookies in the session.
+- [ ] `suyac state cookies clear` - Clear cookies in the session.
+- [ ] `suyac state var` - List vars in a state file.
+- [ ] `suyac state var set` - Set var in state file.
+- [ ] `suyac state var get` - Show var in a state file.
+- [ ] `suyac state var delete` - Delete a var in the state file.
 
 ### Request Sending
 

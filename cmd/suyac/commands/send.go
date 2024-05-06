@@ -252,6 +252,7 @@ func invokeSend(reqName string, opts sendOptions) error {
 	}
 
 	// TODO: PERSIST HISTORY
+	// TODO: PERSIST COOKIES
 
 	return nil
 }

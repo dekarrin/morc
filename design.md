@@ -1,6 +1,13 @@
 This file has some notes on what the program should look like and upcoming
 planned work at a high level.
 
+## Functionality
+
+- [ ] Request var capture functionality on send
+- [ ] Request var capture resource commands
+- [ ] History resource commands
+- [ ] History functionality
+
 
 ## Full Command Set
 
@@ -20,7 +27,7 @@ impelmented. This lists whether the command is implemented.
 - [x] `suyac req show` - Show details on a specific request template.
 - [ ] `suyac req edit` - Modify a request template. Changing name must be careful to not break history.
 - [x] `suyac req caps` - List variable captures that are a part of the request template.
-- [ ] `suyac req caps delete` - Delete an existing var capture.
+- [x] `suyac req caps delete` - Delete an existing var capture.
 - [ ] `suyac req caps edit` - Update a var capture.
 - [x] `suyac req caps new` - Create a new var capture in the template.
 - [x] `suyac proj` - Show details on the project.

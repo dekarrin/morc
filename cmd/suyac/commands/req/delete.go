@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/dekarrin/suyac"
+	"github.com/dekarrin/suyac/cmd/suyac/commonflags"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +25,7 @@ var deleteCmd = &cobra.Command{
 		}
 
 		opts := deleteOptions{
-			projFile: flagProjectFile,
+			projFile: commonflags.ReqProjectFile,
 		}
 
 		if opts.projFile == "" {

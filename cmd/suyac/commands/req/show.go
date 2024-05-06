@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/dekarrin/suyac"
+	"github.com/dekarrin/suyac/cmd/suyac/commonflags"
 	"github.com/spf13/cobra"
 )
 
@@ -42,7 +43,7 @@ var showCmd = &cobra.Command{
 		}
 
 		opts := showOptions{
-			projFile: flagProjectFile,
+			projFile: commonflags.ReqProjectFile,
 		}
 
 		if opts.projFile == "" {

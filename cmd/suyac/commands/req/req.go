@@ -5,15 +5,12 @@ import (
 	"sort"
 
 	"github.com/dekarrin/suyac"
+	"github.com/dekarrin/suyac/cmd/suyac/commonflags"
 	"github.com/spf13/cobra"
 )
 
-var (
-	flagProjectFile string
-)
-
 func init() {
-	RootCmd.PersistentFlags().StringVarP(&flagProjectFile, "project_file", "F", suyac.DefaultProjectPath, "Use the specified file for project data instead of "+suyac.DefaultProjectPath)
+	RootCmd.PersistentFlags().StringVarP(&commonflags.ReqProjectFile, "project_file", "F", suyac.DefaultProjectPath, "Use the specified file for project data instead of "+suyac.DefaultProjectPath)
 }
 
 var RootCmd = &cobra.Command{
@@ -23,7 +20,7 @@ var RootCmd = &cobra.Command{
 	Long:    "Print out a listing of the names and methods of the request templates in the project.",
 	Args:    cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		filename := flagProjectFile
+		filename := commonflags.ReqProjectFile
 
 		if filename == "" {
 			return fmt.Errorf("project file is set to empty string")

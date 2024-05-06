@@ -28,11 +28,11 @@ var RootCmd = &cobra.Command{
 		if filename == "" {
 			return fmt.Errorf("project file is set to empty string")
 		}
-		return listRequests(filename)
+		return invokeReqList(filename)
 	},
 }
 
-func listRequests(filename string) error {
+func invokeReqList(filename string) error {
 	p, err := suyac.LoadProjectFromDisk(filename, true)
 	if err != nil {
 		return err

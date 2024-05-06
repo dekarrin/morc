@@ -53,7 +53,7 @@ var newCmd = &cobra.Command{
 			return fmt.Errorf("could not get absolute path for project file: %w", err)
 		}
 
-		return invokeNew(projectName, opts)
+		return invokeProjNew(projectName, opts)
 	},
 }
 
@@ -64,7 +64,7 @@ type newOptions struct {
 	cookieLifetime time.Duration
 }
 
-func invokeNew(name string, opts newOptions) error {
+func invokeProjNew(name string, opts newOptions) error {
 	p := suyac.Project{
 		Name:      name,
 		Templates: map[string]suyac.RequestTemplate{},

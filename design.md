@@ -1,12 +1,14 @@
 This file has some notes on what the program should look like and upcoming
 planned work at a high level.
 
-## Functionality
+## Functionality TODOs
 
 - [ ] Request var capture functionality on send
-- [ ] Request var capture resource commands
 - [ ] History resource commands
 - [ ] History functionality
+- [ ] Cookie persistence
+- [ ] Cookie commands
+- [ ] Var resource commands (basic)
 
 
 ## Full Command Set
@@ -38,12 +40,9 @@ impelmented. This lists whether the command is implemented.
 - [ ] `suyac hist clear` - Clear history. Filterable.
 - [ ] `suyac hist off` - Disable saving to history while still tracking any existing history file.
 - [ ] `suyac hist on` - Enable saving to history.
-- [ ] `suyac var` - List basic info about the var store.
-- [ ] `suyac var list` - List all vars.
-- [ ] `suyac var set` - Set a variable in the current environment. It will be propagated to the default env as well.
-- [ ] `suyac var get` - Get the current value of a variable in the current environment.
-- [ ] `suyac var env` - Set or get the current environment. If given one that does not exist, it is created.
-- [ ] `suyac var delete` - Delete a variable in the current environment. Flags can specify deletion everywhere.
+- [ ] `suyac var [NAME] [VALUE]` - By self, list basic info about the var store, with breakdown by env.
+- [ ] `suyac var -d` - Delete a variable in the current environment. Flags can specify deletion everywhere.
+- [ ] `suyac env` - Set or get the current var environment. If given one that does not exist, it is created.
 - [ ] `suyac flow` - Show details on flows and list them out.
 - [ ] `suyac flow new` - Create a new flow in the project.
 - [ ] `suyac flow show` - Show a particular flow's details.

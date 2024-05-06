@@ -2,27 +2,62 @@ package caps
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/dekarrin/suyac"
+	"github.com/dekarrin/suyac/cmd/suyac/commonflags"
 	"github.com/spf13/cobra"
 )
 
-var (
-	flagProjectFile string
-)
-
 var RootCmd = &cobra.Command{
-	Use:     "caps NAME [-F project_file]",
-	GroupID: "project",
-	Short:   "List variable captures in a request template",
-	Long:    "Print a listing of all variable captures that will be attempted on responses to requests made from this template.",
-	Args:    cobra.ExactArgs(1),
+	Use:   "caps NAME [-F project_file]",
+	Short: "List variable captures in a request template",
+	Long:  "Print a listing of all variable captures that will be attempted on responses to requests made from this template.",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		filename := flagProjectFile
+		opts := listOptions{
+			projectFile: commonflags.ReqProjectFile,
+		}
 
-		if filename == "" {
+		if opts.projectFile == "" {
 			return fmt.Errorf("project file is set to empty string")
 		}
-		//		return listRequests(filename)
-		return nil
+
+		reqName := args[0]
+		if reqName == "" {
+			return fmt.Errorf("request name cannot be empty")
+		}
+
+		return invokeCapsList(reqName, opts)
 	},
+}
+
+type listOptions struct {
+	projectFile string
+}
+
+func invokeCapsList(name string, opts listOptions) error {
+	// load the project file
+	p, err := suyac.LoadProjectFromDisk(opts.projectFile, true)
+	if err != nil {
+		return err
+	}
+
+	// case doesn't matter for request template names
+	name = strings.ToLower(name)
+
+	req, ok := p.Templates[name]
+	if !ok {
+		return fmt.Errorf("no request template %s", name)
+	}
+
+	if len(req.Captures) == 0 {
+		fmt.Println("(none)")
+	} else {
+		for _, cap := range req.Captures {
+			fmt.Printf("%s\n", cap)
+		}
+	}
+
+	return nil
 }

@@ -5,12 +5,15 @@ import (
 	"sort"
 
 	"github.com/dekarrin/suyac"
+	"github.com/dekarrin/suyac/cmd/suyac/commands/req/caps"
 	"github.com/dekarrin/suyac/cmd/suyac/commonflags"
 	"github.com/spf13/cobra"
 )
 
 func init() {
 	RootCmd.PersistentFlags().StringVarP(&commonflags.ReqProjectFile, "project_file", "F", suyac.DefaultProjectPath, "Use the specified file for project data instead of "+suyac.DefaultProjectPath)
+
+	RootCmd.AddCommand(caps.RootCmd)
 }
 
 var RootCmd = &cobra.Command{

@@ -44,27 +44,7 @@ func (t TraversalStep) Traverse(data interface{}) (interface{}, error) {
 	}
 }
 
-func ParseVarScraper(s string) (VarScraper, error) {
-	// Parse var scraper specification strings of the form "NAME::START,END" for
-	// byte offsets and "NAME:key1.key2[index1]...keyN" for JSON traversal with array
-	// indexes and object keys in a syntax similar to jq.
-
-	// first, split name from spec:
-	parts := strings.SplitN(s, ":", 2)
-	if len(parts) != 2 {
-		return VarScraper{}, fmt.Errorf("not in NAME:SPEC format")
-	}
-
-	name := parts[0]
-
-	// validate that name does not contain any invalid characters; it must be
-	// alphanumeric or underscore
-	if !regexp.MustCompile(`^[a-zA-Z0-9_]+$`).MatchString(name) {
-		return VarScraper{}, fmt.Errorf("name %q contains invalid characters", name)
-	}
-
-	spec := parts[1]
-
+func ParseVarScraperSpec(name, spec string) (VarScraper, error) {
 	// okay, are we looking at a byte offset or a JSON traversal?
 	if strings.HasPrefix(spec, ":") {
 		// it is a byte offset of the form ":START,END"
@@ -230,6 +210,36 @@ func ParseVarScraper(s string) (VarScraper, error) {
 		Name:  name,
 		Steps: steps,
 	}, nil
+}
+
+func ParseVarScraperName(name string) (string, error) {
+	// validate that name does not contain any invalid characters; it must be
+	// alphanumeric or underscore
+	if !regexp.MustCompile(`^[a-zA-Z0-9_]+$`).MatchString(name) {
+		return "", fmt.Errorf("name %q contains invalid characters", name)
+	}
+
+	return name, nil
+}
+
+func ParseVarScraper(s string) (VarScraper, error) {
+	// Parse var scraper specification strings of the form "NAME::START,END" for
+	// byte offsets and "NAME:key1.key2[index1]...keyN" for JSON traversal with array
+	// indexes and object keys in a syntax similar to jq.
+
+	// first, split name from spec:
+	parts := strings.SplitN(s, ":", 2)
+	if len(parts) != 2 {
+		return VarScraper{}, fmt.Errorf("not in NAME:SPEC format")
+	}
+
+	name, err := ParseVarScraperName(parts[0])
+	if err != nil {
+		return VarScraper{}, err
+	}
+	spec := parts[1]
+
+	return ParseVarScraperSpec(name, spec)
 }
 
 type VarScraper struct {

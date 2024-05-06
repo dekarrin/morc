@@ -32,7 +32,7 @@ func init() {
 }
 
 var showCmd = &cobra.Command{
-	Use:   "show NAME [-F project_file] [--body | --method | --url | --headers | --captures | --auth]",
+	Use:   "show REQ [-F project_file] [--body | --method | --url | --headers | --captures | --auth]",
 	Short: "Show details on a request template",
 	Long:  "Print out the details of a request template in the project. If no flags are given, prints out all data",
 	Args:  cobra.ExactArgs(1),

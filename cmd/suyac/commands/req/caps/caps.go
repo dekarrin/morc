@@ -10,7 +10,7 @@ import (
 )
 
 var RootCmd = &cobra.Command{
-	Use:   "caps NAME [-F project_file]",
+	Use:   "caps REQ [-F project_file]",
 	Short: "List variable captures in a request template",
 	Long:  "Print a listing of all variable captures that will be attempted on responses to requests made from this template.",
 	Args:  cobra.ExactArgs(1),
@@ -28,7 +28,7 @@ var RootCmd = &cobra.Command{
 			return fmt.Errorf("request name cannot be empty")
 		}
 
-		return invokeCapsList(reqName, opts)
+		return invokeReqCapsList(reqName, opts)
 	},
 }
 
@@ -36,7 +36,7 @@ type listOptions struct {
 	projectFile string
 }
 
-func invokeCapsList(name string, opts listOptions) error {
+func invokeReqCapsList(name string, opts listOptions) error {
 	// load the project file
 	p, err := suyac.LoadProjectFromDisk(opts.projectFile, true)
 	if err != nil {

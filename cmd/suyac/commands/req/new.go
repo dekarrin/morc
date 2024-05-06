@@ -30,7 +30,7 @@ func init() {
 }
 
 var newCmd = &cobra.Command{
-	Use:   "new NAME [-F project_file] [-H header]... [-d body_data | -d @file] [-X method] [-u url]",
+	Use:   "new REQ [-F project_file] [-H header]... [-d body_data | -d @file] [-X method] [-u url]",
 	Short: "Create a new request template",
 	Long:  "Create a new request template with options to specify details of it. The template can later be sent by calling 'suyac send NAME'",
 	Args:  cobra.ExactArgs(1),

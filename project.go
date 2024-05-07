@@ -417,32 +417,6 @@ func (v *VarStore) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (v *VarStore) Get(key string) string {
-	if v.envs == nil {
-		v.envs = make(map[string]map[string]string)
-	}
-
-	env := v.envs[v.Environment]
-	if env != nil {
-		if value, ok := env[key]; ok {
-			return value
-		}
-	}
-
-	// for some reason, the var doesn't exist. see if it does in the default env
-	if v.Environment != "" {
-		env = v.envs[""]
-		if env != nil {
-			if value, ok := env[key]; ok {
-				return value
-			}
-		}
-	}
-
-	// couldn't find it, return empty
-	return ""
-}
-
 // Count returns the number of variables accessible from the current
 // environment. This includes any in the default environment that are not
 // overridden by the current environment. This will match the number of elements
@@ -485,6 +459,53 @@ func (v *VarStore) EnvNames() []string {
 	return names
 }
 
+func (v *VarStore) IsDefined(key string) bool {
+	if v.envs == nil {
+		return false
+	}
+
+	envUpper := strings.ToUpper(v.Environment)
+	env := v.envs[envUpper]
+	if env == nil {
+		return false
+	}
+
+	k := strings.ToUpper(key)
+	if _, ok := env[k]; ok {
+		return true
+	}
+
+	if v.Environment != "" {
+		env = v.envs[""]
+		if env != nil {
+			if _, ok := env[k]; ok {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func (v *VarStore) IsDefinedIn(key, env string) bool {
+	if v.envs == nil {
+		return false
+	}
+
+	envUpper := strings.ToUpper(env)
+	varEnv := v.envs[envUpper]
+	if varEnv == nil {
+		return false
+	}
+
+	k := strings.ToUpper(key)
+	if _, ok := varEnv[k]; ok {
+		return true
+	}
+
+	return false
+}
+
 // Defined returns the names of all variables defined in the current
 // environment. It does not include any vars that are only defined in the
 // default environment.
@@ -493,13 +514,36 @@ func (v *VarStore) Defined() []string {
 		return nil
 	}
 
-	env := v.envs[v.Environment]
+	envUpper := strings.ToUpper(v.Environment)
+	env := v.envs[envUpper]
 	if env == nil {
 		return nil
 	}
 
 	var keys []string
 	for k := range env {
+		keys = append(keys, k)
+	}
+
+	return keys
+}
+
+// DefinedIn returns the names of all variables defined in the given
+// environment. It does not include any vars that are only defined in the
+// default environment unless "" is given as env.
+func (v *VarStore) DefinedIn(env string) []string {
+	if v.envs == nil {
+		return nil
+	}
+
+	envUpper := strings.ToUpper(v.Environment)
+	varEnv := v.envs[envUpper]
+	if varEnv == nil {
+		return nil
+	}
+
+	var keys []string
+	for k := range varEnv {
 		keys = append(keys, k)
 	}
 
@@ -517,7 +561,8 @@ func (v *VarStore) All() []string {
 	seenKeys := map[string]struct{}{}
 	keys := []string{}
 
-	if env, ok := v.envs[v.Environment]; ok {
+	envUpper := strings.ToUpper(v.Environment)
+	if env, ok := v.envs[envUpper]; ok {
 		for k := range env {
 			seenKeys[k] = struct{}{}
 			keys = append(keys, k)
@@ -538,6 +583,104 @@ func (v *VarStore) All() []string {
 	return keys
 }
 
+func (v *VarStore) Get(key string) string {
+	if v.envs == nil {
+		v.envs = make(map[string]map[string]string)
+	}
+
+	envUpper := strings.ToUpper(v.Environment)
+	env := v.envs[envUpper]
+	k := strings.ToUpper(key)
+	if env != nil {
+		if value, ok := env[k]; ok {
+			return value
+		}
+	}
+
+	// for some reason, the var doesn't exist. see if it does in the default env
+	if v.Environment != "" {
+		env = v.envs[""]
+		if env != nil {
+			if value, ok := env[k]; ok {
+				return value
+			}
+		}
+	}
+
+	// couldn't find it, return empty
+	return ""
+}
+
+func (v *VarStore) GetFrom(key, env string) string {
+	if v.envs == nil {
+		v.envs = make(map[string]map[string]string)
+	}
+
+	envUpper := strings.ToUpper(env)
+	varEnv := v.envs[envUpper]
+	k := strings.ToUpper(key)
+	if varEnv != nil {
+		return varEnv[k]
+	}
+
+	// couldn't find it, return empty
+	return ""
+}
+
+func (v *VarStore) Set(key, value string) {
+	if v.envs == nil {
+		v.envs = make(map[string]map[string]string)
+	}
+
+	envUpper := strings.ToUpper(v.Environment)
+	env := v.envs[envUpper]
+	if env == nil {
+		env = make(map[string]string)
+		v.envs[v.Environment] = env
+	}
+
+	k := strings.ToUpper(key)
+	env[k] = value
+
+	// also make shore var exists in default env
+	if v.Environment != "" {
+		env = v.envs[""]
+		if env == nil {
+			env = make(map[string]string)
+			v.envs[""] = env
+		}
+
+		env[k] = ""
+	}
+}
+
+func (v *VarStore) SetIn(key, value, env string) {
+	if v.envs == nil {
+		v.envs = make(map[string]map[string]string)
+	}
+
+	envUpper := strings.ToUpper(env)
+	varEnv := v.envs[envUpper]
+	if varEnv == nil {
+		varEnv = make(map[string]string)
+		v.envs[envUpper] = varEnv
+	}
+
+	k := strings.ToUpper(key)
+	varEnv[k] = value
+
+	// also make shore var exists in default env
+	if envUpper != "" {
+		defEnv := v.envs[""]
+		if defEnv == nil {
+			defEnv = make(map[string]string)
+			v.envs[""] = defEnv
+		}
+
+		defEnv[k] = ""
+	}
+}
+
 // Unset removes the variable from the current environemnt. If the current
 // environment is not the default environment, the variable will not be removed
 // from the default environment. Use Remove to remove the variable from all
@@ -556,9 +699,29 @@ func (v *VarStore) Unset(key string) {
 		return
 	}
 
-	env := v.envs[v.Environment]
+	envUpper := strings.ToUpper(v.Environment)
+	env := v.envs[envUpper]
 	if env != nil {
-		delete(env, key)
+		k := strings.ToUpper(key)
+		delete(env, k)
+	}
+}
+
+func (v *VarStore) UnsetIn(key, env string) {
+	if v.envs == nil {
+		return
+	}
+
+	if env == "" {
+		v.Remove(key)
+		return
+	}
+
+	envUpper := strings.ToUpper(v.Environment)
+	varEnv := v.envs[envUpper]
+	if varEnv != nil {
+		k := strings.ToUpper(key)
+		delete(varEnv, k)
 	}
 }
 
@@ -570,33 +733,9 @@ func (v *VarStore) Remove(key string) {
 
 	for _, env := range v.envs {
 		if env != nil {
-			delete(env, key)
+			k := strings.ToUpper(key)
+			delete(env, k)
 		}
-	}
-}
-
-func (v *VarStore) Set(key, value string) {
-	if v.envs == nil {
-		v.envs = make(map[string]map[string]string)
-	}
-
-	env := v.envs[v.Environment]
-	if env == nil {
-		env = make(map[string]string)
-		v.envs[v.Environment] = env
-	}
-
-	env[key] = value
-
-	// also make shore var exists in default env
-	if v.Environment != "" {
-		env = v.envs[""]
-		if env == nil {
-			env = make(map[string]string)
-			v.envs[""] = env
-		}
-
-		env[key] = ""
 	}
 }
 

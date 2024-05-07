@@ -35,15 +35,14 @@ impelmented. This lists whether the command is implemented.
 - [x] `suyac proj` - Show details on the project.
 - [ ] `suyac proj edit` - Modify the project. Setting var prefix must be possible.
 - [x] `suyac proj new` - Create a new project file with settable options.
-- [ ] `suyac hist` - Show basic info on the history such as file location and number of entries. Filterable by req.
-- [ ] `suyac hist show` - Show a single history entry.
-- [ ] `suyac hist clear` - Clear history. Filterable.
-- [ ] `suyac hist off` - Disable saving to history while still tracking any existing history file.
-- [ ] `suyac hist on` - Enable saving to history.
+- [x] `suyac hist` - Show basic info on the history such as file location and number of entries. Filterable by req.
+- [x] `suyac hist show` - Show a single history entry.
+- [x] `suyac hist clear` - Clear history. Filterable.
+- [x] `suyac hist off` - Disable saving to history while still tracking any existing history file.
+- [x] `suyac hist on` - Enable saving to history.
 - [x] `suyac var [NAME] [VALUE]` - By self, list basic info about the var store, with breakdown by env.
 - [x] `suyac var -d` - Delete a variable in the current environment. Flags can specify deletion everywhere.
 - [x] `suyac env` - Set or get the current var environment. If given one that does not exist, it is created.
-- [x] `suyac env --list` - List out all environments.
 - [ ] `suyac flow` - Show details on flows and list them out.
 - [ ] `suyac flow new` - Create a new flow in the project.
 - [ ] `suyac flow show` - Show a particular flow's details.

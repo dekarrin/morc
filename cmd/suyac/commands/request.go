@@ -316,7 +316,15 @@ func invokeRequest(method, url, varSymbol string, opts requestOptions) error {
 			fmt.Println(lineDelimStart + " VARS")
 		}
 
-		for k, v := range caps {
+		capNames := []string{}
+		for k := range caps {
+			capNames = append(capNames, k)
+		}
+
+		sort.Strings(capNames)
+
+		for _, k := range capNames {
+			v := caps[k]
 			if opts.format == formatPretty {
 				fmt.Printf("%s: %s\n", k, v)
 			} else if opts.format == formatLine {

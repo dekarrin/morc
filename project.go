@@ -37,6 +37,7 @@ type Settings struct {
 	HistFile       string        `json:"history_file"`
 	SeshFile       string        `json:"session_file"`
 	CookieLifetime time.Duration `json:"cookie_lifetime"`
+	RecordHistory  bool          `json:"record_history"`
 }
 
 // HistoryFSPath returns the file-system compatible path to the history file. If
@@ -749,18 +750,28 @@ type Flow struct {
 	Requests []RequestTemplate
 }
 
+type marshaledHistory struct {
+	Filetype string         `json:"filetype"`
+	Version  int            `json:"version"`
+	Entries  []HistoryEntry `json:"history"`
+}
+
 type HistoryEntry struct {
 	Template string
 	ReqTime  time.Time
 	RespTime time.Time
 	Request  http.Request
 	Response http.Response
+	Captures map[string]string
 }
 
-type marshaledHistory struct {
-	Filetype string         `json:"filetype"`
-	Version  int            `json:"version"`
-	Entries  []HistoryEntry `json:"history"`
+type marshaledHistoryEntry struct {
+	Template string               `json:"template"`
+	ReqTime  int64                `json:"request_time"`
+	RespTime int64                `json:"response_time"`
+	Request  clientRequestRecord  `json:"request"`
+	Response clientResponseRecord `json:"response"`
+	Captures map[string]string    `json:"captures,omitempty"`
 }
 
 func (h HistoryEntry) MarshalJSON() ([]byte, error) {
@@ -776,6 +787,7 @@ func (h HistoryEntry) MarshalJSON() ([]byte, error) {
 		RespTime: h.RespTime.Unix(),
 		Request:  reqRec,
 		Response: respRec,
+		Captures: h.Captures,
 	}
 
 	return json.Marshal(m)
@@ -805,16 +817,9 @@ func (h *HistoryEntry) UnmarshalJSON(data []byte) error {
 	h.RespTime = time.Unix(m.RespTime, 0)
 	h.Request = *req
 	h.Response = *resp
+	h.Captures = m.Captures
 
 	return nil
-}
-
-type marshaledHistoryEntry struct {
-	Template string               `json:"template"`
-	ReqTime  int64                `json:"request_time"`
-	RespTime int64                `json:"response_time"`
-	Request  clientRequestRecord  `json:"request"`
-	Response clientResponseRecord `json:"response"`
 }
 
 type clientRequestRecord struct {

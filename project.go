@@ -636,7 +636,7 @@ func (v *VarStore) Set(key, value string) {
 	env := v.envs[envUpper]
 	if env == nil {
 		env = make(map[string]string)
-		v.envs[v.Environment] = env
+		v.envs[envUpper] = env
 	}
 
 	k := strings.ToUpper(key)
@@ -650,7 +650,9 @@ func (v *VarStore) Set(key, value string) {
 			v.envs[""] = env
 		}
 
-		env[k] = ""
+		if _, ok := env[k]; !ok {
+			env[k] = ""
+		}
 	}
 }
 
@@ -677,7 +679,9 @@ func (v *VarStore) SetIn(key, value, env string) {
 			v.envs[""] = defEnv
 		}
 
-		defEnv[k] = ""
+		if _, ok := defEnv[k]; !ok {
+			defEnv[k] = ""
+		}
 	}
 }
 

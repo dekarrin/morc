@@ -611,6 +611,7 @@ func (v *VarStore) Get(key string) string {
 	return ""
 }
 
+// GetFrom has no fallback to default, unlike Get.
 func (v *VarStore) GetFrom(key, env string) string {
 	if v.envs == nil {
 		v.envs = make(map[string]map[string]string)

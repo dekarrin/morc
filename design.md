@@ -40,9 +40,10 @@ impelmented. This lists whether the command is implemented.
 - [ ] `suyac hist clear` - Clear history. Filterable.
 - [ ] `suyac hist off` - Disable saving to history while still tracking any existing history file.
 - [ ] `suyac hist on` - Enable saving to history.
-- [ ] `suyac var [NAME] [VALUE]` - By self, list basic info about the var store, with breakdown by env.
-- [ ] `suyac var -d` - Delete a variable in the current environment. Flags can specify deletion everywhere.
-- [ ] `suyac env` - Set or get the current var environment. If given one that does not exist, it is created.
+- [x] `suyac var [NAME] [VALUE]` - By self, list basic info about the var store, with breakdown by env.
+- [x] `suyac var -d` - Delete a variable in the current environment. Flags can specify deletion everywhere.
+- [x] `suyac env` - Set or get the current var environment. If given one that does not exist, it is created.
+- [x] `suyac env --list` - List out all environments.
 - [ ] `suyac flow` - Show details on flows and list them out.
 - [ ] `suyac flow new` - Create a new flow in the project.
 - [ ] `suyac flow show` - Show a particular flow's details.

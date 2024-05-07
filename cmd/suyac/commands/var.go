@@ -8,6 +8,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	reservedDefaultEnvName = "<DEFAULT>"
+)
+
 var (
 	flagVarProjectFile string
 	flagVarDelete      bool
@@ -56,6 +60,9 @@ var varCmd = &cobra.Command{
 			if opts.envAll {
 				return fmt.Errorf("--all is only valid when deleting a var")
 			}
+			if opts.envOverride == reservedDefaultEnvName {
+				return fmt.Errorf("cannot use reserved environment name %q; use --default to list vars in default env", reservedDefaultEnvName)
+			}
 
 			// otherwise, go ahead and call list
 			return invokeVarList(opts)
@@ -63,13 +70,20 @@ var varCmd = &cobra.Command{
 			// value get mode, or a delete
 			if opts.deleteVar {
 				if opts.envDefaultOverride {
-					return fmt.Errorf("cannot specify --default with --delete/-d; use --all to delete from all environments")
+					return fmt.Errorf("cannot specify --default with --delete/-d; use --all to delete from all envs")
+				}
+				if opts.envOverride == reservedDefaultEnvName {
+					return fmt.Errorf("cannot use reserved environment name %q; use --all to delete from all envs (including default)", reservedDefaultEnvName)
 				}
 				return invokeVarDelete(args[0], opts)
 			}
 
+			if opts.envOverride == reservedDefaultEnvName {
+				return fmt.Errorf("cannot use reserved environment name %q; use --default to get the default env's value", reservedDefaultEnvName)
+			}
+
 			if opts.envAll {
-				return fmt.Errorf("--all is only valid when deleting a var; use --default to get var's value in default environment")
+				return fmt.Errorf("--all is only valid when deleting a var; use --default to get from default env")
 			}
 			return invokeVarGet(args[0], opts)
 		} else if len(args) == 2 {
@@ -79,6 +93,9 @@ var varCmd = &cobra.Command{
 			}
 			if opts.envAll {
 				return fmt.Errorf("--all is only valid when deleting; use --default to set var in the default environment")
+			}
+			if opts.envOverride == reservedDefaultEnvName {
+				return fmt.Errorf("cannot use reserved environment name %q; use --default to set in default env", reservedDefaultEnvName)
 			}
 			return invokeVarSet(args[0], args[1], opts)
 		}

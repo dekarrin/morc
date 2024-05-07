@@ -536,7 +536,7 @@ func (v *VarStore) DefinedIn(env string) []string {
 		return nil
 	}
 
-	envUpper := strings.ToUpper(v.Environment)
+	envUpper := strings.ToUpper(env)
 	varEnv := v.envs[envUpper]
 	if varEnv == nil {
 		return nil

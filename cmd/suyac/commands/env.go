@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/dekarrin/suyac"
@@ -52,6 +53,9 @@ var envCmd = &cobra.Command{
 			if opts.doDelete {
 				if opts.doAll {
 					return invokeEnvDelete("", opts)
+				}
+				if opts.swapToDefault {
+					return fmt.Errorf("cannot use --default with --delete; use --all with --delete instead to confirm intent")
 				}
 				return fmt.Errorf("must specify environment to delete")
 			}
@@ -115,7 +119,27 @@ func invokeEnvList(opts envOptions) error {
 	}
 
 	envs := p.Vars.EnvNames()
+
+	// if current env isn't in there, add it
+	var inEnvs bool
 	for _, env := range envs {
+		if env == strings.ToUpper(p.Vars.Environment) {
+			inEnvs = true
+			break
+		}
+	}
+
+	if !inEnvs {
+		envs = append(envs, strings.ToUpper(p.Vars.Environment))
+	}
+
+	// alphabetize it
+	sort.Strings(envs)
+
+	for _, env := range envs {
+		if env == "" {
+			env = reservedDefaultEnvName
+		}
 		fmt.Println(env)
 	}
 
@@ -167,8 +191,9 @@ func invokeEnvShowCurrent(opts envOptions) error {
 
 	if p.Vars.Environment == "" {
 		fmt.Println(reservedDefaultEnvName)
+	} else {
+		fmt.Println(strings.ToUpper(p.Vars.Environment))
 	}
 
-	fmt.Println(strings.ToUpper(p.Vars.Environment))
 	return nil
 }

@@ -137,7 +137,15 @@ func invokeSend(reqName string, opts sendOptions) error {
 	client := suyac.NewRESTClient(0) // TODO: allow cookie settings
 	client.VarOverrides = opts.oneTimeVars
 	client.VarPrefix = varSymbol
-	//client.Scrapers = opts.scrapers
+
+	capVarNames := []string{}
+	for k := range tmpl.Captures {
+		capVarNames = append(capVarNames, k)
+	}
+	sort.Strings(capVarNames)
+	for _, k := range capVarNames {
+		client.Scrapers = append(client.Scrapers, tmpl.Captures[k])
+	}
 
 	// TODO: cookies glue
 

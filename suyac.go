@@ -8,8 +8,11 @@ import (
 	"io"
 	"net/http"
 	"net/http/cookiejar"
+	"net/http/httputil"
 	"net/url"
+	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -703,4 +706,226 @@ func (j *TimedCookieJar) checkEviction() {
 	if j.numCalls == 0 {
 		j.evictOld()
 	}
+}
+
+type Format int
+
+const (
+	FormatPretty Format = iota
+	FormatLine
+)
+
+type OutputControl struct {
+	Request bool
+}
+
+// SendOptions is used to encapsulate non-critical options for sending a request
+// via the Send function.
+type SendOptions struct {
+
+	// Vars are request variables and their values that are set only for this
+	// request. A variable in Vars with the same name as one that is in any
+	// loaded state (should that be requested) will override the loaded state
+	// value, but will not be saved in resulting state.
+	Vars map[string]string
+
+	// Captures is a list of variable scrapers that will be used to extract
+	// values from the response body. The captured values *will* be kept in any
+	// saved state (should state save be requested).
+	Captures []VarScraper
+
+	// LoadStateFile is the path to a state file that should be loaded before
+	// sending the request. If this is set, the state file will be loaded and
+	// used to populate the initial RESTClient state before applying any further
+	// options given in this struct.
+	LoadStateFile string
+
+	// Body is bytes of data that make up the body of the request to be sent. If
+	// not set, the request will be sent with no body. Variable substitution
+	// will be performed on the data prior to sending.
+	Body []byte
+
+	// Headers is a map of headers to be sent with the request. If not set, the
+	// request will be sent with default headers only. Variable substitution
+	// will be performed on the header names and values prior to sending.
+	Headers http.Header
+
+	// OutputRequest controls whether the request should be output to stdout
+	// immediately prior to sending it. All variable substitution will be
+	// applied prior to outputting the request; the output will show the final
+	// request exactly as it will be sent.
+	OutputRequest bool
+
+	// Format sets the format of the output. The default is "pretty", which is
+	// human-readable. "line" is a more compact format that is slightly more
+	// machine-readable. "sr" is a format that is shorthand for "line" but
+	// including only the status and response payload.
+
+}
+
+// Send performs standardized sending of a request, along with standardized
+// output control options. A RESTClient is built and populated and used to send
+// the request. All requests sent from a CLI command should be sent using this
+// function
+func Send(method, url, varSymbol string, opts SendOptions) error {
+	const (
+		lineDelimStart = ">>>"
+		lineDelimEnd   = "<<<"
+	)
+
+	if varSymbol == "" {
+		return fmt.Errorf("variable symbol cannot be empty")
+	}
+
+	// create the client
+	client := NewRESTClient(0) // TODO: allow cookie settings
+	client.VarOverrides = opts.Vars
+	client.VarPrefix = varSymbol
+	client.Scrapers = opts.Captures
+
+	// if we have been asked to load state, do that now
+	if opts.LoadStateFile != "" {
+		// open the state file and load it
+		stateIn, err := os.Open(opts.LoadStateFile)
+		if err != nil {
+			return fmt.Errorf("open state file: %w", err)
+		}
+		defer stateIn.Close()
+
+		if err := client.ReadState(stateIn); err != nil {
+			return fmt.Errorf("read state file: %w", err)
+		}
+	}
+
+	req, err := client.CreateRequest(method, url, opts.Body, opts.Headers)
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+
+	if opts.OutputRequest {
+		reqBytes, err := httputil.DumpRequestOut(req, true)
+		if err != nil {
+			return fmt.Errorf("dump request: %w", err)
+		}
+
+		if opts.format == formatPretty {
+			fmt.Println("------------------- REQUEST -------------------")
+		} else if opts.format == formatLine {
+			fmt.Println(lineDelimStart + " REQUEST")
+		}
+
+		fmt.Println(string(reqBytes))
+
+		if opts.format == formatPretty && req.Body == nil || req.Body == http.NoBody {
+			fmt.Println("(no request body)")
+		}
+
+		if opts.format == formatPretty {
+			fmt.Println("----------------- END REQUEST -----------------")
+		} else if opts.format == formatLine {
+			fmt.Println(lineDelimEnd)
+		}
+	}
+
+	resp, caps, err := client.SendRequest(req)
+	if err != nil {
+		return fmt.Errorf("send request: %w", err)
+	}
+
+	// if we have been asked to save state, do that now
+	if opts.stateFileOut != "" {
+		// open the state file and save it
+		stateOut, err := os.Create(opts.stateFileOut)
+		if err != nil {
+			return fmt.Errorf("create state file: %w", err)
+		}
+		defer stateOut.Close()
+
+		if err := client.WriteState(stateOut); err != nil {
+			return fmt.Errorf("write state file: %w", err)
+		}
+	}
+
+	// output the captures if requested
+	if opts.outputCaptures {
+		if opts.format == formatPretty {
+			fmt.Println("----------------- VAR CAPTURES ----------------")
+		} else if opts.format == formatLine {
+			fmt.Println(lineDelimStart + " VARS")
+		}
+
+		capNames := []string{}
+		for k := range caps {
+			capNames = append(capNames, k)
+		}
+
+		sort.Strings(capNames)
+
+		for _, k := range capNames {
+			v := caps[k]
+			if opts.format == formatPretty {
+				fmt.Printf("%s: %s\n", k, v)
+			} else if opts.format == formatLine {
+				fmt.Printf("%s %s\n", k, v)
+			}
+		}
+
+		if opts.format == formatPretty {
+			fmt.Println("-----------------------------------------------")
+		} else if opts.format == formatLine {
+			fmt.Println(lineDelimEnd)
+		}
+	}
+
+	// output the status line
+	fmt.Printf("%s %s\n", resp.Proto, resp.Status)
+
+	// output the response headers if requested
+	if opts.outputHeaders {
+		if opts.format == formatPretty {
+			fmt.Println("------------------- HEADERS -------------------")
+		} else if opts.format == formatLine {
+			fmt.Println(lineDelimStart + " HEADERS")
+		}
+
+		// alphabetize the headers
+		keys := make([]string, 0, len(resp.Header))
+		for k := range resp.Header {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		for _, k := range keys {
+			vals := resp.Header[k]
+			for _, v := range vals {
+				// works for both pretty and line formats
+				fmt.Printf("%s: %s\n", k, v)
+			}
+		}
+
+		if opts.format == formatPretty {
+			fmt.Println("-----------------------------------------------")
+		} else if opts.format == formatLine {
+			fmt.Println(lineDelimEnd)
+		}
+	}
+
+	// output the response body, if any
+	if !opts.suppressResponseBody {
+		if resp.Body != nil && resp.Body != http.NoBody {
+			entireBody, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return fmt.Errorf("read response body: %w", err)
+			}
+
+			// works for both pretty and line formats
+			fmt.Println(string(entireBody))
+		} else {
+			if opts.format == formatPretty {
+				fmt.Println("(no response body)")
+			}
+		}
+	}
+
+	return nil
 }

@@ -2,10 +2,6 @@ package commands
 
 import (
 	"fmt"
-	"io"
-	"net/http"
-	"net/http/httputil"
-	"sort"
 	"strconv"
 	"time"
 
@@ -20,11 +16,7 @@ var (
 	flagHistEnable      bool
 	flagHistDisable     bool
 
-	flagHistNoDates               bool
-	flagHistOutputResponseHeaders bool
-	flagHistOutputCaptures        bool
-	flagHistOutputRequest         bool
-	flagHistSuppressResponseBody  bool
+	flagHistNoDates bool
 )
 
 func init() {
@@ -35,13 +27,11 @@ func init() {
 	histCmd.PersistentFlags().BoolVarP(&flagHistDisable, "off", "", false, "Disable history for future requests")
 
 	histCmd.PersistentFlags().BoolVarP(&flagHistNoDates, "no-dates", "", false, "Do not prefix the request with the date of request and response with date of response. Output control option; only used with 'hist ENTRY'")
-	histCmd.PersistentFlags().BoolVarP(&flagHistOutputResponseHeaders, "headers", "", false, "Output the headers of the response. Output control option; only used with 'hist ENTRY'")
-	histCmd.PersistentFlags().BoolVarP(&flagHistOutputCaptures, "captures", "", false, "Output the captures from the response. Output control option; only used with 'hist ENTRY'")
-	histCmd.PersistentFlags().BoolVarP(&flagHistSuppressResponseBody, "no-body", "", false, "Suppress the output of the response body. Output control option; only used with 'hist ENTRY'")
-	histCmd.PersistentFlags().BoolVarP(&flagHistOutputRequest, "request", "", false, "Output the filled request prior to sending it. Output control option; only used with 'hist ENTRY'")
 
 	// mark the delete and default flags as mutually exclusive
 	histCmd.MarkFlagsMutuallyExclusive("on", "off", "clear", "info")
+
+	setupRequestOutputFlags("suyac hist", histCmd)
 
 	rootCmd.AddCommand(histCmd)
 }
@@ -54,14 +44,16 @@ var histCmd = &cobra.Command{
 	Args:    cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := histOptions{
-			projFile:             flagEnvProjectFile,
-			outputRequest:        flagHistOutputRequest,
-			outputCaptures:       flagHistOutputCaptures,
-			outputHeaders:        flagHistOutputResponseHeaders,
-			suppressResponseBody: flagHistSuppressResponseBody,
+			projFile: flagEnvProjectFile,
 		}
 		if opts.projFile == "" {
 			return fmt.Errorf("project file is set to empty string")
+		}
+
+		var err error
+		opts.outputCtrl, err = gatherRequestOutputFlags("suyac hist")
+		if err != nil {
+			return err
 		}
 
 		if flagHistInfo {
@@ -98,14 +90,17 @@ var histCmd = &cobra.Command{
 			if flagHistNoDates {
 				return fmt.Errorf("--no-dates is only valid when printing history entry details")
 			}
-			if flagHistOutputRequest {
+			if opts.outputCtrl.Request {
 				return fmt.Errorf("--request is only valid when printing history entry details")
 			}
-			if flagHistOutputCaptures {
+			if opts.outputCtrl.Captures {
 				return fmt.Errorf("--captures is only valid when printing history entry details")
 			}
-			if flagHistOutputResponseHeaders {
+			if opts.outputCtrl.Headers {
 				return fmt.Errorf("--headers is only valid when printing history entry details")
+			}
+			if opts.outputCtrl.SuppressResponseBody {
+				return fmt.Errorf("--no-body is only valid when printing history entry details")
 			}
 		}
 
@@ -145,13 +140,10 @@ const (
 )
 
 type histOptions struct {
-	projFile             string
-	action               histAction
-	outputRequest        bool
-	outputCaptures       bool
-	outputHeaders        bool
-	suppressResponseBody bool
-	suppressDates        bool
+	projFile      string
+	action        histAction
+	outputCtrl    suyac.OutputControl
+	suppressDates bool
 }
 
 func invokeHistDetail(entryNum int, opts histOptions) error {
@@ -177,76 +169,12 @@ func invokeHistDetail(entryNum int, opts histOptions) error {
 		fmt.Printf("Total round-trip time: %s\n", hist.RespTime.Sub(hist.ReqTime))
 	}
 
-	if opts.outputRequest {
-		reqBytes, err := httputil.DumpRequestOut(&hist.Request, true)
-		if err != nil {
-			return fmt.Errorf("dump request: %w", err)
-		}
-
-		fmt.Println("------------------- REQUEST -------------------")
-		fmt.Println(string(reqBytes))
-
-		if hist.Request.Body == nil || hist.Request.Body == http.NoBody {
-			fmt.Println("(no request body)")
-		}
-
-		fmt.Println("----------------- END REQUEST -----------------")
+	if err := suyac.OutputRequest(hist.Request, opts.outputCtrl); err != nil {
+		return err
 	}
 
-	if opts.outputCaptures {
-		fmt.Println("----------------- VAR CAPTURES ----------------")
-
-		capNames := []string{}
-		for k := range hist.Captures {
-			capNames = append(capNames, k)
-		}
-
-		sort.Strings(capNames)
-
-		for _, k := range capNames {
-			v := hist.Captures[k]
-			fmt.Printf("%s: %s\n", k, v)
-		}
-
-		fmt.Println("-----------------------------------------------")
-	}
-
-	resp := hist.Response
-
-	fmt.Printf("%s %s\n", resp.Proto, resp.Status)
-
-	if opts.outputHeaders {
-
-		fmt.Println("------------------- HEADERS -------------------")
-
-		// alphabetize the headers
-		keys := make([]string, 0, len(resp.Header))
-		for k := range resp.Header {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-
-		for _, k := range keys {
-			vals := resp.Header[k]
-			for _, v := range vals {
-				fmt.Printf("%s: %s\n", k, v)
-			}
-		}
-
-		fmt.Println("-----------------------------------------------")
-	}
-
-	if !opts.suppressResponseBody {
-		if resp.Body != nil && resp.Body != http.NoBody {
-			entireBody, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return fmt.Errorf("read response body: %w", err)
-			}
-
-			fmt.Println(string(entireBody))
-		} else {
-			fmt.Println("(no response body)")
-		}
+	if err := suyac.OutputResponse(hist.Response, hist.Captures, opts.outputCtrl); err != nil {
+		return err
 	}
 
 	return nil

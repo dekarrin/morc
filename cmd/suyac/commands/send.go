@@ -2,9 +2,6 @@ package commands
 
 import (
 	"fmt"
-	"io"
-	"net/http"
-	"net/http/httputil"
 	"sort"
 	"strings"
 
@@ -18,24 +15,17 @@ var (
 
 func init() {
 	sendCmd.PersistentFlags().StringVarP(&flagProjectFile, "project_file", "F", suyac.DefaultProjectPath, "Use the specified file for project data instead of "+suyac.DefaultProjectPath)
-	sendCmd.PersistentFlags().BoolVarP(&flagOutputResponseHeaders, "headers", "", false, "Output the headers of the response")
-	sendCmd.PersistentFlags().StringVarP(&flagFormat, "format", "f", "pretty", "Output format (pretty, line, sr)")
 	sendCmd.PersistentFlags().StringArrayVarP(&flagVars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Format is name:value")
-	sendCmd.PersistentFlags().BoolVarP(&flagOutputCaptures, "captures", "", false, "Output the captures from the response")
-	sendCmd.PersistentFlags().BoolVarP(&flagSuppressResponseBody, "no-body", "", false, "Suppress the output of the response body")
-	sendCmd.PersistentFlags().BoolVarP(&flagOutputRequest, "request", "", false, "Output the filled request prior to sending it")
+
+	setupRequestOutputFlags("suyac send", sendCmd)
 
 	rootCmd.AddCommand(sendCmd)
 }
 
 type sendOptions struct {
-	projFile             string
-	outputHeaders        bool
-	outputCaptures       bool
-	outputRequest        bool
-	suppressResponseBody bool
-	oneTimeVars          map[string]string
-	format               format
+	projFile    string
+	oneTimeVars map[string]string
+	outputCtrl  suyac.OutputControl
 }
 
 var sendCmd = &cobra.Command{
@@ -55,33 +45,17 @@ var sendCmd = &cobra.Command{
 }
 
 func sendFlagsToOptions() (sendOptions, error) {
-	opts := sendOptions{
-		outputHeaders:        flagOutputResponseHeaders,
-		outputCaptures:       flagOutputCaptures,
-		outputRequest:        flagOutputRequest,
-		suppressResponseBody: flagSuppressResponseBody,
-	}
+	opts := sendOptions{}
 
 	opts.projFile = flagProjectFile
 	if opts.projFile == "" {
 		return opts, fmt.Errorf("project file is set to empty string")
 	}
 
-	// check format
-	switch strings.ToLower(flagFormat) {
-	case "pretty":
-		opts.format = formatPretty
-	case "sr":
-		opts.format = formatLine
-
-		// check if user is trying to turn on things that aren't allowed
-		if flagOutputRequest || flagOutputResponseHeaders || flagSuppressResponseBody || flagOutputCaptures {
-			return opts, fmt.Errorf("format 'sr' only allows status line and response body; use format 'line' for control over output")
-		}
-	case "line":
-		opts.format = formatLine
-	default:
-		return opts, fmt.Errorf("invalid format %q; must be one of pretty, line, or sr", flagFormat)
+	var err error
+	opts.outputCtrl, err = gatherRequestOutputFlags("suyac send")
+	if err != nil {
+		return opts, err
 	}
 
 	// check vars
@@ -90,7 +64,7 @@ func sendFlagsToOptions() (sendOptions, error) {
 		for idx, v := range flagVars {
 			parts := strings.SplitN(v, ":", 2)
 			if len(parts) != 2 {
-				return opts, fmt.Errorf("var #%d (%q) is not in format key: value", idx+1, v)
+				return opts, fmt.Errorf("var #%d (%q) is not in format key:value", idx+1, v)
 			}
 			oneTimeVars[parts[0]] = parts[1]
 		}
@@ -102,7 +76,6 @@ func sendFlagsToOptions() (sendOptions, error) {
 
 // invokeRequest receives named vars and checked/defaulted requestOptions.
 func invokeSend(reqName string, opts sendOptions) error {
-
 	// load the project file
 	p, err := suyac.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
@@ -126,17 +99,14 @@ func invokeSend(reqName string, opts sendOptions) error {
 		return fmt.Errorf("request template %s has no URL set", reqName)
 	}
 
-	const (
-		lineDelimStart = ">>>"
-		lineDelimEnd   = "<<<"
-	)
-
 	varSymbol := "$"
 
-	// create the client
-	client := suyac.NewRESTClient(0) // TODO: allow cookie settings
-	client.VarOverrides = opts.oneTimeVars
-	client.VarPrefix = varSymbol
+	sendOpts := suyac.SendOptions{
+		Vars:    opts.oneTimeVars,
+		Body:    tmpl.Body,
+		Headers: tmpl.Headers,
+		Output:  opts.outputCtrl,
+	}
 
 	capVarNames := []string{}
 	for k := range tmpl.Captures {
@@ -144,123 +114,25 @@ func invokeSend(reqName string, opts sendOptions) error {
 	}
 	sort.Strings(capVarNames)
 	for _, k := range capVarNames {
-		client.Scrapers = append(client.Scrapers, tmpl.Captures[k])
+		sendOpts.Captures = append(sendOpts.Captures, tmpl.Captures[k])
 	}
 
-	// TODO: cookies glue
-
-	req, err := client.CreateRequest(tmpl.Method, tmpl.URL, tmpl.Body, tmpl.Headers)
+	result, err := suyac.Send(tmpl.Method, tmpl.URL, varSymbol, sendOpts)
 	if err != nil {
-		return fmt.Errorf("create request: %w", err)
+		return err
 	}
 
-	if opts.outputRequest {
-		reqBytes, err := httputil.DumpRequestOut(req, true)
-		if err != nil {
-			return fmt.Errorf("dump request: %w", err)
-		}
-
-		if opts.format == formatPretty {
-			fmt.Println("------------------- REQUEST -------------------")
-		} else if opts.format == formatLine {
-			fmt.Println(lineDelimStart + " REQUEST")
-		}
-
-		fmt.Println(string(reqBytes))
-
-		if opts.format == formatPretty && req.Body == nil || req.Body == http.NoBody {
-			fmt.Println("(no request body)")
-		}
-
-		if opts.format == formatPretty {
-			fmt.Println("----------------- END REQUEST -----------------")
-		} else if opts.format == formatLine {
-			fmt.Println(lineDelimEnd)
-		}
+	// persist history
+	entry := suyac.HistoryEntry{
+		Template: tmpl.Name,
+		ReqTime:  result.SendTime,
+		RespTime: result.RecvTime,
+		Request:  result.Request,
+		Response: result.Response,
+		Captures: result.Captures,
 	}
 
-	resp, caps, err := client.SendRequest(req)
-	if err != nil {
-		return fmt.Errorf("send request: %w", err)
-	}
+	p.History = append(p.History, entry)
 
-	// TODO: output cookie glue
-
-	// output the captures if requested
-	if opts.outputCaptures {
-		if opts.format == formatPretty {
-			fmt.Println("----------------- VAR CAPTURES ----------------")
-		} else if opts.format == formatLine {
-			fmt.Println(lineDelimStart + " VARS")
-		}
-
-		for k, v := range caps {
-			if opts.format == formatPretty {
-				fmt.Printf("%s: %s\n", k, v)
-			} else if opts.format == formatLine {
-				fmt.Printf("%s %s\n", k, v)
-			}
-		}
-
-		if opts.format == formatPretty {
-			fmt.Println("-----------------------------------------------")
-		} else if opts.format == formatLine {
-			fmt.Println(lineDelimEnd)
-		}
-	}
-
-	// output the status line
-	fmt.Printf("%s %s\n", resp.Proto, resp.Status)
-
-	// output the response headers if requested
-	if opts.outputHeaders {
-		if opts.format == formatPretty {
-			fmt.Println("------------------- HEADERS -------------------")
-		} else if opts.format == formatLine {
-			fmt.Println(lineDelimStart + " HEADERS")
-		}
-
-		// alphabetize the headers
-		keys := make([]string, 0, len(resp.Header))
-		for k := range resp.Header {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-
-		for _, k := range keys {
-			vals := resp.Header[k]
-			for _, v := range vals {
-				// works for both pretty and line formats
-				fmt.Printf("%s: %s\n", k, v)
-			}
-		}
-
-		if opts.format == formatPretty {
-			fmt.Println("-----------------------------------------------")
-		} else if opts.format == formatLine {
-			fmt.Println(lineDelimEnd)
-		}
-	}
-
-	// output the response body, if any
-	if !opts.suppressResponseBody {
-		if resp.Body != nil && resp.Body != http.NoBody {
-			entireBody, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return fmt.Errorf("read response body: %w", err)
-			}
-
-			// works for both pretty and line formats
-			fmt.Println(string(entireBody))
-		} else {
-			if opts.format == formatPretty {
-				fmt.Println("(no response body)")
-			}
-		}
-	}
-
-	// TODO: PERSIST HISTORY
-	// TODO: PERSIST COOKIES
-
-	return nil
+	return p.PersistHistoryToDisk()
 }

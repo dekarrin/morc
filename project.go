@@ -760,8 +760,8 @@ type HistoryEntry struct {
 	Template string
 	ReqTime  time.Time
 	RespTime time.Time
-	Request  http.Request
-	Response http.Response
+	Request  *http.Request
+	Response *http.Response
 	Captures map[string]string
 }
 
@@ -777,8 +777,8 @@ type marshaledHistoryEntry struct {
 func (h HistoryEntry) MarshalJSON() ([]byte, error) {
 	// convert the http.Request and http.Response into marshaledHistoryEntry
 	// structs
-	reqRec := httpRequestToRecord(&h.Request)
-	respRec := httpResponseToRecord(&h.Response)
+	reqRec := httpRequestToRecord(h.Request)
+	respRec := httpResponseToRecord(h.Response)
 
 	// marshal the marshaledHistoryEntry struct
 	m := marshaledHistoryEntry{
@@ -815,8 +815,8 @@ func (h *HistoryEntry) UnmarshalJSON(data []byte) error {
 	h.Template = m.Template
 	h.ReqTime = time.Unix(m.ReqTime, 0)
 	h.RespTime = time.Unix(m.RespTime, 0)
-	h.Request = *req
-	h.Response = *resp
+	h.Request = req
+	h.Response = resp
 	h.Captures = m.Captures
 
 	return nil

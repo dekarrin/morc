@@ -4,64 +4,43 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/http/httputil"
 	"os"
-	"sort"
 	"strings"
 
 	"github.com/dekarrin/suyac"
 	"github.com/spf13/cobra"
 )
 
-type format int
-
-const (
-	formatPretty format = iota
-	formatLine
-)
-
 var (
-	flagWriteStateFile        string
-	flagReadStateFile         string
-	flagHeaders               []string
-	flagBodyData              string
-	flagVarSymbol             string
-	flagOutputResponseHeaders bool
-	flagOutputCaptures        bool
-	flagOutputRequest         bool
-	flagSuppressResponseBody  bool
-	flagGetVars               []string
-	flagVars                  []string
-	flagFormat                string
+	flagWriteStateFile string
+	flagReadStateFile  string
+	flagHeaders        []string
+	flagBodyData       string
+	flagVarSymbol      string
+	flagGetVars        []string
+	flagVars           []string
 )
 
-func addRequestFlags(cmd *cobra.Command) {
+func addRequestFlags(id string, cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVarP(&flagWriteStateFile, "write-state", "b", "", "Write collected cookies and captured vars to the given file")
 	cmd.PersistentFlags().StringVarP(&flagReadStateFile, "read-state", "c", "", "Read and use the cookies and vars from the given file")
 	cmd.PersistentFlags().StringArrayVarP(&flagHeaders, "header", "H", []string{}, "Add a header to the request")
 	cmd.PersistentFlags().StringVarP(&flagBodyData, "data", "d", "", "Add the given data as a body to the request; prefix with @ to read data from a file")
 	cmd.PersistentFlags().StringVarP(&flagVarSymbol, "var-symbol", "", "$", "The symbol to use for variable substitution")
-	cmd.PersistentFlags().BoolVarP(&flagOutputResponseHeaders, "headers", "", false, "Output the headers of the response")
-	cmd.PersistentFlags().BoolVarP(&flagOutputCaptures, "captures", "", false, "Output the captures from the response")
-	cmd.PersistentFlags().BoolVarP(&flagSuppressResponseBody, "no-body", "", false, "Suppress the output of the response body")
-	cmd.PersistentFlags().BoolVarP(&flagOutputRequest, "request", "", false, "Output the filled request prior to sending it")
 	cmd.PersistentFlags().StringArrayVarP(&flagGetVars, "capture-var", "C", []string{}, "Get a variable's value from the response. Format is name::start,end for byte offset or name:path[0].to.value (jq-ish syntax)")
 	cmd.PersistentFlags().StringArrayVarP(&flagVars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Format is name:value")
-	cmd.PersistentFlags().StringVarP(&flagFormat, "format", "f", "pretty", "Output format (pretty, line, sr)")
+
+	setupRequestOutputFlags(id, cmd)
 }
 
 type requestOptions struct {
-	stateFileOut         string
-	stateFileIn          string
-	headers              http.Header
-	bodyData             []byte
-	outputHeaders        bool
-	outputCaptures       bool
-	outputRequest        bool
-	suppressResponseBody bool
-	oneTimeVars          map[string]string
-	scrapers             []suyac.VarScraper
-	format               format
+	stateFileOut string
+	stateFileIn  string
+	headers      http.Header
+	bodyData     []byte
+	oneTimeVars  map[string]string
+	scrapers     []suyac.VarScraper
+	outputCtrl   suyac.OutputControl
 }
 
 var requestCmd = &cobra.Command{
@@ -71,7 +50,7 @@ var requestCmd = &cobra.Command{
 	Long:    "Creates a new request and sends it using the specified method. The method may be non-standard.",
 	Args:    cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		opts, err := requestFlagsToOptions()
+		opts, err := requestFlagsToOptions("suyac request")
 		if err != nil {
 			return err
 		}
@@ -90,7 +69,7 @@ var requestCmd = &cobra.Command{
 }
 
 func init() {
-	addRequestFlags(requestCmd)
+	addRequestFlags("suyac request", requestCmd)
 	rootCmd.AddCommand(requestCmd)
 
 	quickMethods := []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE"}
@@ -110,7 +89,7 @@ func addQuickMethodCommand(method string) {
 		Long:    "Creates a new one-off" + upperMeth + " request and immediately sends it. No project file is consulted, but state files may be read and written.",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts, err := requestFlagsToOptions()
+			opts, err := requestFlagsToOptions("suyac " + lowerMeth)
 			if err != nil {
 				return err
 			}
@@ -125,39 +104,24 @@ func addQuickMethodCommand(method string) {
 		},
 	}
 
-	addRequestFlags(quickCmd)
+	addRequestFlags("suyac "+lowerMeth, quickCmd)
 	rootCmd.AddCommand(quickCmd)
 }
 
-func requestFlagsToOptions() (requestOptions, error) {
+func requestFlagsToOptions(cmdID string) (requestOptions, error) {
 	opts := requestOptions{
-		stateFileIn:          flagReadStateFile,
-		stateFileOut:         flagWriteStateFile,
-		outputHeaders:        flagOutputResponseHeaders,
-		outputCaptures:       flagOutputCaptures,
-		outputRequest:        flagOutputRequest,
-		suppressResponseBody: flagSuppressResponseBody,
+		stateFileIn:  flagReadStateFile,
+		stateFileOut: flagWriteStateFile,
 	}
 
 	if flagVarSymbol == "" {
 		return opts, fmt.Errorf("variable symbol cannot be empty")
 	}
 
-	// check format
-	switch strings.ToLower(flagFormat) {
-	case "pretty":
-		opts.format = formatPretty
-	case "sr":
-		opts.format = formatLine
-
-		// check if user is trying to turn on things that aren't allowed
-		if flagOutputRequest || flagOutputResponseHeaders || flagSuppressResponseBody || flagOutputCaptures {
-			return opts, fmt.Errorf("format 'sr' only allows status line and response body; use format 'line' for control over output")
-		}
-	case "line":
-		opts.format = formatLine
-	default:
-		return opts, fmt.Errorf("invalid format %q; must be one of pretty, line, or sr", flagFormat)
+	var err error
+	opts.outputCtrl, err = gatherRequestOutputFlags(cmdID)
+	if err != nil {
+		return opts, err
 	}
 
 	// check get vars
@@ -230,164 +194,16 @@ func requestFlagsToOptions() (requestOptions, error) {
 
 // invokeRequest receives named vars and checked/defaulted requestOptions.
 func invokeRequest(method, url, varSymbol string, opts requestOptions) error {
-	const (
-		lineDelimStart = ">>>"
-		lineDelimEnd   = "<<<"
-	)
-
-	if varSymbol == "" {
-		return fmt.Errorf("variable symbol cannot be empty")
+	sendOpts := suyac.SendOptions{
+		LoadStateFile: opts.stateFileIn,
+		SaveStateFile: opts.stateFileOut,
+		Headers:       opts.headers,
+		Body:          opts.bodyData,
+		Captures:      opts.scrapers,
+		Output:        opts.outputCtrl,
+		Vars:          opts.oneTimeVars,
 	}
 
-	// create the client
-	client := suyac.NewRESTClient(0) // TODO: allow cookie settings
-	client.VarOverrides = opts.oneTimeVars
-	client.VarPrefix = varSymbol
-	client.Scrapers = opts.scrapers
-
-	// if we have been asked to load state, do that now
-	if opts.stateFileIn != "" {
-		// open the state file and load it
-		stateIn, err := os.Open(opts.stateFileIn)
-		if err != nil {
-			return fmt.Errorf("open state file: %w", err)
-		}
-		defer stateIn.Close()
-
-		if err := client.ReadState(stateIn); err != nil {
-			return fmt.Errorf("read state file: %w", err)
-		}
-	}
-
-	req, err := client.CreateRequest(method, url, opts.bodyData, opts.headers)
-	if err != nil {
-		return fmt.Errorf("create request: %w", err)
-	}
-
-	if opts.outputRequest {
-		reqBytes, err := httputil.DumpRequestOut(req, true)
-		if err != nil {
-			return fmt.Errorf("dump request: %w", err)
-		}
-
-		if opts.format == formatPretty {
-			fmt.Println("------------------- REQUEST -------------------")
-		} else if opts.format == formatLine {
-			fmt.Println(lineDelimStart + " REQUEST")
-		}
-
-		fmt.Println(string(reqBytes))
-
-		if opts.format == formatPretty && req.Body == nil || req.Body == http.NoBody {
-			fmt.Println("(no request body)")
-		}
-
-		if opts.format == formatPretty {
-			fmt.Println("----------------- END REQUEST -----------------")
-		} else if opts.format == formatLine {
-			fmt.Println(lineDelimEnd)
-		}
-	}
-
-	resp, caps, err := client.SendRequest(req)
-	if err != nil {
-		return fmt.Errorf("send request: %w", err)
-	}
-
-	// if we have been asked to save state, do that now
-	if opts.stateFileOut != "" {
-		// open the state file and save it
-		stateOut, err := os.Create(opts.stateFileOut)
-		if err != nil {
-			return fmt.Errorf("create state file: %w", err)
-		}
-		defer stateOut.Close()
-
-		if err := client.WriteState(stateOut); err != nil {
-			return fmt.Errorf("write state file: %w", err)
-		}
-	}
-
-	// output the captures if requested
-	if opts.outputCaptures {
-		if opts.format == formatPretty {
-			fmt.Println("----------------- VAR CAPTURES ----------------")
-		} else if opts.format == formatLine {
-			fmt.Println(lineDelimStart + " VARS")
-		}
-
-		capNames := []string{}
-		for k := range caps {
-			capNames = append(capNames, k)
-		}
-
-		sort.Strings(capNames)
-
-		for _, k := range capNames {
-			v := caps[k]
-			if opts.format == formatPretty {
-				fmt.Printf("%s: %s\n", k, v)
-			} else if opts.format == formatLine {
-				fmt.Printf("%s %s\n", k, v)
-			}
-		}
-
-		if opts.format == formatPretty {
-			fmt.Println("-----------------------------------------------")
-		} else if opts.format == formatLine {
-			fmt.Println(lineDelimEnd)
-		}
-	}
-
-	// output the status line
-	fmt.Printf("%s %s\n", resp.Proto, resp.Status)
-
-	// output the response headers if requested
-	if opts.outputHeaders {
-		if opts.format == formatPretty {
-			fmt.Println("------------------- HEADERS -------------------")
-		} else if opts.format == formatLine {
-			fmt.Println(lineDelimStart + " HEADERS")
-		}
-
-		// alphabetize the headers
-		keys := make([]string, 0, len(resp.Header))
-		for k := range resp.Header {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-
-		for _, k := range keys {
-			vals := resp.Header[k]
-			for _, v := range vals {
-				// works for both pretty and line formats
-				fmt.Printf("%s: %s\n", k, v)
-			}
-		}
-
-		if opts.format == formatPretty {
-			fmt.Println("-----------------------------------------------")
-		} else if opts.format == formatLine {
-			fmt.Println(lineDelimEnd)
-		}
-	}
-
-	// output the response body, if any
-	if !opts.suppressResponseBody {
-		if resp.Body != nil && resp.Body != http.NoBody {
-			entireBody, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return fmt.Errorf("read response body: %w", err)
-			}
-
-			// works for both pretty and line formats
-			fmt.Println(string(entireBody))
-		} else {
-			if opts.format == formatPretty {
-				fmt.Println("(no response body)")
-			}
-		}
-	}
-
-	return nil
+	_, err := suyac.Send(method, url, varSymbol, sendOpts)
+	return err
 }

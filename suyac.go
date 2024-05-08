@@ -716,13 +716,35 @@ const (
 )
 
 type OutputControl struct {
+
+	// Request controls whether the request should be output to stdout
+	// immediately prior to sending it. All variable substitution will be
+	// applied prior to outputting the request; the output will show the final
+	// request exactly as it will be sent.
 	Request bool
+
+	// Captures controls whether captured variables and their values should be
+	// output to stdout after the response is received.
+	Captures bool
+
+	// Headers controls whether the response headers should be output to stdout
+	// after the response is received.
+	Headers bool
+
+	// SuppressResponseBody controls whether the response body should be output
+	// to stdout after the response is received.
+	SuppressResponseBody bool
+
+	// Format sets the format of the output. The default is "pretty", which is
+	// human-readable. "line" is a more compact format that is slightly more
+	// machine-readable. "sr" is a format that is shorthand for "line" but
+	// including only the status and response payload.
+	Format Format
 }
 
 // SendOptions is used to encapsulate non-critical options for sending a request
 // via the Send function.
 type SendOptions struct {
-
 	// Vars are request variables and their values that are set only for this
 	// request. A variable in Vars with the same name as one that is in any
 	// loaded state (should that be requested) will override the loaded state
@@ -740,6 +762,11 @@ type SendOptions struct {
 	// options given in this struct.
 	LoadStateFile string
 
+	// SaveStateFile is the path to a state file that should be saved after
+	// sending the request, for non-project based state saving. If set, state
+	// will be saved in this file immediately after the response is received.
+	SaveStateFile string
+
 	// Body is bytes of data that make up the body of the request to be sent. If
 	// not set, the request will be sent with no body. Variable substitution
 	// will be performed on the data prior to sending.
@@ -750,31 +777,31 @@ type SendOptions struct {
 	// will be performed on the header names and values prior to sending.
 	Headers http.Header
 
-	// OutputRequest controls whether the request should be output to stdout
-	// immediately prior to sending it. All variable substitution will be
-	// applied prior to outputting the request; the output will show the final
-	// request exactly as it will be sent.
-	OutputRequest bool
-
-	// Format sets the format of the output. The default is "pretty", which is
-	// human-readable. "line" is a more compact format that is slightly more
-	// machine-readable. "sr" is a format that is shorthand for "line" but
-	// including only the status and response payload.
-
+	// Output contains output control options that determine what output is
+	// generated after the request is sent.
+	Output OutputControl
 }
+
+type SendResult struct {
+	SendTime time.Time
+	RecvTime time.Time
+	Request  *http.Request
+	Response *http.Response
+	Captures map[string]string
+}
+
+const (
+	lineDelimStart = ">>>"
+	lineDelimEnd   = "<<<"
+)
 
 // Send performs standardized sending of a request, along with standardized
 // output control options. A RESTClient is built and populated and used to send
 // the request. All requests sent from a CLI command should be sent using this
 // function
-func Send(method, url, varSymbol string, opts SendOptions) error {
-	const (
-		lineDelimStart = ">>>"
-		lineDelimEnd   = "<<<"
-	)
-
+func Send(method, url, varSymbol string, opts SendOptions) (SendResult, error) {
 	if varSymbol == "" {
-		return fmt.Errorf("variable symbol cannot be empty")
+		return SendResult{}, fmt.Errorf("variable symbol cannot be empty")
 	}
 
 	// create the client
@@ -788,69 +815,66 @@ func Send(method, url, varSymbol string, opts SendOptions) error {
 		// open the state file and load it
 		stateIn, err := os.Open(opts.LoadStateFile)
 		if err != nil {
-			return fmt.Errorf("open state file: %w", err)
+			return SendResult{}, fmt.Errorf("open state file: %w", err)
 		}
 		defer stateIn.Close()
 
 		if err := client.ReadState(stateIn); err != nil {
-			return fmt.Errorf("read state file: %w", err)
+			return SendResult{}, fmt.Errorf("read state file: %w", err)
 		}
 	}
 
 	req, err := client.CreateRequest(method, url, opts.Body, opts.Headers)
 	if err != nil {
-		return fmt.Errorf("create request: %w", err)
+		return SendResult{}, fmt.Errorf("create request: %w", err)
 	}
 
-	if opts.OutputRequest {
-		reqBytes, err := httputil.DumpRequestOut(req, true)
-		if err != nil {
-			return fmt.Errorf("dump request: %w", err)
-		}
-
-		if opts.format == formatPretty {
-			fmt.Println("------------------- REQUEST -------------------")
-		} else if opts.format == formatLine {
-			fmt.Println(lineDelimStart + " REQUEST")
-		}
-
-		fmt.Println(string(reqBytes))
-
-		if opts.format == formatPretty && req.Body == nil || req.Body == http.NoBody {
-			fmt.Println("(no request body)")
-		}
-
-		if opts.format == formatPretty {
-			fmt.Println("----------------- END REQUEST -----------------")
-		} else if opts.format == formatLine {
-			fmt.Println(lineDelimEnd)
-		}
+	if err := OutputRequest(req, opts.Output); err != nil {
+		return SendResult{}, err
 	}
 
+	sendTime := time.Now()
 	resp, caps, err := client.SendRequest(req)
+	recvTime := time.Now() // finer grained time would need to come from client.SendRequest, this is fine for now
 	if err != nil {
-		return fmt.Errorf("send request: %w", err)
+		return SendResult{}, fmt.Errorf("send request: %w", err)
 	}
 
 	// if we have been asked to save state, do that now
-	if opts.stateFileOut != "" {
+	if opts.SaveStateFile != "" {
 		// open the state file and save it
-		stateOut, err := os.Create(opts.stateFileOut)
+		stateOut, err := os.Create(opts.SaveStateFile)
 		if err != nil {
-			return fmt.Errorf("create state file: %w", err)
+			return SendResult{}, fmt.Errorf("create state file: %w", err)
 		}
 		defer stateOut.Close()
 
 		if err := client.WriteState(stateOut); err != nil {
-			return fmt.Errorf("write state file: %w", err)
+			return SendResult{}, fmt.Errorf("write state file: %w", err)
 		}
 	}
 
+	if err := OutputResponse(resp, caps, opts.Output); err != nil {
+		return SendResult{}, err
+	}
+
+	// TODO: PROPAGATE SET COOKIES
+
+	return SendResult{
+		SendTime: sendTime,
+		RecvTime: recvTime,
+		Request:  req,
+		Response: resp,
+		Captures: caps,
+	}, nil
+}
+
+func OutputResponse(resp *http.Response, caps map[string]string, opts OutputControl) error {
 	// output the captures if requested
-	if opts.outputCaptures {
-		if opts.format == formatPretty {
+	if opts.Captures {
+		if opts.Format == FormatPretty {
 			fmt.Println("----------------- VAR CAPTURES ----------------")
-		} else if opts.format == formatLine {
+		} else if opts.Format == FormatLine {
 			fmt.Println(lineDelimStart + " VARS")
 		}
 
@@ -863,16 +887,16 @@ func Send(method, url, varSymbol string, opts SendOptions) error {
 
 		for _, k := range capNames {
 			v := caps[k]
-			if opts.format == formatPretty {
+			if opts.Format == FormatPretty {
 				fmt.Printf("%s: %s\n", k, v)
-			} else if opts.format == formatLine {
+			} else if opts.Format == FormatLine {
 				fmt.Printf("%s %s\n", k, v)
 			}
 		}
 
-		if opts.format == formatPretty {
+		if opts.Format == FormatPretty {
 			fmt.Println("-----------------------------------------------")
-		} else if opts.format == formatLine {
+		} else if opts.Format == FormatLine {
 			fmt.Println(lineDelimEnd)
 		}
 	}
@@ -881,10 +905,10 @@ func Send(method, url, varSymbol string, opts SendOptions) error {
 	fmt.Printf("%s %s\n", resp.Proto, resp.Status)
 
 	// output the response headers if requested
-	if opts.outputHeaders {
-		if opts.format == formatPretty {
+	if opts.Headers {
+		if opts.Format == FormatPretty {
 			fmt.Println("------------------- HEADERS -------------------")
-		} else if opts.format == formatLine {
+		} else if opts.Format == FormatLine {
 			fmt.Println(lineDelimStart + " HEADERS")
 		}
 
@@ -903,15 +927,15 @@ func Send(method, url, varSymbol string, opts SendOptions) error {
 			}
 		}
 
-		if opts.format == formatPretty {
+		if opts.Format == FormatPretty {
 			fmt.Println("-----------------------------------------------")
-		} else if opts.format == formatLine {
+		} else if opts.Format == FormatLine {
 			fmt.Println(lineDelimEnd)
 		}
 	}
 
 	// output the response body, if any
-	if !opts.suppressResponseBody {
+	if !opts.SuppressResponseBody {
 		if resp.Body != nil && resp.Body != http.NoBody {
 			entireBody, err := io.ReadAll(resp.Body)
 			if err != nil {
@@ -921,9 +945,38 @@ func Send(method, url, varSymbol string, opts SendOptions) error {
 			// works for both pretty and line formats
 			fmt.Println(string(entireBody))
 		} else {
-			if opts.format == formatPretty {
+			if opts.Format == FormatPretty {
 				fmt.Println("(no response body)")
 			}
+		}
+	}
+
+	return nil
+}
+
+func OutputRequest(req *http.Request, opts OutputControl) error {
+	if opts.Request {
+		reqBytes, err := httputil.DumpRequestOut(req, true)
+		if err != nil {
+			return fmt.Errorf("dump request: %w", err)
+		}
+
+		if opts.Format == FormatPretty {
+			fmt.Println("------------------- REQUEST -------------------")
+		} else if opts.Format == FormatLine {
+			fmt.Println(lineDelimStart + " REQUEST")
+		}
+
+		fmt.Println(string(reqBytes))
+
+		if opts.Format == FormatPretty && req.Body == nil || req.Body == http.NoBody {
+			fmt.Println("(no request body)")
+		}
+
+		if opts.Format == FormatPretty {
+			fmt.Println("----------------- END REQUEST -----------------")
+		} else if opts.Format == FormatLine {
+			fmt.Println(lineDelimEnd)
 		}
 	}
 

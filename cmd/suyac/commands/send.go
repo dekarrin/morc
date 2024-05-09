@@ -40,6 +40,9 @@ var sendCmd = &cobra.Command{
 			return err
 		}
 
+		// done checking args, don't show usage on error
+		cmd.SilenceUsage = true
+
 		return invokeSend(args[0], opts)
 	},
 }

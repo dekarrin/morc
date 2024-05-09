@@ -53,6 +53,9 @@ var newCmd = &cobra.Command{
 			return fmt.Errorf("could not get absolute path for project file: %w", err)
 		}
 
+		// done checking args, don't show usage on error
+		cmd.SilenceUsage = true
+
 		return invokeProjNew(projectName, opts)
 	},
 }

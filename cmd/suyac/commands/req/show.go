@@ -66,6 +66,9 @@ var showCmd = &cobra.Command{
 			opts.show = showAll
 		}
 
+		// done checking args, don't show usage on error
+		cmd.SilenceUsage = true
+
 		return invokeReqShow(reqName, opts)
 	},
 }

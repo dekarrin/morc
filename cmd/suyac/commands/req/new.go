@@ -92,6 +92,9 @@ var newCmd = &cobra.Command{
 			opts.url = "http://" + opts.url
 		}
 
+		// done checking args, don't show usage on error
+		cmd.SilenceUsage = true
+
 		return invokeReqNew(reqName, opts)
 	},
 }

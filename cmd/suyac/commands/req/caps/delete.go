@@ -37,6 +37,9 @@ var deleteCmd = &cobra.Command{
 			return fmt.Errorf("project file cannot be set to empty string")
 		}
 
+		// done checking args, don't show usage on error
+		cmd.SilenceUsage = true
+
 		return invokeReqCapsDelete(reqName, varName, opts)
 	},
 }

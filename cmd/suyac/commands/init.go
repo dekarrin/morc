@@ -30,6 +30,9 @@ var initCmd = &cobra.Command{
 			return fmt.Errorf("project name cannot be set to empty")
 		}
 
+		// done checking args, don't show usage on error
+		cmd.SilenceUsage = true
+
 		return invokeInit(projName)
 	},
 }

@@ -21,6 +21,10 @@ var stateCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		filename := args[0]
+
+		// done checking args, don't show usage on error
+		cmd.SilenceUsage = true
+
 		return invokeStateShow(filename)
 	},
 }

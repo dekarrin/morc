@@ -28,6 +28,10 @@ var RootCmd = &cobra.Command{
 		if filename == "" {
 			return fmt.Errorf("project file is set to empty string")
 		}
+
+		// done checking args, don't show usage on error
+		cmd.SilenceUsage = true
+
 		return invokeReqList(filename)
 	},
 }

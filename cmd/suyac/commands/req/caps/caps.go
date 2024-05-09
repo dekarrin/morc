@@ -28,6 +28,9 @@ var RootCmd = &cobra.Command{
 			return fmt.Errorf("request name cannot be empty")
 		}
 
+		// done checking args, don't show usage on error
+		cmd.SilenceUsage = true
+
 		return invokeReqCapsList(reqName, opts)
 	},
 }

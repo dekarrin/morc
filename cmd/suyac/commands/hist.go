@@ -105,15 +105,23 @@ var histCmd = &cobra.Command{
 			}
 		}
 
+		var entryIndex int
+
+		if opts.action == histDetail {
+			entryIndex, err = strconv.Atoi(args[0])
+			if err != nil {
+				return fmt.Errorf("%q is not a valid history entry index; it must be an integer", args[0])
+			}
+		}
+
+		// done checking args, don't show usage on error
+		cmd.SilenceUsage = true
+
 		switch opts.action {
 		case histList:
 			return invokeHistList(opts)
 		case histDetail:
-			indexNum, err := strconv.Atoi(args[0])
-			if err != nil {
-				return fmt.Errorf("%q is not a valid history entry index; it must be an integer", args[0])
-			}
-			return invokeHistDetail(indexNum, opts)
+			return invokeHistDetail(entryIndex, opts)
 		case histInfo:
 			return invokeHistInfo(opts)
 		case histClear:

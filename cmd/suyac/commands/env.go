@@ -16,6 +16,15 @@ var (
 	flagEnvDefault     bool
 )
 
+type envAction int
+
+const (
+	envActionList envAction = iota
+	envActionDelete
+	envActionSwitch
+	envActionShow
+)
+
 func init() {
 	envCmd.PersistentFlags().StringVarP(&flagEnvProjectFile, "project_file", "F", suyac.DefaultProjectPath, "Use the specified file for project data instead of "+suyac.DefaultProjectPath)
 	envCmd.PersistentFlags().BoolVarP(&flagEnvDelete, "delete", "d", false, "Delete the specified environment")
@@ -48,60 +57,75 @@ var envCmd = &cobra.Command{
 		// depending on mode, actions are: print the current environment,
 		// list all environments, switch to a new environment, or delete an
 		// environment
+		action := envActionShow
+		var env string
 
 		if len(args) == 0 {
 			if opts.doDelete {
 				if opts.doAll {
-					return invokeEnvDelete("", opts)
+					action = envActionDelete
 				}
+
+				// error modes:
 				if opts.swapToDefault {
 					return fmt.Errorf("cannot use --default with --delete; use --all with --delete instead to confirm intent")
 				}
 				return fmt.Errorf("must specify environment to delete")
+			} else if opts.swapToDefault {
+				action = envActionSwitch
+			} else if opts.doAll {
+				action = envActionList
 			}
 
-			if opts.swapToDefault {
-				return invokeEnvSwitch("", opts)
+			// otherwise, leave action as just print the current environment
+		} else {
+			env = args[0]
+
+			if env == "" {
+				if opts.doDelete {
+					return fmt.Errorf("environment name cannot be empty; use --all to confirm deletion from default env and therefore all others")
+				}
+
+				return fmt.Errorf("environment name cannot be empty; use --default instead to swap to the default environment")
 			}
 
 			if opts.doAll {
-				return invokeEnvList(opts)
+				return fmt.Errorf("--all cannot be used with an environment name")
 			}
 
-			// otherwise, just print the current environment
-			return invokeEnvShowCurrent(opts)
-		}
-		// valid combos:
-		// NAME + -d: VALID, delete the environment
-		// NAME: VALID, switch to the environment
+			if opts.swapToDefault {
+				return fmt.Errorf("--default cannot be used with an environment name")
+			}
 
-		if args[0] == "" {
 			if opts.doDelete {
-				return fmt.Errorf("environment name cannot be empty; use --all to confirm deletion from default env and therefore all others")
+				if args[0] == reservedDefaultEnvName {
+					return fmt.Errorf("refusing to delete the default environment as this clears all vars; use -d --all with no other args to confirm intent")
+				}
+				action = envActionDelete
+			} else {
+
+				if args[0] == reservedDefaultEnvName {
+					return fmt.Errorf("do not specify default env by name; use --default instead")
+				}
+				action = envActionSwitch
 			}
-
-			return fmt.Errorf("environment name cannot be empty; use --default instead to swap to the default environment")
 		}
 
-		if opts.doAll {
-			return fmt.Errorf("--all cannot be used with an environment name")
-		}
+		// done checking args, don't show usage on error
+		cmd.SilenceUsage = true
 
-		if opts.swapToDefault {
-			return fmt.Errorf("--default cannot be used with an environment name")
+		switch action {
+		case envActionList:
+			return invokeEnvList(opts)
+		case envActionDelete:
+			return invokeEnvDelete(env, opts)
+		case envActionSwitch:
+			return invokeEnvSwitch(env, opts)
+		case envActionShow:
+			return invokeEnvShowCurrent(opts)
+		default:
+			return fmt.Errorf("unhandled action %d", action)
 		}
-
-		if opts.doDelete {
-			if args[0] == reservedDefaultEnvName {
-				return fmt.Errorf("refusing to delete the default environment as this clears all vars; use -d --all with no other args to confirm intent")
-			}
-			return invokeEnvDelete(args[0], opts)
-		}
-
-		if args[0] == reservedDefaultEnvName {
-			return fmt.Errorf("do not specify default env by name; use --default instead")
-		}
-		return invokeEnvSwitch(args[0], opts)
 	},
 }
 

@@ -64,6 +64,9 @@ var requestCmd = &cobra.Command{
 			args[1] = "http://" + args[1]
 		}
 
+		// done checking args, don't show usage on error
+		cmd.SilenceUsage = true
+
 		return invokeRequest(args[0], args[1], flagVarSymbol, opts)
 	},
 }
@@ -93,6 +96,9 @@ func addQuickMethodCommand(method string) {
 			if err != nil {
 				return err
 			}
+
+			// done checking args, don't show usage on error
+			cmd.SilenceUsage = true
 
 			// make sure the URL has a scheme
 			lowerURL := strings.ToLower(args[0])

@@ -34,10 +34,11 @@ func init() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:     "suyac",
-	Short:   "Suyac is a scriptable CLI REST client",
-	Long:    "A CLI REST client that allows you to script HTTP requests and responses",
-	Version: suyac.Version,
+	Use:           "suyac",
+	Short:         "Suyac is a scriptable CLI REST client",
+	Long:          "A CLI REST client that allows you to script HTTP requests and responses",
+	Version:       suyac.Version,
+	SilenceErrors: true,
 }
 
 func Execute() {

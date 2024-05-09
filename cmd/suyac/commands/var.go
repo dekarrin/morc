@@ -2,7 +2,6 @@ package commands
 
 import (
 	"fmt"
-	"log"
 	"sort"
 	"strings"
 
@@ -21,6 +20,15 @@ var (
 	flagVarDefaultEnv  bool
 	flagVarAll         bool
 	flagVarCurrent     bool
+)
+
+type varAction int
+
+const (
+	varActionList varAction = iota
+	varActionGet
+	varActionSet
+	varActionDelete
 )
 
 func init() {
@@ -56,6 +64,8 @@ var varCmd = &cobra.Command{
 			return fmt.Errorf("project file is set to empty string")
 		}
 
+		action := varActionList
+
 		// what mode are we in? listing, reading, or writing? infer by arg count
 		if len(args) == 0 {
 			// listing mode
@@ -70,7 +80,7 @@ var varCmd = &cobra.Command{
 			}
 
 			// otherwise, go ahead and call list
-			return invokeVarList(opts)
+			action = varActionList
 		} else if len(args) == 1 {
 			// value get mode, or a delete
 			if opts.deleteVar {
@@ -80,17 +90,19 @@ var varCmd = &cobra.Command{
 				if opts.envOverride == reservedDefaultEnvName {
 					return fmt.Errorf("cannot use reserved environment name %q; use --all to delete from all envs (including default)", reservedDefaultEnvName)
 				}
-				return invokeVarDelete(args[0], opts)
-			}
 
-			if opts.envOverride == reservedDefaultEnvName {
-				return fmt.Errorf("cannot use reserved environment name %q; use --default to get the default env's value", reservedDefaultEnvName)
-			}
+				action = varActionDelete
+			} else {
+				if opts.envOverride == reservedDefaultEnvName {
+					return fmt.Errorf("cannot use reserved environment name %q; use --default to get the default env's value", reservedDefaultEnvName)
+				}
 
-			if opts.envAll {
-				return fmt.Errorf("--all is only valid when deleting a var; use --default to get from default env")
+				if opts.envAll {
+					return fmt.Errorf("--all is only valid when deleting a var; use --default to get from default env")
+				}
+
+				action = varActionGet
 			}
-			return invokeVarGet(args[0], opts)
 		} else if len(args) == 2 {
 			// value set mode.
 			if opts.deleteVar {
@@ -102,10 +114,24 @@ var varCmd = &cobra.Command{
 			if opts.envOverride == reservedDefaultEnvName {
 				return fmt.Errorf("cannot use reserved environment name %q; use --default to set in default env", reservedDefaultEnvName)
 			}
-			return invokeVarSet(args[0], args[1], opts)
+			action = varActionSet
 		}
 
-		return invokeVarList(opts)
+		// done checking args, don't show usage on error
+		cmd.SilenceUsage = true
+
+		switch action {
+		case varActionList:
+			return invokeVarList(opts)
+		case varActionGet:
+			return invokeVarGet(args[0], opts)
+		case varActionSet:
+			return invokeVarSet(args[0], args[1], opts)
+		case varActionDelete:
+			return invokeVarDelete(args[0], opts)
+		default:
+			panic(fmt.Sprintf("unhandled var action %q", action))
+		}
 	},
 }
 
@@ -150,7 +176,6 @@ func invokeVarGet(varName string, opts varOptions) error {
 	} else if opts.envOverride != "" {
 		val = p.Vars.GetFrom(varName, opts.envOverride)
 	} else if opts.envCurrentOverride {
-		log.Printf("wtf")
 		val = p.Vars.GetFrom(varName, p.Vars.Environment)
 	} else {
 		val = p.Vars.Get(varName)

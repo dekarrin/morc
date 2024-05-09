@@ -122,10 +122,18 @@ func invokeSend(reqName string, opts sendOptions) error {
 		return err
 	}
 
-	// TODO: persist caps
+	// if any variable changes occurred, persist to disk
+	if len(result.Captures) > 0 {
+		for k, v := range result.Captures {
+			p.Vars.Set(k, v)
+		}
+		err := p.PersistToDisk(false)
+		if err != nil {
+			return fmt.Errorf("save project to disk: %w", err)
+		}
+	}
 
 	// persist history
-
 	if p.Config.RecordHistory {
 		entry := suyac.HistoryEntry{
 			Template: tmpl.Name,
@@ -137,7 +145,10 @@ func invokeSend(reqName string, opts sendOptions) error {
 		}
 
 		p.History = append(p.History, entry)
-		return p.PersistHistoryToDisk()
+		err := p.PersistHistoryToDisk()
+		if err != nil {
+			return fmt.Errorf("save history to disk: %w", err)
+		}
 	}
 
 	return nil

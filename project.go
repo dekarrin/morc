@@ -180,7 +180,7 @@ func (p Project) PersistToDisk(all bool) error {
 
 	projDataBytes, err := json.Marshal(m)
 	if err != nil {
-		return fmt.Errorf("marshal suite data: %w", err)
+		return fmt.Errorf("marshal project data: %w", err)
 	}
 
 	// check file paths and see if they need to be defaulted
@@ -191,12 +191,12 @@ func (p Project) PersistToDisk(all bool) error {
 
 	// call mkdir -p on the paths
 	if err := os.MkdirAll(filepath.Dir(projPath), 0755); err != nil {
-		return fmt.Errorf("create dir for suite file: %w", err)
+		return fmt.Errorf("create dir for project file: %w", err)
 	}
 
 	// write out the data for project, session, and history
 	if err := os.WriteFile(projPath, projDataBytes, 0644); err != nil {
-		return fmt.Errorf("write suite file: %w", err)
+		return fmt.Errorf("write project file: %w", err)
 	}
 
 	if all {

@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"time"
 
@@ -184,6 +185,11 @@ func invokeHistOn(opts histOptions) error {
 	p, err := suyac.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
 		return err
+	}
+
+	if p.Config.HistFile == "" {
+		p.Config.HistFile = suyac.DefaultHistoryPath
+		fmt.Fprintf(os.Stderr, "no history file configured; defaulting to "+p.Config.HistoryFSPath())
 	}
 
 	p.Config.RecordHistory = true

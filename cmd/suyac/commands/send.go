@@ -125,16 +125,17 @@ func invokeSend(reqName string, opts sendOptions) error {
 	// TODO: persist caps
 
 	// persist history
-	entry := suyac.HistoryEntry{
-		Template: tmpl.Name,
-		ReqTime:  result.SendTime,
-		RespTime: result.RecvTime,
-		Request:  result.Request,
-		Response: result.Response,
-		Captures: result.Captures,
-	}
 
 	if p.Config.RecordHistory {
+		entry := suyac.HistoryEntry{
+			Template: tmpl.Name,
+			ReqTime:  result.SendTime,
+			RespTime: result.RecvTime,
+			Request:  result.Request,
+			Response: result.Response,
+			Captures: result.Captures,
+		}
+
 		p.History = append(p.History, entry)
 		return p.PersistHistoryToDisk()
 	}

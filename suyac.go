@@ -342,10 +342,15 @@ type RESTClient struct {
 	jar *TimedCookieJar
 }
 
+func (r *RESTClient) SetCookieJar(jar *TimedCookieJar) {
+	r.jar = jar
+	r.HTTP.Jar = jar
+}
+
 // NewRESTClient creates a new RESTClient. 0 for cookie lifetime will default it
 // to 24 hours.
 func NewRESTClient(cookieLifetime time.Duration) *RESTClient {
-	cookies := newTimedCookieJar(nil, cookieLifetime)
+	cookies := NewTimedCookieJar(nil, cookieLifetime)
 
 	return &RESTClient{
 		HTTP: &http.Client{
@@ -541,7 +546,7 @@ func (r *RESTClient) ReadState(rd io.Reader) error {
 	if r.jar != nil {
 		existingLifetime = r.jar.lifetime
 	}
-	jar := newTimedCookieJar(nil, existingLifetime)
+	jar := NewTimedCookieJar(nil, existingLifetime)
 	jar.calls = state.Cookies
 
 	jar.evictOld()
@@ -643,11 +648,11 @@ type TimedCookieJar struct {
 	mx                  *sync.Mutex
 }
 
-// newTimedCookieJar creates a new TimedCookieJar with the given lifetime. If
+// NewTimedCookieJar creates a new TimedCookieJar with the given lifetime. If
 // lifetime is 0, the default lifetime of 24 hours is used. If wrapped is nil,
 // a new net/http/cookiejar.Jar is created with default options and used as
 // wrapped.
-func newTimedCookieJar(wrapped http.CookieJar, lifetime time.Duration) *TimedCookieJar {
+func NewTimedCookieJar(wrapped http.CookieJar, lifetime time.Duration) *TimedCookieJar {
 	if lifetime <= 0 {
 		lifetime = 24 * time.Hour
 	}
@@ -705,6 +710,15 @@ func (j *TimedCookieJar) evictOld() {
 func (j *TimedCookieJar) checkEviction() {
 	if j.numCalls == 0 {
 		j.evictOld()
+	}
+}
+
+func (j *TimedCookieJar) SetCookiesFromCalls(calls []SetCookiesCall) {
+	j.calls = calls
+
+	j.evictOld()
+	for _, call := range j.calls {
+		j.wrapped.SetCookies(call.URL, call.Cookies)
 	}
 }
 
@@ -777,6 +791,16 @@ type SendOptions struct {
 	// will be performed on the header names and values prior to sending.
 	Headers http.Header
 
+	// Cookies loads the given cookies from a set of SetCookiesCalls into
+	// the client before sending the request.
+	Cookies []SetCookiesCall
+
+	// CookieLifetime is the lifetime of cookie records in the client. It is
+	// used to evict old cookie records regardless of actual lifetime in the
+	// Set-Cookie header that originally caused it to be set. If not set, it
+	// will default to 24 hours.
+	CookieLifetime time.Duration
+
 	// Output contains output control options that determine what output is
 	// generated after the request is sent.
 	Output OutputControl
@@ -805,7 +829,7 @@ func Send(method, url, varSymbol string, opts SendOptions) (SendResult, error) {
 	}
 
 	// create the client
-	client := NewRESTClient(0) // TODO: allow cookie settings
+	client := NewRESTClient(opts.CookieLifetime) // TODO: allow cookie settings
 	client.VarOverrides = opts.Vars
 	client.VarPrefix = varSymbol
 	client.Scrapers = opts.Captures
@@ -824,6 +848,10 @@ func Send(method, url, varSymbol string, opts SendOptions) (SendResult, error) {
 		}
 	}
 
+	if len(opts.Cookies) > 0 {
+		client.jar.SetCookiesFromCalls(opts.Cookies)
+	}
+
 	req, err := client.CreateRequest(method, url, opts.Body, opts.Headers)
 	if err != nil {
 		return SendResult{}, fmt.Errorf("create request: %w", err)
@@ -834,8 +862,8 @@ func Send(method, url, varSymbol string, opts SendOptions) (SendResult, error) {
 	}
 
 	sendTime := time.Now()
-	resp, caps, err := client.SendRequest(req)
-	recvTime := time.Now() // finer grained time would need to come from client.SendRequest, this is fine for now
+	resp, caps, err := client.SendRequest(req) // TODO: need to get cookie records from jar
+	recvTime := time.Now()                     // finer grained time would need to come from client.SendRequest, this is fine for now
 	if err != nil {
 		return SendResult{}, fmt.Errorf("send request: %w", err)
 	}

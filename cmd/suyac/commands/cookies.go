@@ -30,7 +30,7 @@ func init() {
 	//cookiesCmd.PersistentFlags().StringVarP(&flagCookiesURL, "url", "u", "", "Get cookies that would only be set on the given URL")
 
 	// mark the delete and default flags as mutually exclusive
-	cookiesCmd.MarkFlagsMutuallyExclusive("on", "off", "clear", "info", "url")
+	cookiesCmd.MarkFlagsMutuallyExclusive("on", "off", "clear", "info") //, "url")
 
 	rootCmd.AddCommand(cookiesCmd)
 }

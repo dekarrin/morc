@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/dekarrin/suyac"
+	"github.com/dekarrin/suyac/cmd/suyac/commands/flows"
 	"github.com/dekarrin/suyac/cmd/suyac/commands/proj"
 	"github.com/dekarrin/suyac/cmd/suyac/commands/reqs"
 	"github.com/spf13/cobra"
@@ -31,6 +32,7 @@ func init() {
 	rootCmd.AddGroup(quickreqCommands)
 	rootCmd.AddCommand(proj.RootCmd)
 	rootCmd.AddCommand(reqs.RootCmd)
+	rootCmd.AddCommand(flows.RootCmd)
 }
 
 var rootCmd = &cobra.Command{

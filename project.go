@@ -38,6 +38,7 @@ type Settings struct {
 	SeshFile       string        `json:"session_file"`
 	CookieLifetime time.Duration `json:"cookie_lifetime"`
 	RecordHistory  bool          `json:"record_history"`
+	RecordSession  bool          `json:"record_cookies"`
 }
 
 // HistoryFSPath returns the file-system compatible path to the history file. If

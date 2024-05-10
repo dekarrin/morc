@@ -646,6 +646,9 @@ type TimedCookieJar struct {
 	numCalls            int
 	callsBeforeEviction int
 	mx                  *sync.Mutex
+
+	setListeners map[int]func(*url.URL, []*http.Cookie)
+	nextListenID int
 }
 
 // NewTimedCookieJar creates a new TimedCookieJar with the given lifetime. If
@@ -679,6 +682,10 @@ func (j *TimedCookieJar) SetCookies(u *url.URL, cookies []*http.Cookie) {
 
 	j.mx.Lock()
 	defer j.mx.Unlock()
+	for _, listener := range j.setListeners {
+		listener(u, cookies)
+	}
+
 	j.calls = append(j.calls, SetCookiesCall{
 		Time:    time.Now(),
 		URL:     u,
@@ -711,6 +718,28 @@ func (j *TimedCookieJar) checkEviction() {
 	if j.numCalls == 0 {
 		j.evictOld()
 	}
+}
+
+func (j *TimedCookieJar) ForwardSetCookieCalls(fn func(u *url.URL, cookies []*http.Cookie)) int {
+	j.mx.Lock()
+	defer j.mx.Unlock()
+
+	idx := j.nextListenID
+	j.nextListenID++
+
+	if j.setListeners == nil {
+		j.setListeners = make(map[int]func(*url.URL, []*http.Cookie))
+	}
+
+	j.setListeners[idx] = fn
+	return idx
+}
+
+func (j *TimedCookieJar) StopForwardingSetCookieCalls(idx int) {
+	j.mx.Lock()
+	defer j.mx.Unlock()
+
+	delete(j.setListeners, idx)
 }
 
 func (j *TimedCookieJar) SetCookiesFromCalls(calls []SetCookiesCall) {
@@ -807,11 +836,26 @@ type SendOptions struct {
 }
 
 type SendResult struct {
+
+	// SendTime is the time that the request was sent to the remote host.
 	SendTime time.Time
+
+	// RecvTime is the time that the response was received from the remote host.
 	RecvTime time.Time
-	Request  *http.Request
+
+	// Request is the request exactly as it was sent.
+	Request *http.Request
+
+	// Response is the received response.
 	Response *http.Response
+
+	// Captures is map of variables to their values that were captured from the
+	// response body
 	Captures map[string]string
+
+	// Cookies is records of calls to SetCookie in the client cookie jar during
+	// the request.
+	Cookies []SetCookiesCall
 }
 
 const (
@@ -823,7 +867,7 @@ const (
 // output control options. A RESTClient is built and populated and used to send
 // the request. All requests sent from a CLI command should be sent using this
 // function
-func Send(method, url, varSymbol string, opts SendOptions) (SendResult, error) {
+func Send(method, URL, varSymbol string, opts SendOptions) (SendResult, error) {
 	if varSymbol == "" {
 		return SendResult{}, fmt.Errorf("variable symbol cannot be empty")
 	}
@@ -852,7 +896,7 @@ func Send(method, url, varSymbol string, opts SendOptions) (SendResult, error) {
 		client.jar.SetCookiesFromCalls(opts.Cookies)
 	}
 
-	req, err := client.CreateRequest(method, url, opts.Body, opts.Headers)
+	req, err := client.CreateRequest(method, URL, opts.Body, opts.Headers)
 	if err != nil {
 		return SendResult{}, fmt.Errorf("create request: %w", err)
 	}
@@ -861,12 +905,24 @@ func Send(method, url, varSymbol string, opts SendOptions) (SendResult, error) {
 		return SendResult{}, err
 	}
 
+	var cookiesSetDuringReq []SetCookiesCall
+	recordSetCookies := func(u *url.URL, cookies []*http.Cookie) {
+		cookiesSetDuringReq = append(cookiesSetDuringReq, SetCookiesCall{
+			Time:    time.Now(),
+			URL:     u,
+			Cookies: cookies,
+		})
+	}
+	setCookiesListenerID := client.jar.ForwardSetCookieCalls(recordSetCookies)
+
 	sendTime := time.Now()
 	resp, caps, err := client.SendRequest(req) // TODO: need to get cookie records from jar
 	recvTime := time.Now()                     // finer grained time would need to come from client.SendRequest, this is fine for now
 	if err != nil {
 		return SendResult{}, fmt.Errorf("send request: %w", err)
 	}
+
+	client.jar.StopForwardingSetCookieCalls(setCookiesListenerID)
 
 	// if we have been asked to save state, do that now
 	if opts.SaveStateFile != "" {
@@ -886,14 +942,13 @@ func Send(method, url, varSymbol string, opts SendOptions) (SendResult, error) {
 		return SendResult{}, err
 	}
 
-	// TODO: PROPAGATE SET COOKIES
-
 	return SendResult{
 		SendTime: sendTime,
 		RecvTime: recvTime,
 		Request:  req,
 		Response: resp,
 		Captures: caps,
+		Cookies:  cookiesSetDuringReq,
 	}, nil
 }
 

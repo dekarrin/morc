@@ -105,10 +105,11 @@ func invokeSend(reqName string, opts sendOptions) error {
 	varSymbol := "$"
 
 	sendOpts := suyac.SendOptions{
-		Vars:    opts.oneTimeVars,
-		Body:    tmpl.Body,
-		Headers: tmpl.Headers,
-		Output:  opts.outputCtrl,
+		Vars:           opts.oneTimeVars,
+		Body:           tmpl.Body,
+		Headers:        tmpl.Headers,
+		Output:         opts.outputCtrl,
+		CookieLifetime: p.Config.CookieLifetime,
 	}
 
 	capVarNames := []string{}
@@ -118,6 +119,10 @@ func invokeSend(reqName string, opts sendOptions) error {
 	sort.Strings(capVarNames)
 	for _, k := range capVarNames {
 		sendOpts.Captures = append(sendOpts.Captures, tmpl.Captures[k])
+	}
+
+	if len(p.Session.Cookies) > 0 {
+		sendOpts.Cookies = p.Session.Cookies
 	}
 
 	result, err := suyac.Send(tmpl.Method, tmpl.URL, varSymbol, sendOpts)
@@ -151,6 +156,16 @@ func invokeSend(reqName string, opts sendOptions) error {
 		err := p.PersistHistoryToDisk()
 		if err != nil {
 			return fmt.Errorf("save history to disk: %w", err)
+		}
+	}
+
+	// persist cookies
+	if p.Config.RecordSession && len(result.Cookies) > 0 {
+		p.Session.Cookies = append(p.Session.Cookies, result.Cookies...)
+
+		err := p.PersistSessionToDisk()
+		if err != nil {
+			return fmt.Errorf("save session to disk: %w", err)
 		}
 	}
 

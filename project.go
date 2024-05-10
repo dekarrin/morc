@@ -123,7 +123,7 @@ func (p Project) PersistHistoryToDisk() error {
 		Entries:  p.History,
 	}
 
-	histDataBytes, err := json.Marshal(m)
+	histDataBytes, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal history data: %w", err)
 	}
@@ -145,7 +145,7 @@ func (p Project) PersistSessionToDisk() error {
 		return fmt.Errorf("session file path is not set")
 	}
 
-	seshDataBytes, err := json.Marshal(p.Session)
+	seshDataBytes, err := json.MarshalIndent(p.Session, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal session data: %w", err)
 	}
@@ -179,7 +179,7 @@ func (p Project) PersistToDisk(all bool) error {
 		Config:    p.Config,
 	}
 
-	projDataBytes, err := json.Marshal(m)
+	projDataBytes, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal project data: %w", err)
 	}

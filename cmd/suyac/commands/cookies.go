@@ -25,7 +25,9 @@ func init() {
 	cookiesCmd.PersistentFlags().BoolVarP(&flagCookiesClear, "clear", "", false, "Delete all cookies")
 	cookiesCmd.PersistentFlags().BoolVarP(&flagCookiesEnable, "on", "", false, "Enable cookie recording for future requests")
 	cookiesCmd.PersistentFlags().BoolVarP(&flagCookiesDisable, "off", "", false, "Disable cookie recording for future requests")
-	cookiesCmd.PersistentFlags().StringVarP(&flagCookiesURL, "url", "u", "", "Get cookies that would only be set on the given URL")
+
+	// TODO: enable below
+	//cookiesCmd.PersistentFlags().StringVarP(&flagCookiesURL, "url", "u", "", "Get cookies that would only be set on the given URL")
 
 	// mark the delete and default flags as mutually exclusive
 	cookiesCmd.MarkFlagsMutuallyExclusive("on", "off", "clear", "info", "url")
@@ -191,6 +193,8 @@ func invokeCookiesList(opts cookiesOptions) error {
 		fmt.Println("(no cookies)")
 		return nil
 	}
+
+	// TODO: actually use --url
 
 	cookiesByDomain := map[string][]suyac.SetCookiesCall{}
 	domains := []string{}

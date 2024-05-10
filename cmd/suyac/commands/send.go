@@ -161,7 +161,7 @@ func invokeSend(reqName string, opts sendOptions) error {
 
 	// persist cookies
 	if p.Config.RecordSession && len(result.Cookies) > 0 {
-		p.Session.Cookies = append(p.Session.Cookies, result.Cookies...)
+		p.Session.Cookies = result.Cookies
 
 		err := p.PersistSessionToDisk()
 		if err != nil {

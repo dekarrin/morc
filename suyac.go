@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httputil"
@@ -854,8 +853,8 @@ type SendResult struct {
 	// response body
 	Captures map[string]string
 
-	// Cookies is records of calls to SetCookie in the client cookie jar during
-	// the request.
+	// Cookies is all cookies available in the client after the request was
+	// sent.
 	Cookies []SetCookiesCall
 }
 
@@ -894,11 +893,7 @@ func Send(method, URL, varSymbol string, opts SendOptions) (SendResult, error) {
 	}
 
 	if len(opts.Cookies) > 0 {
-		log.Printf("Setting %d cookies from calls", len(opts.Cookies))
 		client.jar.SetCookiesFromCalls(opts.Cookies)
-
-		actualURL, _ := url.Parse(URL)
-		log.Printf("RESULTS IN THIS: %v", client.jar.Cookies(actualURL))
 	}
 
 	req, err := client.CreateRequest(method, URL, opts.Body, opts.Headers)
@@ -906,19 +901,25 @@ func Send(method, URL, varSymbol string, opts SendOptions) (SendResult, error) {
 		return SendResult{}, fmt.Errorf("create request: %w", err)
 	}
 
-	var cookiesSetDuringReq []SetCookiesCall
-	recordSetCookies := func(u *url.URL, cookies []*http.Cookie) {
-		cookiesSetDuringReq = append(cookiesSetDuringReq, SetCookiesCall{
-			Time:    time.Now(),
-			URL:     u,
-			Cookies: cookies,
-		})
+	// copy request body bytes now because we are about to lose it once we send
+	// the request
+	var reqBodyBytes []byte
+	if req.Body != nil && req.Body != http.NoBody {
+		reqBodyBytes, err = io.ReadAll(req.Body)
+		if err != nil {
+			return SendResult{}, fmt.Errorf("read request body: %w", err)
+		}
+		req.Body = io.NopCloser(bytes.NewBuffer(reqBodyBytes))
 	}
-	setCookiesListenerID := client.jar.ForwardSetCookieCalls(recordSetCookies)
 
 	sendTime := time.Now()
 	resp, caps, err := client.SendRequest(req) // TODO: need to get cookie records from jar
 	recvTime := time.Now()                     // finer grained time would need to come from client.SendRequest, this is fine for now
+
+	// if we had a body, put it back after request
+	if len(reqBodyBytes) > 0 {
+		req.Body = io.NopCloser(bytes.NewBuffer(reqBodyBytes))
+	}
 
 	// we can ONLY output a proper request once it has been sent, so do that before
 	// we error check the response
@@ -929,8 +930,6 @@ func Send(method, URL, varSymbol string, opts SendOptions) (SendResult, error) {
 	if err != nil {
 		return SendResult{}, fmt.Errorf("send request: %w", err)
 	}
-
-	client.jar.StopForwardingSetCookieCalls(setCookiesListenerID)
 
 	// if we have been asked to save state, do that now
 	if opts.SaveStateFile != "" {
@@ -950,13 +949,15 @@ func Send(method, URL, varSymbol string, opts SendOptions) (SendResult, error) {
 		return SendResult{}, err
 	}
 
+	client.jar.evictOld()
+
 	return SendResult{
 		SendTime: sendTime,
 		RecvTime: recvTime,
 		Request:  req,
 		Response: resp,
 		Captures: caps,
-		Cookies:  cookiesSetDuringReq,
+		Cookies:  client.jar.calls,
 	}, nil
 }
 
@@ -1035,6 +1036,9 @@ func OutputResponse(resp *http.Response, caps map[string]string, opts OutputCont
 
 			// works for both pretty and line formats
 			fmt.Println(string(entireBody))
+
+			// put the body back into a reader
+			resp.Body = io.NopCloser(bytes.NewBuffer(entireBody))
 		} else {
 			if opts.Format == FormatPretty {
 				fmt.Println("(no response body)")

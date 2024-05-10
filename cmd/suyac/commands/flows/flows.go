@@ -56,11 +56,11 @@ func invokeFlowsList(filename string) error {
 			f := p.Flows[name]
 
 			reqS := "s"
-			if len(f.Requests) == 1 {
+			if len(f.Steps) == 1 {
 				reqS = ""
 			}
 
-			fmt.Printf("%s: %d request%s\n", f.Name, len(f.Requests), reqS)
+			fmt.Printf("%s: %d request%s\n", f.Name, len(f.Steps), reqS)
 		}
 	}
 

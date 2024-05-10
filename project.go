@@ -759,8 +759,8 @@ func (v *VarStore) Remove(key string) {
 }
 
 type Flow struct {
-	Name     string
-	Requests []RequestTemplate
+	Name  string   `json:"name"`
+	Steps []string `json:"steps"`
 }
 
 type marshaledHistory struct {

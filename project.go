@@ -140,7 +140,7 @@ func (p Project) PersistHistoryToDisk() error {
 }
 
 func (p Project) PersistSessionToDisk() error {
-	seshPath := p.Config.HistoryFSPath()
+	seshPath := p.Config.SessionFSPath()
 	if seshPath == "" {
 		return fmt.Errorf("session file path is not set")
 	}
@@ -228,6 +228,10 @@ func LoadProjectFromDisk(projFilename string, all bool) (Project, error) {
 		return Project{}, fmt.Errorf("unmarshal project data: %w", err)
 	}
 
+	if m.Filetype != FiletypeProject {
+		return Project{}, fmt.Errorf("project file has wrong filetype: %s", m.Filetype)
+	}
+
 	p := Project{
 		Name:      m.Name,
 		Templates: m.Templates,
@@ -278,6 +282,10 @@ func LoadHistoryFromDisk(histFilename string) ([]HistoryEntry, error) {
 	var m marshaledHistory
 	if err := json.Unmarshal(histData, &m); err != nil {
 		return nil, fmt.Errorf("unmarshal history data: %w", err)
+	}
+
+	if m.Filetype != FiletypeHistory {
+		return nil, fmt.Errorf("history file has wrong filetype: %s", m.Filetype)
 	}
 
 	return m.Entries, nil
@@ -335,6 +343,10 @@ func (s *Session) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	if ms.Filetype != FiletypeSession {
+		return fmt.Errorf("session file has wrong filetype: %s", ms.Filetype)
+	}
+
 	for idx, c := range ms.Cookies {
 		if !strings.HasPrefix(c, "rezi/b64:") {
 			return fmt.Errorf("invalid cookie encoding in cookie index %d; not 'rezi/b64'", idx)
@@ -348,7 +360,7 @@ func (s *Session) UnmarshalJSON(data []byte) error {
 		}
 
 		buf := bytes.NewBuffer(decoded)
-		rzr, err := rezi.NewReader(buf, nil)
+		rzr, err := rezi.NewReader(buf, &rezi.Format{Compression: true})
 		if err != nil {
 			return err
 		}

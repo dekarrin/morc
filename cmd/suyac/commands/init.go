@@ -50,6 +50,8 @@ func invokeInit(projName string) error {
 			ProjFile:       suyac.DefaultProjectPath,
 			HistFile:       suyac.DefaultHistoryPath,
 			SeshFile:       suyac.DefaultSessionPath,
+			RecordHistory:  true,
+			RecordSession:  true,
 		},
 	}
 

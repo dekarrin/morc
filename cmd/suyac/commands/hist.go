@@ -83,8 +83,6 @@ var histCmd = &cobra.Command{
 
 		if len(args) > 0 {
 			opts.action = histDetail
-		} else {
-			opts.action = histInfo
 		}
 
 		if opts.action != histDetail {
@@ -261,7 +259,7 @@ func invokeHistList(opts histOptions) error {
 	}
 
 	if len(p.History) == 0 {
-		fmt.Println("(no history entries).")
+		fmt.Println("(no history)")
 		return nil
 	}
 

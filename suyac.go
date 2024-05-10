@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httputil"
@@ -893,16 +894,16 @@ func Send(method, URL, varSymbol string, opts SendOptions) (SendResult, error) {
 	}
 
 	if len(opts.Cookies) > 0 {
+		log.Printf("Setting %d cookies from calls", len(opts.Cookies))
 		client.jar.SetCookiesFromCalls(opts.Cookies)
+
+		actualURL, _ := url.Parse(URL)
+		log.Printf("RESULTS IN THIS: %v", client.jar.Cookies(actualURL))
 	}
 
 	req, err := client.CreateRequest(method, URL, opts.Body, opts.Headers)
 	if err != nil {
 		return SendResult{}, fmt.Errorf("create request: %w", err)
-	}
-
-	if err := OutputRequest(req, opts.Output); err != nil {
-		return SendResult{}, err
 	}
 
 	var cookiesSetDuringReq []SetCookiesCall
@@ -918,6 +919,13 @@ func Send(method, URL, varSymbol string, opts SendOptions) (SendResult, error) {
 	sendTime := time.Now()
 	resp, caps, err := client.SendRequest(req) // TODO: need to get cookie records from jar
 	recvTime := time.Now()                     // finer grained time would need to come from client.SendRequest, this is fine for now
+
+	// we can ONLY output a proper request once it has been sent, so do that before
+	// we error check the response
+	if outReqErr := OutputRequest(req, opts.Output); outReqErr != nil {
+		return SendResult{}, outReqErr
+	}
+
 	if err != nil {
 		return SendResult{}, fmt.Errorf("send request: %w", err)
 	}

@@ -49,7 +49,7 @@ headers, URL, and method are saved at creation and later sent with `suyac send`.
 First, a project is created with `suyac init`. This puts all project files by
 default in a new `.suyac` directory in the directory it is called from.
 
-Then, call `suyac req new` to create a new request, giving the name of request.
+Then, call `suyac reqs new` to create a new request, giving the name of request.
 
 Finally, at a later time, call `suyac send` to actually fire it.
 
@@ -58,7 +58,7 @@ As an example:
 ```shell
 suyac init   # create the project, if it doesn't yet exist
 
-suyac req new get-google --url http://google.com/ -X GET
+suyac reqs new get-google --url http://google.com/ -X GET
 
 suyac send get-google  # actually fire it off
 ```

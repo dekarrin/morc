@@ -48,8 +48,8 @@ impelmented. This lists whether the command is implemented.
 - [ ] `suyac flow show` - Show a particular flow's details.
 - [ ] `suyac flow delete` - Delete an existing flow.
 - [ ] `suyac flow edit` - Modify a flow.
-- [ ] `suyac cookies` - Show the cookies that are currently stored.
-- [ ] `suyac cookies clear` - Clear all current cookies.
+- [x] `suyac cookies` - Show the cookies that are currently stored.
+- [x] `suyac cookies clear` - Clear all current cookies.
 
 ### Projectless State Manipulation
 

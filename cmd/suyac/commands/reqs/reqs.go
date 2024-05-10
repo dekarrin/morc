@@ -1,11 +1,11 @@
-package req
+package reqs
 
 import (
 	"fmt"
 	"sort"
 
 	"github.com/dekarrin/suyac"
-	"github.com/dekarrin/suyac/cmd/suyac/commands/req/caps"
+	"github.com/dekarrin/suyac/cmd/suyac/commands/reqs/caps"
 	"github.com/dekarrin/suyac/cmd/suyac/commonflags"
 	"github.com/spf13/cobra"
 )
@@ -17,7 +17,7 @@ func init() {
 }
 
 var RootCmd = &cobra.Command{
-	Use:     "req [-F project_file]",
+	Use:     "reqs [-F project_file]",
 	GroupID: "project",
 	Short:   "Show or manipulate request templates",
 	Long:    "Print out a listing of the names and methods of the request templates in the project.",

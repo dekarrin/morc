@@ -6,7 +6,7 @@ import (
 
 	"github.com/dekarrin/suyac"
 	"github.com/dekarrin/suyac/cmd/suyac/commands/proj"
-	"github.com/dekarrin/suyac/cmd/suyac/commands/req"
+	"github.com/dekarrin/suyac/cmd/suyac/commands/reqs"
 	"github.com/spf13/cobra"
 )
 
@@ -30,7 +30,7 @@ func init() {
 	rootCmd.AddGroup(sendingCommands)
 	rootCmd.AddGroup(quickreqCommands)
 	rootCmd.AddCommand(proj.RootCmd)
-	rootCmd.AddCommand(req.RootCmd)
+	rootCmd.AddCommand(reqs.RootCmd)
 }
 
 var rootCmd = &cobra.Command{

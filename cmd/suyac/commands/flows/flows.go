@@ -37,7 +37,7 @@ var RootCmd = &cobra.Command{
 }
 
 func invokeFlowsList(filename string) error {
-	p, err := suyac.LoadProjectFromDisk(filename, true)
+	p, err := suyac.LoadProjectFromDisk(filename, false)
 	if err != nil {
 		return err
 	}

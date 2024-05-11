@@ -45,7 +45,7 @@ type deleteOptions struct {
 
 func invokeFlowDelete(name string, opts deleteOptions) error {
 	// load the project file
-	p, err := suyac.LoadProjectFromDisk(opts.projFile, true)
+	p, err := suyac.LoadProjectFromDisk(opts.projFile, false)
 	if err != nil {
 		return err
 	}

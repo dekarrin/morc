@@ -57,6 +57,17 @@ func invokeReqDelete(name string, opts deleteOptions) error {
 		return fmt.Errorf("no request template %s", name)
 	}
 
+	// check if this req is in any flows; cannot delete it if so
+	inFlows := p.FlowsWithTemplate(name)
+
+	if len(inFlows) > 0 {
+		flowS := "s"
+		if len(inFlows) == 1 {
+			flowS = ""
+		}
+		return fmt.Errorf("cannot delete template\n%s is used in flow%s %s", name, flowS, strings.Join(inFlows, ", "))
+	}
+
 	delete(p.Templates, name)
 
 	// save the project file

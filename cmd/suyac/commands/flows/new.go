@@ -67,19 +67,22 @@ func invokeFlowsNew(name string, templates []string, opts newOptions) error {
 		return fmt.Errorf("flow %s already exists in project", name)
 	}
 
-	// check that each of the templates exist
-
+	// check that each of the templates exist and create the flow steps
+	var steps []suyac.FlowStep
 	for _, reqName := range templates {
 		reqLower := strings.ToLower(reqName)
 		if _, exists := p.Templates[reqLower]; !exists {
 			return fmt.Errorf("no request template %q in project", reqName)
 		}
+		steps = append(steps, suyac.FlowStep{
+			Template: reqLower,
+		})
 	}
 
 	// create the new flow
 	flow := suyac.Flow{
 		Name:  name,
-		Steps: templates,
+		Steps: steps,
 	}
 
 	p.Flows[name] = flow

@@ -111,6 +111,21 @@ type marshaledProject struct {
 	Config    Settings                   `json:"config"`
 }
 
+func (p Project) FlowsWithTemplate(template string) []string {
+	template = strings.ToLower(template)
+
+	var flows []string
+	for name, flow := range p.Flows {
+		for _, step := range flow.Steps {
+			if step.Template == template {
+				flows = append(flows, name)
+				break
+			}
+		}
+	}
+	return flows
+}
+
 func (p Project) PersistHistoryToDisk() error {
 	histPath := p.Config.HistoryFSPath()
 	if histPath == "" {
@@ -759,8 +774,12 @@ func (v *VarStore) Remove(key string) {
 }
 
 type Flow struct {
-	Name  string   `json:"name"`
-	Steps []string `json:"steps"`
+	Name  string     `json:"name"`
+	Steps []FlowStep `json:"steps"`
+}
+
+type FlowStep struct {
+	Template string `json:"template"`
 }
 
 type marshaledHistory struct {

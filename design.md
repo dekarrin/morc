@@ -43,11 +43,11 @@ impelmented. This lists whether the command is implemented.
 - [x] `suyac var [NAME] [VALUE]` - By self, list basic info about the var store, with breakdown by env.
 - [x] `suyac var -d` - Delete a variable in the current environment. Flags can specify deletion everywhere.
 - [x] `suyac env` - Set or get the current var environment. If given one that does not exist, it is created.
-- [ ] `suyac flow` - Show details on flows and list them out.
-- [ ] `suyac flow new` - Create a new flow in the project.
-- [ ] `suyac flow show` - Show a particular flow's details.
-- [ ] `suyac flow delete` - Delete an existing flow.
-- [ ] `suyac flow edit` - Modify a flow.
+- [x] `suyac flow` - Show details on flows and list them out.
+- [x] `suyac flow new` - Create a new flow in the project.
+- [x] `suyac flow show` - Show a particular flow's details.
+- [x] `suyac flow delete` - Delete an existing flow.
+- [x] `suyac flow edit` - Modify a flow.
 - [x] `suyac cookies` - Show the cookies that are currently stored.
 - [x] `suyac cookies clear` - Clear all current cookies.
 
@@ -64,7 +64,7 @@ impelmented. This lists whether the command is implemented.
 ### Request Sending
 
 - [x] `suyac send` - Send a `req`.
-- [ ] `suyac exec` - Send a flow (a sequence of request templates).
+- [x] `suyac exec` - Send a flow (a sequence of request templates).
 - [x] `suyac request` - (NAME SUBJECT TO CHANGE) Send an ad-hoc one-off request.
 - [x] `suyac get` - Shorthand for `suyac request -X GET`.
 - [x] `suyac post` - Shorthand for `suyac request -X POST`.

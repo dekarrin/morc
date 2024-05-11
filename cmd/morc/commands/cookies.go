@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"sort"
 	"time"
@@ -25,12 +26,10 @@ func init() {
 	cookiesCmd.PersistentFlags().BoolVarP(&flagCookiesClear, "clear", "", false, "Delete all cookies")
 	cookiesCmd.PersistentFlags().BoolVarP(&flagCookiesEnable, "on", "", false, "Enable cookie recording for future requests")
 	cookiesCmd.PersistentFlags().BoolVarP(&flagCookiesDisable, "off", "", false, "Disable cookie recording for future requests")
-
-	// TODO: enable below
-	//cookiesCmd.PersistentFlags().StringVarP(&flagCookiesURL, "url", "u", "", "Get cookies that would only be set on the given URL")
+	cookiesCmd.PersistentFlags().StringVarP(&flagCookiesURL, "url", "u", "", "Get cookies that would only be set on the given URL")
 
 	// mark the delete and default flags as mutually exclusive
-	cookiesCmd.MarkFlagsMutuallyExclusive("on", "off", "clear", "info") //, "url")
+	cookiesCmd.MarkFlagsMutuallyExclusive("on", "off", "clear", "info", "url")
 
 	rootCmd.AddCommand(cookiesCmd)
 }
@@ -44,10 +43,18 @@ var cookiesCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := cookiesOptions{
 			projFile: flagEnvProjectFile,
-			url:      flagCookiesURL,
 		}
 		if opts.projFile == "" {
 			return fmt.Errorf("project file is set to empty string")
+		}
+
+		// parse the URL if given
+		if flagCookiesURL != "" {
+			u, err := url.Parse(flagCookiesURL)
+			if err != nil {
+				return fmt.Errorf("invalid URL: %w", err)
+			}
+			opts.url = u
 		}
 
 		if flagCookiesInfo {
@@ -85,7 +92,6 @@ var cookiesCmd = &cobra.Command{
 type cookiesAction int
 
 const (
-	// list all environments
 	cookiesList cookiesAction = iota
 	cookiesInfo
 	cookiesClear
@@ -96,7 +102,7 @@ const (
 type cookiesOptions struct {
 	projFile string
 	action   cookiesAction
-	url      string
+	url      *url.URL
 }
 
 func invokeCookiesOn(opts cookiesOptions) error {
@@ -194,34 +200,48 @@ func invokeCookiesList(opts cookiesOptions) error {
 		return nil
 	}
 
-	// TODO: actually use --url
+	if opts.url != nil {
+		// list only cookies that would be set on the given URL
 
-	cookiesByDomain := map[string][]morc.SetCookiesCall{}
-	domains := []string{}
-	for _, c := range p.Session.Cookies {
-		u := c.URL.String()
+		cookies := p.CookiesForURL(opts.url)
 
-		if _, ok := cookiesByDomain[u]; !ok {
-			domains = append(domains, u)
-			cookiesByDomain[u] = []morc.SetCookiesCall{}
+		if len(cookies) == 0 {
+			fmt.Println("(no cookies)")
+			return nil
 		}
 
-		dList := cookiesByDomain[u]
-		dList = append(dList, c)
-		cookiesByDomain[u] = dList
-	}
-	sort.Strings(domains)
+		for _, c := range cookies {
+			fmt.Printf("%s\n", c.String())
+		}
+	} else {
+		// list them all
+		cookiesByDomain := map[string][]morc.SetCookiesCall{}
+		domains := []string{}
+		for _, c := range p.Session.Cookies {
+			u := c.URL.String()
 
-	for i, d := range domains {
-		fmt.Printf("%s:\n", d)
-		for _, call := range cookiesByDomain[d] {
-			for _, c := range call.Cookies {
-				fmt.Printf("%s %s\n", call.Time.Format(time.RFC3339), c.String())
+			if _, ok := cookiesByDomain[u]; !ok {
+				domains = append(domains, u)
+				cookiesByDomain[u] = []morc.SetCookiesCall{}
 			}
-		}
 
-		if i < len(domains)-1 {
-			fmt.Println()
+			dList := cookiesByDomain[u]
+			dList = append(dList, c)
+			cookiesByDomain[u] = dList
+		}
+		sort.Strings(domains)
+
+		for i, d := range domains {
+			fmt.Printf("%s:\n", d)
+			for _, call := range cookiesByDomain[d] {
+				for _, c := range call.Cookies {
+					fmt.Printf("%s %s\n", call.Time.Format(time.RFC3339), c.String())
+				}
+			}
+
+			if i < len(domains)-1 {
+				fmt.Println()
+			}
 		}
 	}
 

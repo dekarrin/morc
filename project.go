@@ -101,6 +101,24 @@ type Project struct {
 	Config    Settings
 }
 
+// CookiesForURL returns the cookies that would be sent with a request to the
+// given URL made from the project.
+
+func (p Project) CookiesForURL(u *url.URL) []*http.Cookie {
+	if len(p.Session.Cookies) == 0 {
+		return nil
+	}
+	if u == nil {
+		return nil
+	}
+
+	// Create a RESTClient to invoke its cookiejar creation and set the cookies
+	// on it so we can request for the URL
+	client := NewRESTClient(p.Config.CookieLifetime)
+	client.jar.SetCookiesFromCalls(p.Session.Cookies)
+	return client.jar.Cookies(u)
+}
+
 type marshaledProject struct {
 	Filetype  string                     `json:"filetype"`
 	Version   int                        `json:"version"`
@@ -313,7 +331,7 @@ type Session struct {
 // TotalCookieSets returns the total number of individual cookies that this
 // Session has a record of being set across all URLs. This may include the same
 // cookie being set multiple times.
-func (s *Session) TotalCookieSets() int {
+func (s Session) TotalCookieSets() int {
 	total := 0
 	for _, c := range s.Cookies {
 		total += len(c.Cookies)

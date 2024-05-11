@@ -1,3 +1,31 @@
+v0.1.0 - May 10, 2024
+----------------------
+* The name has been updated from `suyac` to `morc`, MORe than just Curl, the
+MORonically simple Client.
+* Added variable setting, persistence, and capturing, along with environments
+with their own values for the same variables to quickly swap between sets of
+them. Environments default to the default environment's value when a variable
+isn't found.
+* Added history saving and playback.
+* Added cookie persistence.
+* Added experimental support for **flows**, sequences of commands.
+* The root command was updated from `suyac` to `morc`.
+* The `req` subcommand was renamed to `reqs`.
+* Added new commands:
+  * `morc vars` and `morc env` for variable management.
+  * `morc hist` for history management.
+  * `morc cookies` for cookie management.
+  * `morc reqs caps` for viewing template variable captures.
+  * `morc reqs caps new` to create a new variable capture in a template.
+  * `morc reqs caps delete` to remove a variable capture.
+  * `morc flows` for viewing existing flows.
+  * `morc flows new` to create a new flow.
+  * `morc flows show` to see a particular flow.
+  * `morc flows delete` to delete a flow.
+  * `morc flows edit` to update a flow.
+  * `morc exec` to execute a flow.
+
+
 v0.0.1 - May 5, 2024
 --------------------
 * Initial release. This version contains a handful of commands usable as a

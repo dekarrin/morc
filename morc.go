@@ -22,7 +22,7 @@ import (
 	"github.com/dekarrin/rezi/v2"
 )
 
-const Version = "0.0.2-dev"
+const Version = "0.1.0"
 
 type TraversalStep struct {
 	Key   string // if set, index is ignored

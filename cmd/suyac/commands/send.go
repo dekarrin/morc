@@ -94,21 +94,26 @@ func invokeSend(reqName string, opts sendOptions) error {
 		return fmt.Errorf("no request template %s", reqName)
 	}
 
+	return sendTemplate(p, tmpl, opts.oneTimeVars, opts.outputCtrl)
+}
+
+func sendTemplate(p suyac.Project, tmpl suyac.RequestTemplate, vars map[string]string, oc suyac.OutputControl) error {
+
 	if tmpl.Method == "" {
-		return fmt.Errorf("request template %s has no method set", reqName)
+		return fmt.Errorf("request template %s has no method set", tmpl.Name)
 	}
 
 	if tmpl.URL == "" {
-		return fmt.Errorf("request template %s has no URL set", reqName)
+		return fmt.Errorf("request template %s has no URL set", tmpl.Name)
 	}
 
 	varSymbol := "$"
 
 	sendOpts := suyac.SendOptions{
-		Vars:           opts.oneTimeVars,
+		Vars:           vars,
 		Body:           tmpl.Body,
 		Headers:        tmpl.Headers,
-		Output:         opts.outputCtrl,
+		Output:         oc,
 		CookieLifetime: p.Config.CookieLifetime,
 	}
 

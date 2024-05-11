@@ -10,4 +10,8 @@ suyac
 state.bin
 .suyac
 
+morc
+!morc/
+.morc
+
 *.tar.gz

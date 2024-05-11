@@ -21,9 +21,9 @@ fi
 # only do skip tests if tests have already been done.
 [ "$1" = "--skip-tests" ] && skip_tests=1
 
-BINARY_NAME="suyac"
-MAIN_PACKAGE_PATH="./cmd/suyac"
-ARCHIVE_NAME="suyac"
+BINARY_NAME="morc"
+MAIN_PACKAGE_PATH="./cmd/morc"
+ARCHIVE_NAME="morc"
 
 tar_cmd=tar
 if [ "$(uname -s)" = "Darwin" ]

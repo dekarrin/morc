@@ -1,4 +1,4 @@
-module github.com/dekarrin/suyac
+module github.com/dekarrin/morc
 
 go 1.19
 

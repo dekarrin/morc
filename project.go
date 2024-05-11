@@ -1,4 +1,4 @@
-package suyac
+package morc
 
 import (
 	"bytes"
@@ -21,13 +21,13 @@ import (
 const (
 	ProjDirVar = "::PROJ_DIR::"
 
-	DefaultProjectPath = ".suyac/project.json"
+	DefaultProjectPath = ".morc/project.json"
 	DefaultSessionPath = ProjDirVar + "/session.json"
 	DefaultHistoryPath = ProjDirVar + "/history.json"
 
-	FiletypeProject = "SUYAC/PROJECT"
-	FiletypeSession = "SUYAC/SESSION"
-	FiletypeHistory = "SUYAC/HISTORY"
+	FiletypeProject = "MORC/PROJECT"
+	FiletypeSession = "MORC/SESSION"
+	FiletypeHistory = "MORC/HISTORY"
 
 	CurFileVersion = 1
 )
@@ -178,10 +178,10 @@ func (p Project) PersistSessionToDisk() error {
 
 // PersistToDisk writes up to 3 files; one for the suite, one for the session,
 // and one for the history. If p.ProjFile is empty, it will be written to the
-// current working directory at path .suyac/suite.json. If p.SeshFile is
+// current working directory at path .morc/suite.json. If p.SeshFile is
 // empty, it will be written to the current working directory at path
-// .suyac/session.json. If p.HistFile is empty, it will be written to the
-// current working directory at path .suyac/history.json.
+// .morc/session.json. If p.HistFile is empty, it will be written to the
+// current working directory at path .morc/history.json.
 func (p Project) PersistToDisk(all bool) error {
 	// get data to persist
 	m := marshaledProject{

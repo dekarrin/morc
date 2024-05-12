@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/dekarrin/morc"
@@ -50,6 +51,10 @@ var cookiesCmd = &cobra.Command{
 
 		// parse the URL if given
 		if flagCookiesURL != "" {
+			lowerURL := strings.ToLower(flagCookiesURL)
+			if !strings.HasPrefix(lowerURL, "http://") && !strings.HasPrefix(lowerURL, "https://") {
+				flagCookiesURL = "http://" + flagCookiesURL
+			}
 			u, err := url.Parse(flagCookiesURL)
 			if err != nil {
 				return fmt.Errorf("invalid URL: %w", err)

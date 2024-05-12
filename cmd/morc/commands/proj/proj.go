@@ -13,6 +13,8 @@ var (
 )
 
 func init() {
+	// TODO: specific item flags
+
 	RootCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
 }
 

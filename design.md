@@ -33,7 +33,7 @@ impelmented. This lists whether the command is implemented.
 - [ ] `suyac req caps edit` - Update a var capture.
 - [x] `suyac req caps new` - Create a new var capture in the template.
 - [x] `suyac proj` - Show details on the project.
-- [ ] `suyac proj edit` - Modify the project. Setting var prefix must be possible.
+- [x] `suyac proj edit` - Modify the project. Setting var prefix must be possible.
 - [x] `suyac proj new` - Create a new project file with settable options.
 - [x] `suyac hist` - Show basic info on the history such as file location and number of entries. Filterable by req.
 - [x] `suyac hist show` - Show a single history entry.

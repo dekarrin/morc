@@ -638,6 +638,9 @@ func (sc *SetCookiesCall) UnmarshalBinary(data []byte) error {
 //
 // It uses trickiness inside of unmarshal that relies on assumption that it is
 // being called on a valid one whose wrapped cookiejar hasn't yet been called.
+//
+// TODO: this is a highly-coupled structure with RESTClient. Doesn't really make
+// sense to export it.
 type TimedCookieJar struct {
 	lifetime time.Duration
 	wrapped  http.CookieJar

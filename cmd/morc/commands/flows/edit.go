@@ -22,7 +22,7 @@ func init() {
 	editCmd.PersistentFlags().IntSliceVarP(&flagEditDeleteSteps, "delete-step", "", nil, "Delete the step at the given index. Can be repeated.")
 	editCmd.PersistentFlags().StringSliceVarP(&flagEditAddSteps, "add-step", "", nil, "Add a step to the flow, in format [INDEX]:TEMPLATE. Can be repeated.")
 
-	editCmd.MarkFlagsMutuallyExclusive("name", "delete-step", "add-step")
+	// TODO: enforce at least one flag needing to be on
 
 	RootCmd.AddCommand(editCmd)
 }

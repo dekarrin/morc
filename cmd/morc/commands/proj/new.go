@@ -24,7 +24,7 @@ func init() {
 }
 
 var newCmd = &cobra.Command{
-	Use:   "new NAME [-F file] [-H file] [-S file] [-C duration]",
+	Use:   "new NAME [-F project_file] [-H file] [-S file] [-C duration]",
 	Short: "Create a new morc project file",
 	Long:  "Create a new morc project file. Only the project file is created, not a session or history file",
 	Args:  cobra.ExactArgs(1),

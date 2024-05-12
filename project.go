@@ -119,6 +119,23 @@ func (p Project) CookiesForURL(u *url.URL) []*http.Cookie {
 	return client.jar.Cookies(u)
 }
 
+// EvictOldCookies immediately applies the eviction of old cookie sets using the
+// project's current cookie lifetime. If the project has not loaded its session,
+// or if the session has no cookies, this method will do nothing.
+func (p *Project) EvictOldCookies() {
+	if len(p.Session.Cookies) == 0 {
+		// nothing to do
+		return
+	}
+
+	// Create a RESTClient to invoke its cookiejar creation and set the cookies
+	// on it so we can request eviction of old cookie sets.
+	client := NewRESTClient(p.Config.CookieLifetime)
+	client.jar.SetCookiesFromCalls(p.Session.Cookies)
+	client.jar.evictOld()
+	p.Session.Cookies = client.jar.calls
+}
+
 type marshaledProject struct {
 	Filetype  string                     `json:"filetype"`
 	Version   int                        `json:"version"`

@@ -22,8 +22,8 @@ var (
 
 func init() {
 	editCmd.PersistentFlags().StringVarP(&flagEditName, "name", "n", "", "Change the name of the project.")
-	editCmd.PersistentFlags().StringVarP(&flagEditHistoryFile, "history", "H", "", "Set history file to the given path. Does not affect whether history is actually recorded; use --hist-on and --hist-off for that. If the special string '"+morc.ProjDirVar+"' is in the path given, it is replaced with the relative directory of the project file whenever morc is executed.")
-	editCmd.PersistentFlags().StringVarP(&flagEditSessionFile, "session", "S", "", "Set session file to the given path. Does not affect whether session data (cookies) is actually recorded; use --cookies-on and --cookies-off for that.\nIf the special string '"+morc.ProjDirVar+"' is in the path given, it is replaced with the relative directory of the project file whenever morc is executed.")
+	editCmd.PersistentFlags().StringVarP(&flagEditHistoryFile, "history", "H", "", "Set history file to `PATH`. Does not affect whether history is actually recorded; use --hist-on and --hist-off for that. If the special string '"+morc.ProjDirVar+"' is in the path given, it is replaced with the relative directory of the project file whenever morc is executed.")
+	editCmd.PersistentFlags().StringVarP(&flagEditSessionFile, "session", "S", "", "Set session file to `PATH`. Does not affect whether session data (cookies) is actually recorded; use --cookies-on and --cookies-off for that.\nIf the special string '"+morc.ProjDirVar+"' is in the path given, it is replaced with the relative directory of the project file whenever morc is executed.")
 	editCmd.PersistentFlags().StringVarP(&flagEditCookieLifetime, "cookie-lifetime", "C", "24h", "Set the lifetime of recorded Set-Cookie calls in notation like \"24h\" or \"1h30m\". If set to 0 or less, will be interpreted as 24h. Altering this will immediately apply an eviction check to all current cookies; this may result in some being purged.")
 	editCmd.PersistentFlags().BoolVar(&flagEditCookiesOn, "cookies-on", false, "Turn on recording of cookies. Equivalent to 'morc cookies on'.")
 	editCmd.PersistentFlags().BoolVar(&flagEditCookiesOff, "cookies-off", false, "Turn off recording of cookies. Equivalent to 'morc cookies off'.")
@@ -37,7 +37,7 @@ func init() {
 }
 
 var editCmd = &cobra.Command{
-	Use:   "edit [-F project_file] [--name NAME] [-H FILE] [-S FILE] [-C DURATION] [--cookies-on|--cookies-off] [--hist-on|--hist-off]",
+	Use:   "edit [-F project_file] [--name NAME] [-H PATH] [-S PATH] [-C DURATION] [--cookies-on|--cookies-off] [--hist-on|--hist-off]",
 	Short: "Edit properties of the project",
 	Long:  "Edit properties of the project. One or more flags must be set.",
 	Args:  cobra.NoArgs,

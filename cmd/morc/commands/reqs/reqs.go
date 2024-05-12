@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	RootCmd.PersistentFlags().StringVarP(&commonflags.ReqProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+	RootCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
 
 	RootCmd.AddCommand(caps.RootCmd)
 }
@@ -23,7 +23,7 @@ var RootCmd = &cobra.Command{
 	Long:    "Print out a listing of the names and methods of the request templates in the project.",
 	Args:    cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		filename := commonflags.ReqProjectFile
+		filename := commonflags.ProjectFile
 
 		if filename == "" {
 			return fmt.Errorf("project file is set to empty string")

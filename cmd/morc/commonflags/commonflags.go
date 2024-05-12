@@ -2,7 +2,7 @@
 package commonflags
 
 var (
-	// ReqProjectFile is the flag that specifies the project file to use while
+	// ProjectFile is the flag that specifies the project file to use while
 	// calling `morc req` or subcommands.
-	ReqProjectFile string
+	ProjectFile string
 )

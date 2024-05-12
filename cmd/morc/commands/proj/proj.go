@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/commonflags"
 	"github.com/spf13/cobra"
 )
 
@@ -12,7 +13,7 @@ var (
 )
 
 func init() {
-	RootCmd.PersistentFlags().StringVarP(&flagProjectFile, "file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+	RootCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
 }
 
 var RootCmd = &cobra.Command{
@@ -22,7 +23,7 @@ var RootCmd = &cobra.Command{
 	Long:    "Show the contents of the morc project referred to in the .morc dir in the current directory, or use -F to read a file in another location.",
 	Args:    cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		filename := flagProjectFile
+		filename := commonflags.ProjectFile
 
 		if filename == "" {
 			return fmt.Errorf("project file is set to empty string")

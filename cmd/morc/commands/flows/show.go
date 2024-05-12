@@ -25,7 +25,7 @@ var showCmd = &cobra.Command{
 		}
 
 		opts := showOptions{
-			projFile: commonflags.ReqProjectFile,
+			projFile: commonflags.ProjectFile,
 		}
 
 		if opts.projFile == "" {

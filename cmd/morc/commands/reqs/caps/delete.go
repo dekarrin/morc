@@ -30,7 +30,7 @@ var deleteCmd = &cobra.Command{
 		}
 
 		opts := deleteOptions{
-			projFile: commonflags.ReqProjectFile,
+			projFile: commonflags.ProjectFile,
 		}
 
 		if opts.projFile == "" {

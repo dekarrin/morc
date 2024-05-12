@@ -16,7 +16,7 @@ var RootCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := listOptions{
-			projectFile: commonflags.ReqProjectFile,
+			projectFile: commonflags.ProjectFile,
 		}
 
 		if opts.projectFile == "" {

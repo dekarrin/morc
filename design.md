@@ -23,15 +23,15 @@ impelmented. This lists whether the command is implemented.
 ### Project Manipulation
 
 - [x] `suyac init` - Quickly create project with history & session files.
-- [x] `suyac req` - List the request templates in the project.
-- [x] `suyac req new` - Create a new request template in the poject.
-- [x] `suyac req delete` - Delete an existing request template.
-- [x] `suyac req show` - Show details on a specific request template.
-- [ ] `suyac req edit` - Modify a request template. Changing name must be careful to not break history.
-- [x] `suyac req caps` - List variable captures that are a part of the request template.
-- [x] `suyac req caps delete` - Delete an existing var capture.
-- [ ] `suyac req caps edit` - Update a var capture.
-- [x] `suyac req caps new` - Create a new var capture in the template.
+- [x] `suyac reqs` - List the request templates in the project.
+- [x] `suyac reqs new` - Create a new request template in the poject.
+- [x] `suyac reqs delete` - Delete an existing request template.
+- [x] `suyac reqs show` - Show details on a specific request template.
+- [ ] `suyac reqs edit` - Modify a request template. Changing name must be careful to not break history.
+- [x] `suyac reqs caps` - List variable captures that are a part of the request template.
+- [x] `suyac reqs caps delete` - Delete an existing var capture.
+- [ ] `suyac reqs caps edit` - Update a var capture.
+- [x] `suyac reqs caps new` - Create a new var capture in the template.
 - [x] `suyac proj` - Show details on the project.
 - [x] `suyac proj edit` - Modify the project. Setting var prefix must be possible.
 - [x] `suyac proj new` - Create a new project file with settable options.
@@ -40,14 +40,14 @@ impelmented. This lists whether the command is implemented.
 - [x] `suyac hist clear` - Clear history. Filterable.
 - [x] `suyac hist off` - Disable saving to history while still tracking any existing history file.
 - [x] `suyac hist on` - Enable saving to history.
-- [x] `suyac var [NAME] [VALUE]` - By self, list basic info about the var store, with breakdown by env.
-- [x] `suyac var -d` - Delete a variable in the current environment. Flags can specify deletion everywhere.
+- [x] `suyac vars [NAME] [VALUE]` - By self, list basic info about the var store, with breakdown by env.
+- [x] `suyac vars -d` - Delete a variable in the current environment. Flags can specify deletion everywhere.
 - [x] `suyac env` - Set or get the current var environment. If given one that does not exist, it is created.
-- [x] `suyac flow` - Show details on flows and list them out.
-- [x] `suyac flow new` - Create a new flow in the project.
-- [x] `suyac flow show` - Show a particular flow's details.
-- [x] `suyac flow delete` - Delete an existing flow.
-- [x] `suyac flow edit` - Modify a flow.
+- [x] `suyac flows` - Show details on flows and list them out.
+- [x] `suyac flows new` - Create a new flow in the project.
+- [x] `suyac flows show` - Show a particular flow's details.
+- [x] `suyac flows delete` - Delete an existing flow.
+- [x] `suyac flows edit` - Modify a flow.
 - [x] `suyac cookies` - Show the cookies that are currently stored.
 - [x] `suyac cookies clear` - Clear all current cookies.
 

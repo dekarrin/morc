@@ -15,17 +15,17 @@ var (
 )
 
 func init() {
-	editCmd.PersistentFlags().StringVarP(&flagEditVar, "var", "v", "", "Change the variable the captured value is saved to. `VAR` must contain only letters, numbers, or underscore.")
+	editCmd.PersistentFlags().StringVarP(&flagEditVar, "var", "V", "", "Change the variable the captured value is saved to. `VAR` must contain only letters, numbers, or underscore.")
 	editCmd.PersistentFlags().StringVarP(&flagEditSpec, "spec", "s", "", "Change the capture spec. `CAP` must be either ':START,END' for a byte offset (ex: \":4,20\") or a jq-ish path with only keys and variable indexes (ex: \"records[1].auth.token\")")
 
 	RootCmd.AddCommand(editCmd)
 }
 
 var editCmd = &cobra.Command{
-	Use:   "edit REQ VAR [-F project_file] --var VAR --spec CAP",
+	Use:   "edit REQ VAR [-F project_file] [--var VAR] [--spec CAP]",
 	Short: "Edit a variable capture in the request template.",
 	Long:  "Edit an existing variable capture in the request template by changing the var it captures to or the spec of the capture.",
-	Args:  cobra.ExactArgs(3),
+	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		reqName := args[0]
 		if reqName == "" {
@@ -45,31 +45,41 @@ var editCmd = &cobra.Command{
 			return fmt.Errorf("project file cannot be set to empty string")
 		}
 
-		// if altering name, parse it to check it
-
-		varName, err = morc.ParseVarScraperName(varName)
-		if err != nil {
-			return err
-		}
-
-		// var name normalized to upper case
-		varUpper := strings.ToUpper(varName)
-		if len(req.Captures) > 0 {
-			if _, ok := req.Captures[varUpper]; ok {
-				return fmt.Errorf("variable $%s already has a capture", varUpper)
+		// check if var flag was set
+		if cmd.Flags().Changed("var") {
+			if flagEditVar == "" {
+				return fmt.Errorf("variable name cannot be empty")
 			}
+			newName, err := morc.ParseVarScraperName(flagEditVar)
+			if err != nil {
+				return fmt.Errorf("var: %w", err)
+			}
+			opts.newName = optional[string]{set: true, v: newName}
 		}
 
-		// parse the capture spec
-		scraper, err := morc.ParseVarScraperSpec(varName, varCap)
-		if err != nil {
-			return err
+		// check if spec flag was set
+		if cmd.Flags().Changed("spec") {
+			if flagEditSpec == "" {
+				return fmt.Errorf("capture spec cannot be set to empty")
+			}
+
+			// which var name are we using? new, or old?
+			specVarName := varName
+			if opts.newName.set {
+				specVarName = opts.newName.v
+			}
+
+			scraper, err := morc.ParseVarScraperSpec(specVarName, flagEditSpec)
+			if err != nil {
+				return fmt.Errorf("spec: %w", err)
+			}
+			opts.spec = optional[morc.VarScraper]{set: true, v: scraper}
 		}
 
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
 
-		return invokeReqCapsNew(reqName, varName, varCap, opts)
+		return invokeReqCapsEdit(reqName, varName, opts)
 	},
 }
 
@@ -80,51 +90,71 @@ type optional[E any] struct {
 
 type editOptions struct {
 	projFile string
-	varName  string
 	newName  optional[string]
 	spec     optional[morc.VarScraper]
 }
 
-func invokeReqCapsNew(name, varName, varCap string, opts newOptions) error {
+func invokeReqCapsEdit(reqName, varName string, opts editOptions) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+	p, err := morc.LoadProjectFromDisk(opts.projFile, false)
 	if err != nil {
 		return err
 	}
 
 	// case doesn't matter for request template names
-	name = strings.ToLower(name)
-	req, ok := p.Templates[name]
+	reqName = strings.ToLower(reqName)
+	req, ok := p.Templates[reqName]
 	if !ok {
-		return fmt.Errorf("no request template %s", name)
+		return fmt.Errorf("no request template %s", reqName)
 	}
 
-	// parse the var scraper
-	varName, err = morc.ParseVarScraperName(varName)
-	if err != nil {
-		return err
-	}
-
-	// var name normalized to upper case
+	// case doesn't matter for var names
 	varUpper := strings.ToUpper(varName)
-	if len(req.Captures) > 0 {
-		if _, ok := req.Captures[varUpper]; ok {
-			return fmt.Errorf("variable $%s already has a capture", varUpper)
+
+	if len(req.Captures) == 0 {
+		return fmt.Errorf("no capture to variable $%s exists in request %s", varUpper, reqName)
+	}
+
+	cap, ok := req.Captures[varUpper]
+	if !ok {
+		return fmt.Errorf("no capture to variable $%s exists in request %s", varUpper, reqName)
+	}
+
+	// okay did the user actually ask to change somefin
+	if !opts.newName.set && !opts.spec.set {
+		return fmt.Errorf("no changes requested")
+	}
+
+	// if we have a name change, apply that first
+	if opts.newName.set {
+		newNameUpper := strings.ToUpper(opts.newName.v)
+
+		// if new name same as old, no reason to do additional work
+		if newNameUpper != varUpper {
+			// check if the new name is already in use
+			if _, ok := req.Captures[newNameUpper]; ok {
+				return fmt.Errorf("capture to variable $%s already exists in request %s", opts.newName.v, reqName)
+			}
+
+			// remove the old name
+			delete(req.Captures, varUpper)
+
+			// add the new one; we will update the name when we save it back to
+			// the project
+			cap.Name = opts.newName.v
 		}
 	}
 
-	// parse the capture spec
-	scraper, err := morc.ParseVarScraperSpec(varName, varCap)
-	if err != nil {
-		return err
+	// if we have a spec change, apply that next
+	if opts.spec.set {
+		curName := cap.Name
+		cap = opts.spec.v
+		cap.Name = curName
 	}
 
-	// otherwise, we have a valid capture, so add it to the request.
-	if req.Captures == nil {
-		req.Captures = make(map[string]morc.VarScraper)
-		p.Templates[name] = req
-	}
-	req.Captures[varUpper] = scraper
+	// update the request
+	req.Captures[strings.ToUpper(cap.Name)] = cap
+	p.Templates[reqName] = req
 
 	// save the project file
 	return p.PersistToDisk(false)

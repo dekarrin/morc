@@ -30,7 +30,7 @@ impelmented. This lists whether the command is implemented.
 - [ ] `suyac reqs edit` - Modify a request template. Changing name must be careful to not break history.
 - [x] `suyac reqs caps` - List variable captures that are a part of the request template.
 - [x] `suyac reqs caps delete` - Delete an existing var capture.
-- [ ] `suyac reqs caps edit` - Update a var capture.
+- [x] `suyac reqs caps edit` - Update a var capture.
 - [x] `suyac reqs caps new` - Create a new var capture in the template.
 - [x] `suyac proj` - Show details on the project.
 - [x] `suyac proj edit` - Modify the project. Setting var prefix must be possible.

@@ -6,7 +6,7 @@ such as Postman and Insomnia starting as free and useful programs and eventually
 moving to for-profit models when all I used them for was a quick testing
 environment. This tool was created to fulfill the need for testing and provide a
 way to do so from CLI as a bonus. The name Morc comes from more-curl, or, a CLI
-MORonic Client due to it not being very fancy.
+MORonically-simple Client due to it not being very fancy.
 
 Installation
 ------------
@@ -14,15 +14,129 @@ Installation
 Get a distribution from the releases page of the GitHub repo for this project
 and untar it. Place the `morc` command somewhere on your path.
 
+Quickstart
+----------
+
+Send a one-off request:
+
+```shell
+morc request www.example.com -X PUT -u www.example.com -d @datafile.json -H 'Content-Type: application/json'
+```
+
+Send a request using a project:
+
+```shell
+morc init   # create the project, if it doesn't yet exist
+morc reqs new get-google --url http://google.com/ -X GET
+morc send get-google  # actually fire it off
+```
+
 Usage
 -----
 
-Here are basic descriptions of commands, call `morc help` or
-`morc help COMMAND` for info on CLI flags, etc.
+MORC has two primary ways that it can be used: project-oriented, or standalone
+request sending. With project-oriented use, MORC operates within the context of
+a *project* to create named request templates that can be sent as many times as
+desired by referencing them by name. It tends to require more initial setup, but
+is suitable for saving testing flows as data. Standalone-oriented use avoids the
+use of separate project but requires that the entire request be specified every
+time it is sent; using this mode is more similar to raw curl usage, with some
+optional support for saving basic state info in between requests.
 
-### One-off Requests
+### Project-Oriented Use
 
-Morc can send one-off requests by using `morc request`:
+MORC is generally designed to operate on a MORC *project*. A project has
+requests and flows of requests defined within it that can be sent multiple times
+without having to fully specify them each time they are sent. This is similar to
+what you'd see in the main view of a GUI-based REST client, such as Postman or
+Insomnia.
+
+Beyond creating and sending requests, a project tracks sent request history and
+sets of variables that can be set from the response of a request and used in
+later requests. This, combined with defining sequences of requests in *flows*,
+allows entire testing sequences to be defined and then run on-demand, which can
+be useful for automated testing scenarios.
+
+#### Initializing A MORC Project
+
+First, a project is created with `morc init`. This puts all project files by
+default in a new `.morc` directory in the directory it is called from.
+
+WIP:
+* `morc init`
+* (or `morc proj new`)
+
+#### Creating Requests
+
+WIP:
+* `morc reqs new`
+* `morc reqs`
+* `morc reqs show`
+* `morc reqs edit`
+* `morc reqs delete`
+* `morc send`
+
+#### Using Variables
+
+Templating within a body or url or header is supported. Use variables in form of
+`${NAME}` and supply values during a call to `morc send` with `-V`.
+
+Request templates within Morc can have variables within them that are filled at
+send time. Variables are given in the format `${NAME}`, with NAME replaced by
+the actual name of the variable.
+
+When a template with one or more variables is sent, the values are substituted
+in by drawing from one or more sources. First, all `-V` flags are checked for a
+match. If found, that value is used. If there are no flags setting the value,
+the current variable environment is checked for a value. If none is set, the
+default environment is checked. If there is still no value, the template cannot
+be filled, and an error is emitted.
+
+Variables can also be set, viewed, and modified using the `morc vars` and
+`morc env` commands.
+
+WIP:
+* Use of -V in send
+* `morc vars` (etc)
+* Description of vars envs
+* `morc env`.
+
+Saving variables during a `morc send` automatically is supported via the
+concept of Variable Captures.
+
+Variable values can be taken from the response of a request.
+
+WIP:
+
+* `morc reqs caps new`
+* `morc reqs caps`
+* `morc reqs caps edit`
+* `morc reqs caps delete`
+
+#### Creating Sequences Of Requests With Flows
+
+Flows are sequences of requests that will be fired one after another. It can be
+useful to use with variable captures to perform a full sequence of communication
+with a server.
+
+Use `morc flows new` to create a new one. Once created, `morc exec FLOW` will
+actually send off each request. Any variable captures from request sends are
+used to set the values of subsequent requests.
+
+* `morc flows ...`
+* `morc exec`
+
+#### Request History
+
+* `morc hist`
+
+#### Cookie Store
+
+* `morc cookies`
+
+### Standalone Use
+
+MORC can send one-off requests by using `morc request`:
 
 ```shell
 morc request -X GET http://localhost/cool
@@ -41,67 +155,3 @@ are defined. Calling one is exactly the same as calling
 ```shell
 morc get http://localhost:8080/cool  # same as morc request -X GET http://localhost:8080/cool
 ```
-
-### Project management
-
-Commonly sent requests can be collected as templates in a *project*. Body data,
-headers, URL, and method are saved at creation and later sent with `morc send`.
-
-First, a project is created with `morc init`. This puts all project files by
-default in a new `.morc` directory in the directory it is called from.
-
-Then, call `morc reqs new` to create a new request, giving the name of request.
-
-Finally, at a later time, call `morc send` to actually fire it.
-
-As an example:
-
-```shell
-morc init   # create the project, if it doesn't yet exist
-
-morc reqs new get-google --url http://google.com/ -X GET
-
-morc send get-google  # actually fire it off
-```
-
-Templating within a body or url or header is supported. Use variables in form of
-`${NAME}` and supply values during a call to `morc send` with `-V`.
-
-Saving variables during a `morc send` automatically is supported via the
-concept of Variable Captures.
-
-### Variables
-
-Request templates within Morc can have variables within them that are filled at
-send time. Variables are given in the format `${NAME}`, with NAME replaced by
-the actual name of the variable.
-
-```
-(example wip)
-```
-
-When a template with one or more variables is sent, the values are substituted
-in by drawing from one or more sources. First, all `-V` flags are checked for a
-match. If found, that value is used. If there are no flags setting the value,
-the current variable environment is checked for a value. If none is set, the
-default environment is checked. If there is still no value, the template cannot
-be filled, and an error is emitted.
-
-Variables can also be set, viewed, and modified using the `morc vars` and
-`morc env` commands.
-
-#### Captures
-
-Variable values can be taken from the response of a request.
-
-(wip, fill in later)
-
-### Flows
-
-Flows are sequences of requests that will be fired one after another. It can be
-useful to use with variable captures to perform a full sequence of communication
-with a server.
-
-Use `morc flows new` to create a new one. Once created, `morc exec FLOW` will
-actually send off each request. Any variable captures from request sends are
-used to set the values of subsequent requests.

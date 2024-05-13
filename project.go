@@ -161,6 +161,31 @@ func (p Project) FlowsWithTemplate(template string) []string {
 	return flows
 }
 
+func (p Project) IsExecableFlow(name string) bool {
+	name = strings.ToLower(name)
+	flow, ok := p.Flows[name]
+	if !ok {
+		return false
+	}
+
+	if len(flow.Steps) == 0 {
+		return false
+	}
+
+	for _, step := range flow.Steps {
+		req, exists := p.Templates[step.Template]
+		if !exists {
+			return false
+		}
+
+		if !req.Sendable() {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (p Project) PersistHistoryToDisk() error {
 	histPath := p.Config.HistoryFSPath()
 	if histPath == "" {

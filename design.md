@@ -27,7 +27,7 @@ impelmented. This lists whether the command is implemented.
 - [x] `suyac reqs new` - Create a new request template in the poject.
 - [x] `suyac reqs delete` - Delete an existing request template.
 - [x] `suyac reqs show` - Show details on a specific request template.
-- [ ] `suyac reqs edit` - Modify a request template. Changing name must be careful to not break history.
+- [x] `suyac reqs edit` - Modify a request template. Changing name must be careful to not break history.
 - [x] `suyac reqs caps` - List variable captures that are a part of the request template.
 - [x] `suyac reqs caps delete` - Delete an existing var capture.
 - [x] `suyac reqs caps edit` - Update a var capture.

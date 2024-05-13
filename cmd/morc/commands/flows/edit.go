@@ -19,8 +19,8 @@ var (
 
 func init() {
 	editCmd.PersistentFlags().StringVarP(&flagEditName, "name", "n", "", "Change the name of the flow")
-	editCmd.PersistentFlags().IntSliceVarP(&flagEditDeleteSteps, "delete-step", "", nil, "Delete the step at the given index. Can be repeated.")
-	editCmd.PersistentFlags().StringSliceVarP(&flagEditAddSteps, "add-step", "", nil, "Add a step to the flow, in format [INDEX]:TEMPLATE. Can be repeated.")
+	editCmd.PersistentFlags().IntSliceVarP(&flagEditDeleteSteps, "delete-step", "d", nil, "Delete the step at the given index. Can be repeated.")
+	editCmd.PersistentFlags().StringSliceVarP(&flagEditAddSteps, "add-step", "a", nil, "Add a step to the flow, in format [INDEX]:TEMPLATE. Can be repeated.")
 
 	// TODO: enforce at least one flag needing to be on
 
@@ -28,9 +28,9 @@ func init() {
 }
 
 var editCmd = &cobra.Command{
-	Use:   "edit FLOW [-F project_file] [--name NAME] [--delete-step INDEX] [--add-step [INDEX]:TEMPLATE]",
+	Use:   "edit FLOW [-F project_file] [--name NAME] [-d STEP] [-a [STEP]:TEMPLATE]",
 	Short: "Edit steps or other properties of a flow",
-	Long:  "Edit properties of a flow. The name can be changed by passing a name with --name. Steps can be deleted by passing one or more --delete-step flags with the numbers of steps to delete. New steps can be added by passing them to --add-step, in the format [INDEX]:TEMPLATE. If INDEX is omitted, the step is added to the end of the flow. If it is given, the step is inserted at that postion. The first leading colon is considered to indicate that no index is there; double the colon to insert a template whose name begins with a colon at the end of the flow.\n\nMultiple options may be specified in a single command. Deletes are applied first, from highest index to lowest, then adds, from lowest index to highest.",
+	Long:  "Edit properties of a flow. The name can be changed by passing a name with --name. Steps can be deleted by passing one or more --delete-step flags with the numbers of steps to delete. New steps can be added by passing them to --add-step, in the format [STEP]:TEMPLATE. If STEP is omitted, the step is added to the end of the flow. If it is given, the step is inserted at that postion. The first leading colon is considered to indicate that no step index is there; double the colon to insert a template whose name begins with a colon at the end of the flow.\n\nMultiple options may be specified in a single command. Deletes are applied first, from highest index to lowest, then adds, from lowest index to highest.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		flowName := args[0]
@@ -51,7 +51,7 @@ var editCmd = &cobra.Command{
 		}
 
 		if flagEditName != "" {
-			opts.newName = flagEditName
+			opts.newName = optional[string]{set: true, v: flagEditName}
 		}
 
 		if len(flagEditDeleteSteps) > 0 {
@@ -108,6 +108,11 @@ var editCmd = &cobra.Command{
 	},
 }
 
+type optional[E any] struct {
+	set bool
+	v   E
+}
+
 type editAdd struct {
 	index    int
 	template string
@@ -115,7 +120,7 @@ type editAdd struct {
 
 type editOptions struct {
 	projFile string
-	newName  string
+	newName  optional[string]
 	deletes  []int
 	adds     []editAdd
 }
@@ -135,17 +140,19 @@ func invokeFlowEdit(name string, opts editOptions) error {
 		return fmt.Errorf("no flow named %s exists", name)
 	}
 
-	newNameLower := strings.ToLower(opts.newName)
-	if newNameLower != name {
-		if newNameLower == "" {
-			return fmt.Errorf("new name cannot be empty")
-		}
-		if _, exists := p.Flows[newNameLower]; exists {
-			return fmt.Errorf("flow named %s already exists", opts.newName)
-		}
+	if opts.newName.set {
+		newNameLower := strings.ToLower(opts.newName.v)
+		if newNameLower != name {
+			if newNameLower == "" {
+				return fmt.Errorf("new name cannot be empty")
+			}
+			if _, exists := p.Flows[newNameLower]; exists {
+				return fmt.Errorf("flow named %s already exists", opts.newName.v)
+			}
 
-		flow.Name = newNameLower
-		delete(p.Flows, name)
+			flow.Name = newNameLower
+			delete(p.Flows, name)
+		}
 	}
 
 	for _, delIdx := range opts.deletes {

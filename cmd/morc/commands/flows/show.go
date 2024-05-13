@@ -63,17 +63,25 @@ func invokeFlowShow(name string, opts showOptions) error {
 	}
 
 	for i, step := range flow.Steps {
-		req, ok := p.Templates[step.Template]
-		if !ok {
-			return fmt.Errorf("step %d calls a non-existent template %s", i+1, step.Template)
-		}
+		req, exists := p.Templates[step.Template]
 
-		meth := req.Method
-		if meth == "" {
-			meth = "???"
-		}
+		if exists {
+			notSendableBang := ""
+			meth := req.Method
+			reqURL := req.URL
+			if meth == "" {
+				notSendableBang = "!"
+				meth = "???"
+			}
+			if reqURL == "" {
+				notSendableBang = "!"
+				reqURL = "http://???"
+			}
 
-		fmt.Printf("%d: %s (%s %s)\n", i+1, step.Template, meth, req.URL)
+			fmt.Printf("%d:%s %s (%s %s)\n", i+1, notSendableBang, step.Template, meth, reqURL)
+		} else {
+			fmt.Printf("%d:! %s (!non-existent req)\n", i+1, step.Template)
+		}
 	}
 
 	return nil

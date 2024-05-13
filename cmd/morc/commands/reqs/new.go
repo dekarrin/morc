@@ -39,6 +39,9 @@ var newCmd = &cobra.Command{
 		if reqName == "" {
 			return fmt.Errorf("request name cannot be empty")
 		}
+		if strings.Contains(reqName, " ") {
+			return fmt.Errorf("request name cannot contain spaces")
+		}
 
 		opts := newOptions{
 			projFile: commonflags.ProjectFile,
@@ -88,7 +91,8 @@ var newCmd = &cobra.Command{
 		opts.url = flagURL
 
 		// add scheme to url if non empty and not present
-		if opts.url != "" && !strings.HasPrefix(opts.url, "http://") && !strings.HasPrefix(opts.url, "https://") {
+		lowerURL := strings.ToLower(opts.url)
+		if opts.url != "" && !strings.HasPrefix(lowerURL, "http://") && !strings.HasPrefix(lowerURL, "https://") {
 			opts.url = "http://" + opts.url
 		}
 

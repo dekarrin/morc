@@ -60,7 +60,12 @@ func invokeFlowsList(filename string) error {
 				reqS = ""
 			}
 
-			fmt.Printf("%s: %d request%s\n", f.Name, len(f.Steps), reqS)
+			notExecableBang := ""
+			if !p.IsExecableFlow(name) {
+				notExecableBang = "!"
+			}
+
+			fmt.Printf("%s:%s %d request%s\n", f.Name, notExecableBang, len(f.Steps), reqS)
 		}
 	}
 

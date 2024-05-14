@@ -37,8 +37,8 @@ func init() {
 
 var rootCmd = &cobra.Command{
 	Use:           "morc",
-	Short:         "Morc is a scriptable CLI REST client",
-	Long:          "A CLI REST client that allows you to script HTTP requests and responses",
+	Short:         "MORC is a scriptable CLI REST client",
+	Long:          "MORC, the MORonically-simple Client, is a CLI REST client that allows you to script HTTP requests and responses",
 	Version:       morc.Version,
 	SilenceErrors: true,
 }

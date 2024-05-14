@@ -330,7 +330,6 @@ func (v VarScraper) Scrape(data []byte) (string, error) {
 
 // Do not use default RESTClient, call NewRESTClient instead.
 type RESTClient struct {
-	HTTP         *http.Client
 	Vars         map[string]string
 	VarOverrides map[string]string // Cleared after every call to SendRequest.
 	VarPrefix    string
@@ -339,26 +338,37 @@ type RESTClient struct {
 
 	// cookie jar that records all SetCookies calls; this is a pointer to the
 	// same jar that is passed to HTTP
-	jar *TimedCookieJar
+	jar  *TimedCookieJar
+	http *http.Client
 }
 
 func (r *RESTClient) SetCookieJar(jar *TimedCookieJar) {
 	r.jar = jar
-	r.HTTP.Jar = jar
+	r.http.Jar = jar
 }
 
 // NewRESTClient creates a new RESTClient. 0 for cookie lifetime will default it
-// to 24 hours.
-func NewRESTClient(cookieLifetime time.Duration) *RESTClient {
+// to 24 hours. If an http.Client is provided, it will be used for making calls,
+// but its cookie jar will be replaced with MORC's timeoutable variant. Callers
+// should use other methods to load cookies in. If httpClient is set to nil, it
+// will default to a new http.Client with a default transport and timeout of 30
+// seconds.
+func NewRESTClient(cookieLifetime time.Duration, httpClient *http.Client) *RESTClient {
 	cookies := NewTimedCookieJar(nil, cookieLifetime)
 
-	return &RESTClient{
-		HTTP: &http.Client{
+	if httpClient == nil {
+		httpClient = &http.Client{
 			Transport:     http.DefaultTransport,
 			CheckRedirect: nil,
 			Jar:           cookies,
 			Timeout:       30 * time.Second,
-		},
+		}
+	} else {
+		httpClient.Jar = cookies
+	}
+
+	return &RESTClient{
+		http:      httpClient,
 		Vars:      make(map[string]string),
 		VarPrefix: "$",
 		Scrapers:  make([]VarScraper, 0),
@@ -419,7 +429,7 @@ func (r *RESTClient) CreateRequest(method string, url string, data []byte, hdrs 
 // scanned for var captures and those that are captured are stored in Vars and
 // re
 func (r *RESTClient) SendRequest(req *http.Request) (*http.Response, map[string]string, error) {
-	resp, err := r.HTTP.Do(req)
+	resp, err := r.http.Do(req)
 	if err != nil {
 		return resp, nil, err
 	}
@@ -555,7 +565,7 @@ func (r *RESTClient) ReadState(rd io.Reader) error {
 	}
 
 	r.jar = jar
-	r.HTTP.Jar = jar
+	r.http.Jar = jar
 	r.Vars = state.Vars
 
 	return rzr.Close()
@@ -836,6 +846,12 @@ type SendOptions struct {
 	// Output contains output control options that determine what output is
 	// generated after the request is sent.
 	Output OutputControl
+
+	// Client is a user-provided HTTP client that will be used to make external
+	// HTTP calls. If left nil, a default one is used. If provided, note that
+	// its cookie jar will be replaced with an internal variant of a cookie jar
+	// that allows for cookie record keeping.
+	Client *http.Client
 }
 
 type SendResult struct {
@@ -869,14 +885,14 @@ const (
 // Send performs standardized sending of a request, along with standardized
 // output control options. A RESTClient is built and populated and used to send
 // the request. All requests sent from a CLI command should be sent using this
-// function
+// function.
 func Send(method, URL, varSymbol string, opts SendOptions) (SendResult, error) {
 	if varSymbol == "" {
 		return SendResult{}, fmt.Errorf("variable symbol cannot be empty")
 	}
 
 	// create the client
-	client := NewRESTClient(opts.CookieLifetime) // TODO: allow cookie settings
+	client := NewRESTClient(opts.CookieLifetime, opts.Client)
 	client.VarOverrides = opts.Vars
 	client.VarPrefix = varSymbol
 	client.Scrapers = opts.Captures

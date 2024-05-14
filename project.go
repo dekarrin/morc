@@ -101,6 +101,33 @@ type Project struct {
 	Config    Settings
 }
 
+// Dump writes the contents of the project in "project-file" format to the given
+// io.Writer.
+func (p Project) Dump(w io.Writer) error {
+	// get data to persist
+	m := marshaledProject{
+		Filetype:  FiletypeProject,
+		Version:   CurFileVersion,
+		Name:      p.Name,
+		Templates: p.Templates,
+		Flows:     p.Flows,
+		Vars:      p.Vars,
+		Config:    p.Config,
+	}
+
+	projDataBytes, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal project data: %w", err)
+	}
+
+	_, err = w.Write(projDataBytes)
+	if err != nil {
+		return fmt.Errorf("write project data: %w", err)
+	}
+
+	return nil
+}
+
 // CookiesForURL returns the cookies that would be sent with a request to the
 // given URL made from the project.
 
@@ -114,7 +141,7 @@ func (p Project) CookiesForURL(u *url.URL) []*http.Cookie {
 
 	// Create a RESTClient to invoke its cookiejar creation and set the cookies
 	// on it so we can request for the URL
-	client := NewRESTClient(p.Config.CookieLifetime)
+	client := NewRESTClient(p.Config.CookieLifetime, nil)
 	client.jar.SetCookiesFromCalls(p.Session.Cookies)
 	return client.jar.Cookies(u)
 }
@@ -130,7 +157,7 @@ func (p *Project) EvictOldCookies() {
 
 	// Create a RESTClient to invoke its cookiejar creation and set the cookies
 	// on it so we can request eviction of old cookie sets.
-	client := NewRESTClient(p.Config.CookieLifetime)
+	client := NewRESTClient(p.Config.CookieLifetime, nil)
 	client.jar.SetCookiesFromCalls(p.Session.Cookies)
 	client.jar.evictOld()
 	p.Session.Cookies = client.jar.calls
@@ -186,12 +213,9 @@ func (p Project) IsExecableFlow(name string) bool {
 	return true
 }
 
-func (p Project) PersistHistoryToDisk() error {
-	histPath := p.Config.HistoryFSPath()
-	if histPath == "" {
-		return fmt.Errorf("history file path is not set")
-	}
-
+// DumpHistory writes the contents of the history in "history-file" format to
+// the given io.Writer.
+func (p Project) DumpHistory(w io.Writer) error {
 	m := marshaledHistory{
 		Filetype: FiletypeHistory,
 		Version:  CurFileVersion,
@@ -200,18 +224,24 @@ func (p Project) PersistHistoryToDisk() error {
 
 	histDataBytes, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
-		return fmt.Errorf("marshal history data: %w", err)
+		return fmt.Errorf("marshal: %w", err)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(histPath), 0755); err != nil {
-		return fmt.Errorf("create dir for history file: %w", err)
-	}
-
-	if err := os.WriteFile(histPath, histDataBytes, 0644); err != nil {
-		return fmt.Errorf("write history file: %w", err)
+	_, err = w.Write(histDataBytes)
+	if err != nil {
+		return fmt.Errorf("write: %w", err)
 	}
 
 	return nil
+}
+
+func (p Project) PersistHistoryToDisk() error {
+	histPath := p.Config.HistoryFSPath()
+	if histPath == "" {
+		return fmt.Errorf("history file path is not set")
+	}
+
+	return dumpToFile(histPath, p.DumpHistory)
 }
 
 func (p Project) PersistSessionToDisk() error {
@@ -220,20 +250,7 @@ func (p Project) PersistSessionToDisk() error {
 		return fmt.Errorf("session file path is not set")
 	}
 
-	seshDataBytes, err := json.MarshalIndent(p.Session, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal session data: %w", err)
-	}
-
-	if err := os.MkdirAll(filepath.Dir(seshPath), 0755); err != nil {
-		return fmt.Errorf("create dir for session file: %w", err)
-	}
-
-	if err := os.WriteFile(seshPath, seshDataBytes, 0644); err != nil {
-		return fmt.Errorf("write session file: %w", err)
-	}
-
-	return nil
+	return dumpToFile(seshPath, p.Session.Dump)
 }
 
 // PersistToDisk writes up to 3 files; one for the suite, one for the session,
@@ -243,36 +260,14 @@ func (p Project) PersistSessionToDisk() error {
 // .morc/session.json. If p.HistFile is empty, it will be written to the
 // current working directory at path .morc/history.json.
 func (p Project) PersistToDisk(all bool) error {
-	// get data to persist
-	m := marshaledProject{
-		Filetype:  FiletypeProject,
-		Version:   CurFileVersion,
-		Name:      p.Name,
-		Templates: p.Templates,
-		Flows:     p.Flows,
-		Vars:      p.Vars,
-		Config:    p.Config,
-	}
-
-	projDataBytes, err := json.MarshalIndent(m, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal project data: %w", err)
-	}
-
 	// check file paths and see if they need to be defaulted
 	projPath := p.Config.ProjFile
 	if projPath == "" {
 		projPath = DefaultProjectPath
 	}
 
-	// call mkdir -p on the paths
-	if err := os.MkdirAll(filepath.Dir(projPath), 0755); err != nil {
-		return fmt.Errorf("create dir for project file: %w", err)
-	}
-
-	// write out the data for project, session, and history
-	if err := os.WriteFile(projPath, projDataBytes, 0644); err != nil {
-		return fmt.Errorf("write project file: %w", err)
+	if err := dumpToFile(projPath, p.Dump); err != nil {
+		return fmt.Errorf("persist project: %w", err)
 	}
 
 	if all {
@@ -287,6 +282,32 @@ func (p Project) PersistToDisk(all bool) error {
 				return fmt.Errorf("persist history: %w", err)
 			}
 		}
+	}
+
+	return nil
+}
+
+func dumpToFile(path string, dumpFunc func(io.Writer) error) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return fmt.Errorf("create dir for file: %w", err)
+	}
+
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("open: %w", err)
+	}
+
+	// write out the data for project, session, and history
+	if err := dumpFunc(f); err != nil {
+		return err
+	}
+
+	// flush it and close
+	if err := f.Sync(); err != nil {
+		return fmt.Errorf("sync: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("close: %w", err)
 	}
 
 	return nil
@@ -368,6 +389,22 @@ func LoadHistoryFromDisk(histFilename string) ([]HistoryEntry, error) {
 
 type Session struct {
 	Cookies []SetCookiesCall
+}
+
+// Dump writes the contents of the session in "session-file" format to the given
+// io.Writer.
+func (s Session) Dump(w io.Writer) error {
+	seshDataBytes, err := json.MarshalIndent(s, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal: %w", err)
+	}
+
+	_, err = w.Write(seshDataBytes)
+	if err != nil {
+		return fmt.Errorf("write: %w", err)
+	}
+
+	return nil
 }
 
 // TotalCookieSets returns the total number of individual cookies that this

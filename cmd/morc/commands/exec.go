@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/spf13/cobra"
 )
 
@@ -37,8 +38,9 @@ var execCmd = &cobra.Command{
 
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
+		io := cmdio.From(cmd)
 
-		return invokeExec(args[0], opts)
+		return invokeExec(io, args[0], opts)
 	},
 }
 
@@ -73,7 +75,7 @@ func execFlagsToOptions() (execOptions, error) {
 }
 
 // invokeExec receives the name of the flow to execute and the options to use.
-func invokeExec(flowName string, opts execOptions) error {
+func invokeExec(io cmdio.IO, flowName string, opts execOptions) error {
 	// load the project file
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
@@ -103,6 +105,7 @@ func invokeExec(flowName string, opts execOptions) error {
 		templates = append(templates, tmpl)
 	}
 
+	opts.outputCtrl.Writer = io.Out
 	for i, tmpl := range templates {
 		err := sendTemplate(p, tmpl, opts.oneTimeVars, opts.outputCtrl)
 		if err != nil {

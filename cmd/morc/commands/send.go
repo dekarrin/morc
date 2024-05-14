@@ -96,6 +96,8 @@ func invokeSend(io cmdio.IO, reqName string, opts sendOptions) error {
 		return fmt.Errorf("no request template %s", reqName)
 	}
 
+	opts.outputCtrl.Writer = io.Out
+
 	return sendTemplate(p, tmpl, opts.oneTimeVars, opts.outputCtrl)
 }
 

@@ -111,6 +111,20 @@ information on running it.
 
 #### Creating Requests
 
+So, you've got a project rolling! Congrats. Now you can take a look at all the
+requests that are loaded into it:
+
+```shell
+morc reqs
+```
+
+If this is in a brand new project, there won't be anything there. If it has
+requests defined in it, the output will be something like this:
+
+```
+
+```
+
 WIP:
 * `morc reqs new`
 * `morc reqs`

@@ -53,12 +53,24 @@ func invokeReqList(io cmdio.IO, filename string) error {
 		}
 		sort.Strings(sortedNames)
 
+		// get the longest method name
+		maxLen := 0
 		for _, name := range sortedNames {
 			meth := p.Templates[name].Method
 			if meth == "" {
 				meth = "???"
 			}
-			io.Printf("%s %s\n", name, meth)
+			if len(meth) > maxLen {
+				maxLen = len(meth)
+			}
+		}
+
+		for _, name := range sortedNames {
+			meth := p.Templates[name].Method
+			if meth == "" {
+				meth = "???"
+			}
+			io.Printf("%-*s %s\n", maxLen, meth, name)
 		}
 	}
 

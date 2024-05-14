@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/spf13/cobra"
 )
 
@@ -66,8 +67,9 @@ var requestCmd = &cobra.Command{
 
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
+		io := cmdio.From(cmd)
 
-		return invokeRequest(args[0], args[1], flagVarSymbol, opts)
+		return invokeRequest(io, args[0], args[1], flagVarSymbol, opts)
 	},
 }
 
@@ -97,16 +99,17 @@ func addQuickMethodCommand(method string) {
 				return err
 			}
 
-			// done checking args, don't show usage on error
-			cmd.SilenceUsage = true
-
 			// make sure the URL has a scheme
 			lowerURL := strings.ToLower(args[0])
 			if !strings.HasPrefix(lowerURL, "http://") && !strings.HasPrefix(lowerURL, "https://") {
 				args[0] = "http://" + args[0]
 			}
 
-			return invokeRequest(upperMeth, args[0], flagVarSymbol, opts)
+			// done checking args, don't show usage on error
+			cmd.SilenceUsage = true
+			io := cmdio.From(cmd)
+
+			return invokeRequest(io, upperMeth, args[0], flagVarSymbol, opts)
 		},
 	}
 
@@ -199,7 +202,9 @@ func requestFlagsToOptions(cmdID string) (requestOptions, error) {
 }
 
 // invokeRequest receives named vars and checked/defaulted requestOptions.
-func invokeRequest(method, url, varSymbol string, opts requestOptions) error {
+func invokeRequest(io cmdio.IO, method, url, varSymbol string, opts requestOptions) error {
+	opts.outputCtrl.Writer = io.Out
+
 	sendOpts := morc.SendOptions{
 		LoadStateFile: opts.stateFileIn,
 		SaveStateFile: opts.stateFileOut,

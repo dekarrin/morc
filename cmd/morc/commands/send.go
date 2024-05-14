@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/spf13/cobra"
 )
 
@@ -42,8 +43,9 @@ var sendCmd = &cobra.Command{
 
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
+		io := cmdio.From(cmd)
 
-		return invokeSend(args[0], opts)
+		return invokeSend(io, args[0], opts)
 	},
 }
 
@@ -78,7 +80,7 @@ func sendFlagsToOptions() (sendOptions, error) {
 }
 
 // invokeRequest receives named vars and checked/defaulted requestOptions.
-func invokeSend(reqName string, opts sendOptions) error {
+func invokeSend(io cmdio.IO, reqName string, opts sendOptions) error {
 	// load the project file
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
@@ -98,7 +100,6 @@ func invokeSend(reqName string, opts sendOptions) error {
 }
 
 func sendTemplate(p morc.Project, tmpl morc.RequestTemplate, vars map[string]string, oc morc.OutputControl) error {
-
 	if tmpl.Method == "" {
 		return fmt.Errorf("request template %s has no method set", tmpl.Name)
 	}

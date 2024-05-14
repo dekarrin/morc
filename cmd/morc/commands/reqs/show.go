@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/dekarrin/morc/cmd/morc/commonflags"
 	"github.com/spf13/cobra"
 )
@@ -68,8 +69,8 @@ var showCmd = &cobra.Command{
 
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
-
-		return invokeReqShow(reqName, opts)
+		io := cmdio.From(cmd)
+		return invokeReqShow(io, reqName, opts)
 	},
 }
 
@@ -90,7 +91,7 @@ type showOptions struct {
 	show     reqShowable
 }
 
-func invokeReqShow(name string, opts showOptions) error {
+func invokeReqShow(io cmdio.IO, name string, opts showOptions) error {
 	// load the project file
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
@@ -115,19 +116,19 @@ func invokeReqShow(name string, opts showOptions) error {
 		if url == "" {
 			url = "(NO-URL)"
 		}
-		fmt.Printf("%s %s\n\n", meth, url)
+		io.Printf("%s %s\n\n", meth, url)
 	} else if opts.show == showMethod {
 		if req.Method == "" {
-			fmt.Printf("(NONE)\n")
+			io.Printf("(NONE)\n")
 		} else {
-			fmt.Printf("%s\n", req.Method)
+			io.Printf("%s\n", req.Method)
 		}
 		return nil
 	} else if opts.show == showURL {
 		if req.URL == "" {
-			fmt.Printf("(NONE)\n")
+			io.Printf("(NONE)\n")
 		} else {
-			fmt.Printf("%s\n", req.URL)
+			io.Printf("%s\n", req.URL)
 		}
 		return nil
 	}
@@ -136,7 +137,7 @@ func invokeReqShow(name string, opts showOptions) error {
 	if opts.show == showHeaders || opts.show == showAll {
 		if len(req.Headers) > 0 {
 			if opts.show == showAll {
-				fmt.Printf("HEADERS:\n")
+				io.Printf("HEADERS:\n")
 			}
 
 			// alphabetize headers
@@ -148,74 +149,74 @@ func invokeReqShow(name string, opts showOptions) error {
 
 			for _, name := range sortedNames {
 				for _, val := range req.Headers[name] {
-					fmt.Printf("%s: %s\n", name, val)
+					io.Printf("%s: %s\n", name, val)
 				}
 			}
 		} else {
 			if opts.show == showAll {
-				fmt.Printf("HEADERS: (NONE)\n")
+				io.Printf("HEADERS: (NONE)\n")
 			} else {
-				fmt.Printf("(NONE)\n")
+				io.Printf("(NONE)\n")
 			}
 		}
 		if opts.show == showHeaders {
 			return nil
 		}
-		fmt.Printf("\n")
+		io.Printf("\n")
 	}
 
 	if opts.show == showBody || opts.show == showAll {
 		if len(req.Body) > 0 {
 			if opts.show == showAll {
-				fmt.Printf("BODY:\n")
+				io.Printf("BODY:\n")
 			}
-			fmt.Printf("%s\n", string(req.Body))
+			io.Printf("%s\n", string(req.Body))
 		} else {
 			if opts.show == showAll {
-				fmt.Printf("BODY: (NONE)\n")
+				io.Printf("BODY: (NONE)\n")
 			} else {
-				fmt.Printf("(NONE)\n")
+				io.Printf("(NONE)\n")
 			}
 		}
 		if opts.show == showBody {
 			return nil
 		}
-		fmt.Printf("\n")
+		io.Printf("\n")
 	}
 
 	if opts.show == showCaptures || opts.show == showAll {
 		if len(req.Captures) > 0 {
 			if opts.show == showAll {
-				fmt.Printf("VAR CAPTURES:\n")
+				io.Printf("VAR CAPTURES:\n")
 			}
 			for _, cap := range req.Captures {
-				fmt.Printf("%s\n", cap.String())
+				io.Printf("%s\n", cap.String())
 			}
 		} else {
 			if opts.show == showAll {
-				fmt.Printf("VAR CAPTURES: (NONE)\n")
+				io.Printf("VAR CAPTURES: (NONE)\n")
 			} else {
-				fmt.Printf("(NONE)\n")
+				io.Printf("(NONE)\n")
 			}
 		}
 		if opts.show == showCaptures {
 			return nil
 		}
-		fmt.Printf("\n")
+		io.Printf("\n")
 	}
 
 	if opts.show == showAuthFlow || opts.show == showAll {
 		if req.AuthFlow == "" {
 			if opts.show == showAll {
-				fmt.Printf("AUTH FLOW: (NONE)\n")
+				io.Printf("AUTH FLOW: (NONE)\n")
 			} else {
-				fmt.Printf("(NONE)\n")
+				io.Printf("(NONE)\n")
 			}
 		} else {
 			if opts.show == showAll {
-				fmt.Printf("AUTH FLOW: ")
+				io.Printf("AUTH FLOW: ")
 			}
-			fmt.Printf("%s\n", req.AuthFlow)
+			io.Printf("%s\n", req.AuthFlow)
 		}
 
 		if opts.show == showAuthFlow {

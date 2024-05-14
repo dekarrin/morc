@@ -796,6 +796,10 @@ type OutputControl struct {
 	// machine-readable. "sr" is a format that is shorthand for "line" but
 	// including only the status and response payload.
 	Format Format
+
+	// Writer is the writer to which output should be written. If not set,
+	// output will be written to os.Stdout.
+	Writer io.Writer
 }
 
 // SendOptions is used to encapsulate non-critical options for sending a request
@@ -932,8 +936,8 @@ func Send(method, URL, varSymbol string, opts SendOptions) (SendResult, error) {
 	}
 
 	sendTime := time.Now()
-	resp, caps, err := client.SendRequest(req) // TODO: need to get cookie records from jar
-	recvTime := time.Now()                     // finer grained time would need to come from client.SendRequest, this is fine for now
+	resp, caps, err := client.SendRequest(req)
+	recvTime := time.Now() // finer grained time would need to come from client.SendRequest, this is fine for now
 
 	// if we had a body, put it back after request
 	if len(reqBodyBytes) > 0 {
@@ -981,12 +985,20 @@ func Send(method, URL, varSymbol string, opts SendOptions) (SendResult, error) {
 }
 
 func OutputResponse(resp *http.Response, caps map[string]string, opts OutputControl) error {
+	// TODO: error check Fprint output
+
+	// get our output writer, if specified, or default to stdout
+	var w io.Writer = os.Stdout
+	if opts.Writer != nil {
+		w = opts.Writer
+	}
+
 	// output the captures if requested
 	if opts.Captures {
 		if opts.Format == FormatPretty {
-			fmt.Println("----------------- VAR CAPTURES ----------------")
+			fmt.Fprintln(w, "----------------- VAR CAPTURES ----------------")
 		} else if opts.Format == FormatLine {
-			fmt.Println(lineDelimStart + " VARS")
+			fmt.Fprintln(w, lineDelimStart+" VARS")
 		}
 
 		capNames := []string{}
@@ -999,28 +1011,28 @@ func OutputResponse(resp *http.Response, caps map[string]string, opts OutputCont
 		for _, k := range capNames {
 			v := caps[k]
 			if opts.Format == FormatPretty {
-				fmt.Printf("%s: %s\n", k, v)
+				fmt.Fprintf(w, "%s: %s\n", k, v)
 			} else if opts.Format == FormatLine {
-				fmt.Printf("%s %s\n", k, v)
+				fmt.Fprintf(w, "%s %s\n", k, v)
 			}
 		}
 
 		if opts.Format == FormatPretty {
-			fmt.Println("-----------------------------------------------")
+			fmt.Fprintln(w, "-----------------------------------------------")
 		} else if opts.Format == FormatLine {
-			fmt.Println(lineDelimEnd)
+			fmt.Fprintln(w, lineDelimEnd)
 		}
 	}
 
 	// output the status line
-	fmt.Printf("%s %s\n", resp.Proto, resp.Status)
+	fmt.Fprintf(w, "%s %s\n", resp.Proto, resp.Status)
 
 	// output the response headers if requested
 	if opts.Headers {
 		if opts.Format == FormatPretty {
-			fmt.Println("------------------- HEADERS -------------------")
+			fmt.Fprintln(w, "------------------- HEADERS -------------------")
 		} else if opts.Format == FormatLine {
-			fmt.Println(lineDelimStart + " HEADERS")
+			fmt.Fprintln(w, lineDelimStart+" HEADERS")
 		}
 
 		// alphabetize the headers
@@ -1034,14 +1046,14 @@ func OutputResponse(resp *http.Response, caps map[string]string, opts OutputCont
 			vals := resp.Header[k]
 			for _, v := range vals {
 				// works for both pretty and line formats
-				fmt.Printf("%s: %s\n", k, v)
+				fmt.Fprintf(w, "%s: %s\n", k, v)
 			}
 		}
 
 		if opts.Format == FormatPretty {
-			fmt.Println("-----------------------------------------------")
+			fmt.Fprintln(w, "-----------------------------------------------")
 		} else if opts.Format == FormatLine {
-			fmt.Println(lineDelimEnd)
+			fmt.Fprintln(w, lineDelimEnd)
 		}
 	}
 
@@ -1054,13 +1066,13 @@ func OutputResponse(resp *http.Response, caps map[string]string, opts OutputCont
 			}
 
 			// works for both pretty and line formats
-			fmt.Println(string(entireBody))
+			fmt.Fprintln(w, string(entireBody))
 
 			// put the body back into a reader
 			resp.Body = io.NopCloser(bytes.NewBuffer(entireBody))
 		} else {
 			if opts.Format == FormatPretty {
-				fmt.Println("(no response body)")
+				fmt.Fprintln(w, "(no response body)")
 			}
 		}
 	}
@@ -1069,6 +1081,14 @@ func OutputResponse(resp *http.Response, caps map[string]string, opts OutputCont
 }
 
 func OutputRequest(req *http.Request, opts OutputControl) error {
+	// TODO: error check Fprint output
+
+	// get our output writer, if specified, or default to stdout
+	var w io.Writer = os.Stdout
+	if opts.Writer != nil {
+		w = opts.Writer
+	}
+
 	if opts.Request {
 		reqBytes, err := httputil.DumpRequestOut(req, true)
 		if err != nil {
@@ -1076,21 +1096,21 @@ func OutputRequest(req *http.Request, opts OutputControl) error {
 		}
 
 		if opts.Format == FormatPretty {
-			fmt.Println("------------------- REQUEST -------------------")
+			fmt.Fprintln(w, "------------------- REQUEST -------------------")
 		} else if opts.Format == FormatLine {
-			fmt.Println(lineDelimStart + " REQUEST")
+			fmt.Fprintln(w, lineDelimStart+" REQUEST")
 		}
 
-		fmt.Println(string(reqBytes))
+		fmt.Fprintln(w, string(reqBytes))
 
 		if opts.Format == FormatPretty && req.Body == nil || req.Body == http.NoBody {
-			fmt.Println("(no request body)")
+			fmt.Fprintln(w, "(no request body)")
 		}
 
 		if opts.Format == FormatPretty {
-			fmt.Println("----------------- END REQUEST -----------------")
+			fmt.Fprintln(w, "----------------- END REQUEST -----------------")
 		} else if opts.Format == FormatLine {
-			fmt.Println(lineDelimEnd)
+			fmt.Fprintln(w, lineDelimEnd)
 		}
 	}
 

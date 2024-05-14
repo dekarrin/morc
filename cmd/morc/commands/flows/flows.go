@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/dekarrin/morc/cmd/morc/commands/reqs/caps"
 	"github.com/dekarrin/morc/cmd/morc/commonflags"
 	"github.com/spf13/cobra"
@@ -31,19 +32,19 @@ var RootCmd = &cobra.Command{
 
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
-
-		return invokeFlowsList(filename)
+		io := cmdio.From(cmd)
+		return invokeFlowsList(io, filename)
 	},
 }
 
-func invokeFlowsList(filename string) error {
+func invokeFlowsList(io cmdio.IO, filename string) error {
 	p, err := morc.LoadProjectFromDisk(filename, false)
 	if err != nil {
 		return err
 	}
 
 	if len(p.Flows) == 0 {
-		fmt.Println("(none)")
+		io.Println("(none)")
 	} else {
 		// alphabetize the flows
 		var sortedNames []string
@@ -65,7 +66,7 @@ func invokeFlowsList(filename string) error {
 				notExecableBang = "!"
 			}
 
-			fmt.Printf("%s:%s %d request%s\n", f.Name, notExecableBang, len(f.Steps), reqS)
+			io.Printf("%s:%s %d request%s\n", f.Name, notExecableBang, len(f.Steps), reqS)
 		}
 	}
 

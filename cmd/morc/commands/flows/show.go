@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/dekarrin/morc/cmd/morc/commonflags"
 	"github.com/spf13/cobra"
 )
@@ -34,8 +35,8 @@ var showCmd = &cobra.Command{
 
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
-
-		return invokeFlowShow(flowName, opts)
+		io := cmdio.From(cmd)
+		return invokeFlowShow(io, flowName, opts)
 	},
 }
 
@@ -43,7 +44,7 @@ type showOptions struct {
 	projFile string
 }
 
-func invokeFlowShow(name string, opts showOptions) error {
+func invokeFlowShow(io cmdio.IO, name string, opts showOptions) error {
 	// load the project file
 	p, err := morc.LoadProjectFromDisk(opts.projFile, false)
 	if err != nil {
@@ -59,7 +60,7 @@ func invokeFlowShow(name string, opts showOptions) error {
 	}
 
 	if len(flow.Steps) == 0 {
-		fmt.Println("(no steps in flow)")
+		io.Println("(no steps in flow)")
 	}
 
 	for i, step := range flow.Steps {
@@ -78,9 +79,9 @@ func invokeFlowShow(name string, opts showOptions) error {
 				reqURL = "http://???"
 			}
 
-			fmt.Printf("%d:%s %s (%s %s)\n", i+1, notSendableBang, step.Template, meth, reqURL)
+			io.Printf("%d:%s %s (%s %s)\n", i+1, notSendableBang, step.Template, meth, reqURL)
 		} else {
-			fmt.Printf("%d:! %s (!non-existent req)\n", i+1, step.Template)
+			io.Printf("%d:! %s (!non-existent req)\n", i+1, step.Template)
 		}
 	}
 

@@ -2,11 +2,11 @@ package commands
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"time"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/spf13/cobra"
 )
 
@@ -114,20 +114,21 @@ var histCmd = &cobra.Command{
 
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
+		io := cmdio.From(cmd)
 
 		switch opts.action {
 		case histList:
-			return invokeHistList(opts)
+			return invokeHistList(io, opts)
 		case histDetail:
-			return invokeHistDetail(entryIndex, opts)
+			return invokeHistDetail(io, entryIndex, opts)
 		case histInfo:
-			return invokeHistInfo(opts)
+			return invokeHistInfo(io, opts)
 		case histClear:
-			return invokeHistClear(opts)
+			return invokeHistClear(io, opts)
 		case histEnable:
-			return invokeHistOn(opts)
+			return invokeHistOn(io, opts)
 		case histDisable:
-			return invokeHistOff(opts)
+			return invokeHistOff(io, opts)
 		default:
 			panic(fmt.Sprintf("unhandled hist action %q", opts.action))
 		}
@@ -153,7 +154,7 @@ type histOptions struct {
 	suppressDates bool
 }
 
-func invokeHistDetail(entryNum int, opts histOptions) error {
+func invokeHistDetail(io cmdio.IO, entryNum int, opts histOptions) error {
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
 		return err
@@ -168,14 +169,15 @@ func invokeHistDetail(entryNum int, opts histOptions) error {
 
 	hist := p.History[entryNum]
 
-	fmt.Printf("Request template: %s\n", hist.Template)
+	io.Printf("Request template: %s\n", hist.Template)
 
 	if !opts.suppressDates {
-		fmt.Printf("Request sent:          %s\n", hist.ReqTime.Format(time.RFC3339))
-		fmt.Printf("Response received:     %s\n", hist.RespTime.Format(time.RFC3339))
-		fmt.Printf("Total round-trip time: %s\n", hist.RespTime.Sub(hist.ReqTime))
+		io.Printf("Request sent:          %s\n", hist.ReqTime.Format(time.RFC3339))
+		io.Printf("Response received:     %s\n", hist.RespTime.Format(time.RFC3339))
+		io.Printf("Total round-trip time: %s\n", hist.RespTime.Sub(hist.ReqTime))
 	}
 
+	opts.outputCtrl.Writer = io.Out
 	if err := morc.OutputRequest(hist.Request, opts.outputCtrl); err != nil {
 		return err
 	}
@@ -187,7 +189,7 @@ func invokeHistDetail(entryNum int, opts histOptions) error {
 	return nil
 }
 
-func invokeHistOn(opts histOptions) error {
+func invokeHistOn(io cmdio.IO, opts histOptions) error {
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
 		return err
@@ -195,7 +197,7 @@ func invokeHistOn(opts histOptions) error {
 
 	if p.Config.HistFile == "" {
 		p.Config.HistFile = morc.DefaultHistoryPath
-		fmt.Fprintf(os.Stderr, "no history file configured; defaulting to "+p.Config.HistoryFSPath())
+		io.PrintErrf("no history file configured; defaulting to " + p.Config.HistoryFSPath())
 	}
 
 	p.Config.RecordHistory = true
@@ -203,7 +205,7 @@ func invokeHistOn(opts histOptions) error {
 	return p.PersistToDisk(false)
 }
 
-func invokeHistOff(opts histOptions) error {
+func invokeHistOff(_ cmdio.IO, opts histOptions) error {
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
 		return err
@@ -214,7 +216,7 @@ func invokeHistOff(opts histOptions) error {
 	return p.PersistToDisk(false)
 }
 
-func invokeHistClear(opts histOptions) error {
+func invokeHistClear(_ cmdio.IO, opts histOptions) error {
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
 		return err
@@ -225,14 +227,14 @@ func invokeHistClear(opts histOptions) error {
 	return p.PersistHistoryToDisk()
 }
 
-func invokeHistInfo(opts histOptions) error {
+func invokeHistInfo(io cmdio.IO, opts histOptions) error {
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
 		return err
 	}
 
 	if p.Config.HistFile == "" {
-		fmt.Println("Project is not configured to use a history file")
+		io.Println("Project is not configured to use a history file")
 		return nil
 	}
 
@@ -241,25 +243,25 @@ func invokeHistInfo(opts histOptions) error {
 		entrySuffix = "y"
 	}
 
-	fmt.Printf("%d entr%s in %s\n", len(p.History), entrySuffix, p.Config.HistoryFSPath())
-	fmt.Println()
+	io.Printf("%d entr%s in %s\n", len(p.History), entrySuffix, p.Config.HistoryFSPath())
+	io.Println()
 	if p.Config.RecordHistory {
-		fmt.Println("History is ON")
+		io.Println("History is ON")
 	} else {
-		fmt.Println("History is OFF")
+		io.Println("History is OFF")
 	}
 
 	return nil
 }
 
-func invokeHistList(opts histOptions) error {
+func invokeHistList(io cmdio.IO, opts histOptions) error {
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
 		return err
 	}
 
 	if len(p.History) == 0 {
-		fmt.Println("(no history)")
+		io.Println("(no history)")
 		return nil
 	}
 
@@ -267,7 +269,7 @@ func invokeHistList(opts histOptions) error {
 	// 0: 5/25/1993 12:34:56 PM - get-google - GET /api/v1/thing - 200 OK - 1.2s
 
 	for i, h := range p.History {
-		fmt.Printf(
+		io.Printf(
 			"%d: %s - %s - %s %s - %s - %s\n",
 			i,
 			h.ReqTime.Format(time.RFC3339),

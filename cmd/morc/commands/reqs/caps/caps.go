@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/dekarrin/morc/cmd/morc/commonflags"
 	"github.com/spf13/cobra"
 )
@@ -30,8 +31,8 @@ var RootCmd = &cobra.Command{
 
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
-
-		return invokeReqCapsList(reqName, opts)
+		io := cmdio.From(cmd)
+		return invokeReqCapsList(io, reqName, opts)
 	},
 }
 
@@ -39,7 +40,7 @@ type listOptions struct {
 	projectFile string
 }
 
-func invokeReqCapsList(name string, opts listOptions) error {
+func invokeReqCapsList(io cmdio.IO, name string, opts listOptions) error {
 	// load the project file
 	p, err := morc.LoadProjectFromDisk(opts.projectFile, true)
 	if err != nil {
@@ -55,10 +56,10 @@ func invokeReqCapsList(name string, opts listOptions) error {
 	}
 
 	if len(req.Captures) == 0 {
-		fmt.Println("(none)")
+		io.Println("(none)")
 	} else {
 		for _, cap := range req.Captures {
-			fmt.Printf("%s\n", cap)
+			io.Printf("%s\n", cap)
 		}
 	}
 

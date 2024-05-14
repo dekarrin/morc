@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/dekarrin/morc/cmd/morc/commands/reqs/caps"
 	"github.com/dekarrin/morc/cmd/morc/commonflags"
 	"github.com/spf13/cobra"
@@ -31,19 +32,19 @@ var RootCmd = &cobra.Command{
 
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
-
-		return invokeReqList(filename)
+		io := cmdio.From(cmd)
+		return invokeReqList(io, filename)
 	},
 }
 
-func invokeReqList(filename string) error {
+func invokeReqList(io cmdio.IO, filename string) error {
 	p, err := morc.LoadProjectFromDisk(filename, true)
 	if err != nil {
 		return err
 	}
 
 	if len(p.Templates) == 0 {
-		fmt.Println("(none)")
+		io.Println("(none)")
 	} else {
 		// alphabetize the templates
 		var sortedNames []string
@@ -57,7 +58,7 @@ func invokeReqList(filename string) error {
 			if meth == "" {
 				meth = "???"
 			}
-			fmt.Printf("%s %s\n", name, meth)
+			io.Printf("%s %s\n", name, meth)
 		}
 	}
 

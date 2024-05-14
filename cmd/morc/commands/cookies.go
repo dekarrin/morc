@@ -3,12 +3,12 @@ package commands
 import (
 	"fmt"
 	"net/url"
-	"os"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/spf13/cobra"
 )
 
@@ -76,18 +76,19 @@ var cookiesCmd = &cobra.Command{
 
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
+		io := cmdio.From(cmd)
 
 		switch opts.action {
 		case cookiesList:
-			return invokeCookiesList(opts)
+			return invokeCookiesList(io, opts)
 		case cookiesInfo:
-			return invokeCookiesInfo(opts)
+			return invokeCookiesInfo(io, opts)
 		case cookiesClear:
-			return invokeCookiesClear(opts)
+			return invokeCookiesClear(io, opts)
 		case cookiesEnable:
-			return invokeCookiesOn(opts)
+			return invokeCookiesOn(io, opts)
 		case cookiesDisable:
-			return invokeCookiesOff(opts)
+			return invokeCookiesOff(io, opts)
 		default:
 			panic(fmt.Sprintf("unhandled cookies action %q", opts.action))
 		}
@@ -110,7 +111,7 @@ type cookiesOptions struct {
 	url      *url.URL
 }
 
-func invokeCookiesOn(opts cookiesOptions) error {
+func invokeCookiesOn(io cmdio.IO, opts cookiesOptions) error {
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
 		return err
@@ -118,7 +119,7 @@ func invokeCookiesOn(opts cookiesOptions) error {
 
 	if p.Config.SeshFile == "" {
 		p.Config.HistFile = morc.DefaultSessionPath
-		fmt.Fprintf(os.Stderr, "no session file configured; defaulting to "+p.Config.SessionFSPath())
+		io.PrintErrf("no session file configured; defaulting to " + p.Config.SessionFSPath())
 	}
 
 	p.Config.RecordSession = true
@@ -126,7 +127,7 @@ func invokeCookiesOn(opts cookiesOptions) error {
 	return p.PersistToDisk(false)
 }
 
-func invokeCookiesOff(opts cookiesOptions) error {
+func invokeCookiesOff(_ cmdio.IO, opts cookiesOptions) error {
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
 		return err
@@ -137,7 +138,7 @@ func invokeCookiesOff(opts cookiesOptions) error {
 	return p.PersistToDisk(false)
 }
 
-func invokeCookiesClear(opts cookiesOptions) error {
+func invokeCookiesClear(_ cmdio.IO, opts cookiesOptions) error {
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
 		return err
@@ -148,14 +149,14 @@ func invokeCookiesClear(opts cookiesOptions) error {
 	return p.PersistSessionToDisk()
 }
 
-func invokeCookiesInfo(opts cookiesOptions) error {
+func invokeCookiesInfo(io cmdio.IO, opts cookiesOptions) error {
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
 		return err
 	}
 
 	if p.Config.SeshFile == "" {
-		fmt.Println("Project is not configured to use a session file")
+		io.Println("Project is not configured to use a session file")
 		return nil
 	}
 
@@ -183,25 +184,25 @@ func invokeCookiesInfo(opts cookiesOptions) error {
 		totalS = ""
 	}
 
-	fmt.Printf("%d cookie%s across %d domain%s in %s\n", totalCount, totalS, len(countByDomain), domainS, p.Config.SessionFSPath())
-	fmt.Println()
+	io.Printf("%d cookie%s across %d domain%s in %s\n", totalCount, totalS, len(countByDomain), domainS, p.Config.SessionFSPath())
+	io.Println()
 	if p.Config.RecordSession {
-		fmt.Println("Cookie recording is ON")
+		io.Println("Cookie recording is ON")
 	} else {
-		fmt.Println("Cookie recording is OFF")
+		io.Println("Cookie recording is OFF")
 	}
 
 	return nil
 }
 
-func invokeCookiesList(opts cookiesOptions) error {
+func invokeCookiesList(io cmdio.IO, opts cookiesOptions) error {
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
 		return err
 	}
 
 	if len(p.Session.Cookies) == 0 {
-		fmt.Println("(no cookies)")
+		io.Println("(no cookies)")
 		return nil
 	}
 
@@ -211,12 +212,12 @@ func invokeCookiesList(opts cookiesOptions) error {
 		cookies := p.CookiesForURL(opts.url)
 
 		if len(cookies) == 0 {
-			fmt.Println("(no cookies)")
+			io.Println("(no cookies)")
 			return nil
 		}
 
 		for _, c := range cookies {
-			fmt.Printf("%s\n", c.String())
+			io.Printf("%s\n", c.String())
 		}
 	} else {
 		// list them all
@@ -237,15 +238,15 @@ func invokeCookiesList(opts cookiesOptions) error {
 		sort.Strings(domains)
 
 		for i, d := range domains {
-			fmt.Printf("%s:\n", d)
+			io.Printf("%s:\n", d)
 			for _, call := range cookiesByDomain[d] {
 				for _, c := range call.Cookies {
-					fmt.Printf("%s %s\n", call.Time.Format(time.RFC3339), c.String())
+					io.Printf("%s %s\n", call.Time.Format(time.RFC3339), c.String())
 				}
 			}
 
 			if i < len(domains)-1 {
-				fmt.Println()
+				io.Println()
 			}
 		}
 	}

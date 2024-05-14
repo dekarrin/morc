@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/spf13/cobra"
 )
 
@@ -113,16 +114,17 @@ var envCmd = &cobra.Command{
 
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
+		io := cmdio.From(cmd)
 
 		switch action {
 		case envActionList:
-			return invokeEnvList(opts)
+			return invokeEnvList(io, opts)
 		case envActionDelete:
-			return invokeEnvDelete(env, opts)
+			return invokeEnvDelete(io, env, opts)
 		case envActionSwitch:
-			return invokeEnvSwitch(env, opts)
+			return invokeEnvSwitch(io, env, opts)
 		case envActionShow:
-			return invokeEnvShowCurrent(opts)
+			return invokeEnvShowCurrent(io, opts)
 		default:
 			return fmt.Errorf("unhandled action %d", action)
 		}
@@ -136,7 +138,7 @@ type envOptions struct {
 	swapToDefault bool
 }
 
-func invokeEnvList(opts envOptions) error {
+func invokeEnvList(io cmdio.IO, opts envOptions) error {
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
 		return err
@@ -164,13 +166,13 @@ func invokeEnvList(opts envOptions) error {
 		if env == "" {
 			env = reservedDefaultEnvName
 		}
-		fmt.Println(env)
+		io.Println(env)
 	}
 
 	return nil
 }
 
-func invokeEnvDelete(env string, opts envOptions) error {
+func invokeEnvDelete(_ cmdio.IO, env string, opts envOptions) error {
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
 		return err
@@ -195,7 +197,7 @@ func invokeEnvDelete(env string, opts envOptions) error {
 	return p.PersistToDisk(false)
 }
 
-func invokeEnvSwitch(env string, opts envOptions) error {
+func invokeEnvSwitch(_ cmdio.IO, env string, opts envOptions) error {
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
 		return err
@@ -207,16 +209,16 @@ func invokeEnvSwitch(env string, opts envOptions) error {
 	return p.PersistToDisk(false)
 }
 
-func invokeEnvShowCurrent(opts envOptions) error {
+func invokeEnvShowCurrent(io cmdio.IO, opts envOptions) error {
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
 		return err
 	}
 
 	if p.Vars.Environment == "" {
-		fmt.Println(reservedDefaultEnvName)
+		io.Println(reservedDefaultEnvName)
 	} else {
-		fmt.Println(strings.ToUpper(p.Vars.Environment))
+		io.Println(strings.ToUpper(p.Vars.Environment))
 	}
 
 	return nil

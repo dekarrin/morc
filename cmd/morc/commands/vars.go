@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/spf13/cobra"
 )
 
@@ -119,16 +120,17 @@ var varsCmd = &cobra.Command{
 
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
+		io := cmdio.From(cmd)
 
 		switch action {
 		case varsActionList:
-			return invokeVarList(opts)
+			return invokeVarList(io, opts)
 		case varsActionGet:
-			return invokeVarGet(args[0], opts)
+			return invokeVarGet(io, args[0], opts)
 		case varsActionSet:
-			return invokeVarSet(args[0], args[1], opts)
+			return invokeVarSet(io, args[0], args[1], opts)
 		case varsActionDelete:
-			return invokeVarDelete(args[0], opts)
+			return invokeVarDelete(io, args[0], opts)
 		default:
 			panic(fmt.Sprintf("unhandled var action %q", action))
 		}
@@ -144,7 +146,7 @@ type varOptions struct {
 	deleteVar          bool
 }
 
-func invokeVarSet(varName, value string, opts varOptions) error {
+func invokeVarSet(_ cmdio.IO, varName, value string, opts varOptions) error {
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
 		return err
@@ -164,7 +166,7 @@ func invokeVarSet(varName, value string, opts varOptions) error {
 	return p.PersistToDisk(false)
 }
 
-func invokeVarGet(varName string, opts varOptions) error {
+func invokeVarGet(io cmdio.IO, varName string, opts varOptions) error {
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
 		return err
@@ -181,12 +183,12 @@ func invokeVarGet(varName string, opts varOptions) error {
 		val = p.Vars.Get(varName)
 	}
 
-	fmt.Println(val)
+	io.Println(val)
 
 	return nil
 }
 
-func invokeVarDelete(varName string, opts varOptions) error {
+func invokeVarDelete(_ cmdio.IO, varName string, opts varOptions) error {
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
 		return err
@@ -219,7 +221,7 @@ func invokeVarDelete(varName string, opts varOptions) error {
 	return p.PersistToDisk(false)
 }
 
-func invokeVarList(opts varOptions) error {
+func invokeVarList(io cmdio.IO, opts varOptions) error {
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
 		return err
@@ -249,10 +251,10 @@ func invokeVarList(opts varOptions) error {
 	sort.Strings(vars)
 
 	if len(vars) == 0 {
-		fmt.Println("(none)")
+		io.Println("(none)")
 	} else {
 		for _, name := range vars {
-			fmt.Printf("$%s = %q\n", name, p.Vars.Get(name))
+			io.Printf("$%s = %q\n", name, p.Vars.Get(name))
 		}
 	}
 

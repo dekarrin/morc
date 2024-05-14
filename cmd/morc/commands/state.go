@@ -2,10 +2,10 @@ package commands
 
 import (
 	"bufio"
-	"fmt"
 	"os"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/dekarrin/rezi/v2"
 	"github.com/spf13/cobra"
 )
@@ -24,12 +24,12 @@ var stateCmd = &cobra.Command{
 
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
-
-		return invokeStateShow(filename)
+		io := cmdio.From(cmd)
+		return invokeStateShow(io, filename)
 	},
 }
 
-func invokeStateShow(filename string) error {
+func invokeStateShow(io cmdio.IO, filename string) error {
 	// open a buffered reader on the file
 	fRaw, err := os.Open(filename)
 	if err != nil {
@@ -47,24 +47,24 @@ func invokeStateShow(filename string) error {
 		return err
 	}
 
-	fmt.Printf("State data file %s:\n", filename)
-	fmt.Printf("Cookies:\n")
+	io.Printf("State data file %s:\n", filename)
+	io.Printf("Cookies:\n")
 	if len(state.Cookies) == 0 {
-		fmt.Printf("(none)\n")
+		io.Printf("(none)\n")
 	} else {
 		for _, v := range state.Cookies {
-			fmt.Printf(" * %s:\n", v.URL)
+			io.Printf(" * %s:\n", v.URL)
 			for _, cook := range v.Cookies {
-				fmt.Printf("   * %s\n", cook.String())
+				io.Printf("   * %s\n", cook.String())
 			}
 		}
 	}
-	fmt.Printf("Variables:\n")
+	io.Printf("Variables:\n")
 	if len(state.Vars) == 0 {
-		fmt.Printf("(none)\n")
+		io.Printf("(none)\n")
 	} else {
 		for k, v := range state.Vars {
-			fmt.Printf(" * %s: %s\n", k, v)
+			io.Printf(" * %s: %s\n", k, v)
 		}
 	}
 

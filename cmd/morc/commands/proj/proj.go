@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/dekarrin/morc/cmd/morc/commonflags"
 	"github.com/spf13/cobra"
 )
@@ -33,12 +34,12 @@ var RootCmd = &cobra.Command{
 
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
-
-		return invokeProjShow(filename)
+		io := cmdio.From(cmd)
+		return invokeProjShow(io, filename)
 	},
 }
 
-func invokeProjShow(filename string) error {
+func invokeProjShow(io cmdio.IO, filename string) error {
 	proj, err := morc.LoadProjectFromDisk(filename, true)
 	if err != nil {
 		return err
@@ -74,21 +75,21 @@ func invokeProjShow(filename string) error {
 		histS = ""
 	}
 
-	fmt.Printf("Project: %s\n", proj.Name)
-	fmt.Printf("%d request%s, %d flow%s\n", len(proj.Templates), requestS, len(proj.Flows), flowS)
-	fmt.Printf("%d history item%s\n", len(proj.History), histS)
-	fmt.Printf("%d variable%s across %d environment%s\n", proj.Vars.Count(), varS, proj.Vars.EnvCount(), envS)
-	fmt.Printf("%d cookie%s in active session\n", proj.Session.TotalCookieSets(), cookieS)
-	fmt.Println()
-	fmt.Printf("Cookie record lifetime: %s\n", proj.Config.CookieLifetime)
-	fmt.Printf("Project file on record: %s\n", proj.Config.ProjFile)
-	fmt.Printf("Session file on record: %s\n", proj.Config.SeshFile)
-	fmt.Printf("History file on record: %s\n", proj.Config.HistFile)
-	fmt.Println()
+	io.Printf("Project: %s\n", proj.Name)
+	io.Printf("%d request%s, %d flow%s\n", len(proj.Templates), requestS, len(proj.Flows), flowS)
+	io.Printf("%d history item%s\n", len(proj.History), histS)
+	io.Printf("%d variable%s across %d environment%s\n", proj.Vars.Count(), varS, proj.Vars.EnvCount(), envS)
+	io.Printf("%d cookie%s in active session\n", proj.Session.TotalCookieSets(), cookieS)
+	io.Println()
+	io.Printf("Cookie record lifetime: %s\n", proj.Config.CookieLifetime)
+	io.Printf("Project file on record: %s\n", proj.Config.ProjFile)
+	io.Printf("Session file on record: %s\n", proj.Config.SeshFile)
+	io.Printf("History file on record: %s\n", proj.Config.HistFile)
+	io.Println()
 	if proj.Vars.Environment == "" {
-		fmt.Printf("Using default var environment\n")
+		io.Printf("Using default var environment\n")
 	} else {
-		fmt.Printf("Using var environment %s\n", proj.Vars.Environment)
+		io.Printf("Using var environment %s\n", proj.Vars.Environment)
 	}
 
 	return nil

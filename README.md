@@ -118,12 +118,39 @@ requests that are loaded into it:
 morc reqs
 ```
 
-If this is in a brand new project, there won't be anything there. If it has
-requests defined in it, the output will be something like this:
+If this is in a brand new project, there won't be anything there. You can add a
+new request with the `new` subcommand:
 
+```shell
+morc reqs new create-user --url localhost:8080/users -X POST -d '{"name":"Vriska Serket"}' -H 'Content-Type: application/json'
+```
+
+The URL, method, body payload, and headers can be specified with flags.
+Alternatively, if you want to load the body from a file, put '@' followed by the
+file name as the argument for `-d` and it will load the body data from that
+file and use that as the body of the newly-created request:
+
+```shell
+morc reqs new update-user --url localhost:8080/users -X PATCH -d '@vriska.json' -H 'Content-Type: application/json'
+```
+
+After adding several requests, `morc reqs` will have much more interesting
+output:
+
+```shell
+morc reqs
 ```
 
 ```
+POST   create-user
+GET    get-token
+GET    get-user
+GET    list-users
+DELETE remove-user
+PATCH  update-user
+```
+
+
 
 WIP:
 * `morc reqs new`

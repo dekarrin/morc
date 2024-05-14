@@ -133,6 +133,9 @@ func sendTemplate(p morc.Project, tmpl morc.RequestTemplate, vars map[string]str
 		sendOpts.Cookies = p.Session.Cookies
 	}
 
+	// inject the http client, in case we are to use a specific one
+	sendOpts.Client = cmdio.HTTPClient
+
 	result, err := morc.Send(tmpl.Method, tmpl.URL, varSymbol, sendOpts)
 	if err != nil {
 		return err

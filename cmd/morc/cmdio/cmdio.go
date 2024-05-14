@@ -3,9 +3,19 @@ package cmdio
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 
 	"github.com/spf13/cobra"
+)
+
+var (
+
+	// If HTTPClient is set, it will be used for all requests made by the
+	// commands that go through morc.Send. Otherwise, the default client will be
+	// used. Generally, this is useful for testing; if it starts getting used
+	// for other things, we may need a way of specifying via CLI args instead.
+	HTTPClient *http.Client = nil
 )
 
 // IO holds the input and output streams for a command, including a settable

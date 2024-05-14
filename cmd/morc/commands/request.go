@@ -215,6 +215,9 @@ func invokeRequest(io cmdio.IO, method, url, varSymbol string, opts requestOptio
 		Vars:          opts.oneTimeVars,
 	}
 
+	// inject the http client, in case we are to use a specific one
+	sendOpts.Client = cmdio.HTTPClient
+
 	_, err := morc.Send(method, url, varSymbol, sendOpts)
 	return err
 }

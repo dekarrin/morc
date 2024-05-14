@@ -1059,17 +1059,21 @@ func OutputResponse(resp *http.Response, caps map[string]string, opts OutputCont
 
 	// output the response body, if any
 	if !opts.SuppressResponseBody {
+		var entireBody string
+
 		if resp.Body != nil && resp.Body != http.NoBody {
 			entireBody, err := io.ReadAll(resp.Body)
 			if err != nil {
 				return fmt.Errorf("read response body: %w", err)
 			}
 
-			// works for both pretty and line formats
-			fmt.Fprintln(w, string(entireBody))
-
 			// put the body back into a reader
 			resp.Body = io.NopCloser(bytes.NewBuffer(entireBody))
+		}
+
+		if len(entireBody) > 0 {
+			// works for both pretty and line formats
+			fmt.Fprintln(w, string(entireBody))
 		} else {
 			if opts.Format == FormatPretty {
 				fmt.Fprintln(w, "(no response body)")

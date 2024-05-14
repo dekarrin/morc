@@ -67,3 +67,40 @@ func (io IO) PrintErrf(format string, args ...interface{}) {
 		fmt.Fprintf(io.Err, format, args...)
 	}
 }
+
+func (io IO) OnOrOff(on bool) string {
+	if on {
+		return "ON"
+	}
+	return "OFF"
+}
+
+// Count returns a string that automatically pluralizes the given word based on
+// whether it is 0 or 1.
+//
+// If suffixes is not set, it is assumed that the plural is formed by taking
+// word and adding "s". If suffixes is set, the first element is used for the
+// plural form and the second is used for the singular form.
+func (io IO) CountOf(count int, word string, suffixes ...string) string {
+	pluralSuf := "s"
+	singularSuf := ""
+
+	if len(suffixes) > 0 {
+		pluralSuf = suffixes[0]
+		if len(suffixes) > 1 {
+			singularSuf = suffixes[1]
+		}
+	}
+
+	plural := word + pluralSuf
+	singular := word + singularSuf
+
+	var desc string
+	if count == 1 {
+		desc = singular
+	} else {
+		desc = plural
+	}
+
+	return fmt.Sprintf("%d %s", count, desc)
+}

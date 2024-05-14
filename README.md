@@ -59,8 +59,45 @@ be useful for automated testing scenarios.
 
 #### Initializing A MORC Project
 
-First, a project is created with `morc init`. This puts all project files by
-default in a new `.morc` directory in the directory it is called from.
+A MORC project is created with `morc init`. This puts all project files by
+default in a new `.morc` directory in the directory that `morc` is called from,
+and sets up cookie storage and history tracking.
+
+```shell
+morc init
+```
+
+If you want, you can give a name to the new project; otherwise, MORC will fall
+back to using a default one.
+
+```shell
+morc init 'Testing Suite'
+```
+
+Now you can see the details of the project by running `morc proj` from the same
+directory:
+
+```shell
+morc proj
+```
+
+```shell
+Project: Unnamed Project
+0 requests, 0 flows
+0 history items
+0 variables across 1 environment
+0 cookies in active session
+
+Cookie record lifetime: 24h0m0s
+Project file on record: .morc/project.json
+Session file on record: ::PROJ_DIR::/session.json
+History file on record: ::PROJ_DIR::/history.json
+
+Using default var environment
+```
+
+
+
 
 WIP:
 * `morc init`

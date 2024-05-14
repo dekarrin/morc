@@ -45,46 +45,18 @@ func invokeProjShow(io cmdio.IO, filename string) error {
 		return err
 	}
 
-	varS := "s"
-	if proj.Vars.Count() == 1 {
-		varS = ""
-	}
-
-	envS := "s"
-	if proj.Vars.EnvCount() == 1 {
-		envS = ""
-	}
-
-	requestS := "s"
-	if len(proj.Templates) == 1 {
-		requestS = ""
-	}
-
-	flowS := "s"
-	if len(proj.Flows) == 1 {
-		flowS = ""
-	}
-
-	cookieS := "s"
-	if proj.Session.TotalCookieSets() == 1 {
-		cookieS = ""
-	}
-
-	histS := "s"
-	if len(proj.History) == 1 {
-		histS = ""
-	}
-
 	io.Printf("Project: %s\n", proj.Name)
-	io.Printf("%d request%s, %d flow%s\n", len(proj.Templates), requestS, len(proj.Flows), flowS)
-	io.Printf("%d history item%s\n", len(proj.History), histS)
-	io.Printf("%d variable%s across %d environment%s\n", proj.Vars.Count(), varS, proj.Vars.EnvCount(), envS)
-	io.Printf("%d cookie%s in active session\n", proj.Session.TotalCookieSets(), cookieS)
+	io.Printf("%s, %s\n", io.CountOf(len(proj.Templates), "request"), io.CountOf(len(proj.Flows), "flow"))
+	io.Printf("%s\n", io.CountOf(len(proj.History), "history item"))
+	io.Printf("%s across %s\n", io.CountOf(proj.Vars.Count(), "variable"), io.CountOf(proj.Vars.EnvCount(), "environment"))
+	io.Printf("%s in active session\n", io.CountOf(proj.Session.TotalCookieSets(), "cookie"))
 	io.Println()
 	io.Printf("Cookie record lifetime: %s\n", proj.Config.CookieLifetime)
 	io.Printf("Project file on record: %s\n", proj.Config.ProjFile)
 	io.Printf("Session file on record: %s\n", proj.Config.SeshFile)
 	io.Printf("History file on record: %s\n", proj.Config.HistFile)
+	io.Printf("Cookie recording is %s\n", io.OnOrOff(proj.Config.RecordSession))
+	io.Printf("History tracking is %s\n", io.OnOrOff(proj.Config.RecordHistory))
 	io.Println()
 	if proj.Vars.Environment == "" {
 		io.Printf("Using default var environment\n")

@@ -81,7 +81,7 @@ directory:
 morc proj
 ```
 
-```shell
+```
 Project: Unnamed Project
 0 requests, 0 flows
 0 history items
@@ -92,16 +92,22 @@ Cookie record lifetime: 24h0m0s
 Project file on record: .morc/project.json
 Session file on record: ::PROJ_DIR::/session.json
 History file on record: ::PROJ_DIR::/history.json
+Cookie recording is ON
+History tracking is ON
 
 Using default var environment
 ```
 
+If you want to change things about the project, you can do that with the edit
+subcommand:
 
+```shell
+morc proj edit --name 'My Cool Project'
+```
 
-
-WIP:
-* `morc init`
-* (or `morc proj new`)
+Or if you are looking for *very* fine-grained control over new project creation,
+you can use the `morc proj new` command. See `morc help proj new` for
+information on running it.
 
 #### Creating Requests
 

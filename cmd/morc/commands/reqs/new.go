@@ -90,12 +90,6 @@ var newCmd = &cobra.Command{
 		opts.method = strings.ToUpper(flagMethod)
 		opts.url = flagURL
 
-		// add scheme to url if non empty and not present
-		lowerURL := strings.ToLower(opts.url)
-		if opts.url != "" && !strings.HasPrefix(lowerURL, "http://") && !strings.HasPrefix(lowerURL, "https://") {
-			opts.url = "http://" + opts.url
-		}
-
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
 

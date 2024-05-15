@@ -29,7 +29,7 @@ func addRequestFlags(id string, cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVarP(&flagBodyData, "data", "d", "", "Add the given data as a body to the request; prefix with @ to read data from a file")
 	cmd.PersistentFlags().StringVarP(&flagVarSymbol, "var-symbol", "", "$", "The symbol to use for variable substitution")
 	cmd.PersistentFlags().StringArrayVarP(&flagGetVars, "capture-var", "C", []string{}, "Get a variable's value from the response. Format is name::start,end for byte offset or name:path[0].to.value (jq-ish syntax)")
-	cmd.PersistentFlags().StringArrayVarP(&flagVars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Format is name:value")
+	cmd.PersistentFlags().StringArrayVarP(&flagVars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Format is name=value")
 
 	setupRequestOutputFlags(id, cmd)
 }
@@ -58,12 +58,6 @@ var requestCmd = &cobra.Command{
 
 		// make sure that the method is upper case
 		args[0] = strings.ToUpper(args[0])
-
-		// make sure the URL has a scheme
-		lowerURL := strings.ToLower(args[1])
-		if !strings.HasPrefix(lowerURL, "http://") && !strings.HasPrefix(lowerURL, "https://") {
-			args[1] = "http://" + args[1]
-		}
 
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
@@ -97,12 +91,6 @@ func addQuickMethodCommand(method string) {
 			opts, err := requestFlagsToOptions("morc " + lowerMeth)
 			if err != nil {
 				return err
-			}
-
-			// make sure the URL has a scheme
-			lowerURL := strings.ToLower(args[0])
-			if !strings.HasPrefix(lowerURL, "http://") && !strings.HasPrefix(lowerURL, "https://") {
-				args[0] = "http://" + args[0]
 			}
 
 			// done checking args, don't show usage on error
@@ -152,9 +140,9 @@ func requestFlagsToOptions(cmdID string) (requestOptions, error) {
 	if len(flagVars) > 0 {
 		oneTimeVars := make(map[string]string)
 		for idx, v := range flagVars {
-			parts := strings.SplitN(v, ":", 2)
+			parts := strings.SplitN(v, "=", 2)
 			if len(parts) != 2 {
-				return opts, fmt.Errorf("var #%d (%q) is not in format key: value", idx+1, v)
+				return opts, fmt.Errorf("var #%d (%q) is not in format key=value", idx+1, v)
 			}
 			oneTimeVars[parts[0]] = parts[1]
 		}

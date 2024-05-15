@@ -385,6 +385,12 @@ func (r *RESTClient) CreateRequest(method string, url string, data []byte, hdrs 
 		return nil, fmt.Errorf("substitute vars in URL: %w", err)
 	}
 
+	// okay, now ensure that the URL has a scheme
+	lowerURL := strings.ToLower(url)
+	if !strings.HasPrefix(lowerURL, "http://") && !strings.HasPrefix(lowerURL, "https://") {
+		url = "http://" + url
+	}
+
 	var payload io.Reader
 	// find every variable in data and replace it with the value from r.Vars (or return error if encountering invalid var)
 	if data != nil {

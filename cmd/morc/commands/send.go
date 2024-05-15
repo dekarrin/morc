@@ -16,7 +16,7 @@ var (
 
 func init() {
 	sendCmd.PersistentFlags().StringVarP(&flagProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
-	sendCmd.PersistentFlags().StringArrayVarP(&flagVars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Format is name:value")
+	sendCmd.PersistentFlags().StringArrayVarP(&flagVars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Format is name=value")
 
 	setupRequestOutputFlags("morc send", sendCmd)
 
@@ -67,9 +67,9 @@ func sendFlagsToOptions() (sendOptions, error) {
 	if len(flagVars) > 0 {
 		oneTimeVars := make(map[string]string)
 		for idx, v := range flagVars {
-			parts := strings.SplitN(v, ":", 2)
+			parts := strings.SplitN(v, "=", 2)
 			if len(parts) != 2 {
-				return opts, fmt.Errorf("var #%d (%q) is not in format key:value", idx+1, v)
+				return opts, fmt.Errorf("var #%d (%q) is not in format key=value", idx+1, v)
 			}
 			oneTimeVars[parts[0]] = parts[1]
 		}

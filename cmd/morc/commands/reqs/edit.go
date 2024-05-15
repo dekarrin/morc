@@ -131,12 +131,6 @@ var editCmd = &cobra.Command{
 		if cmd.Flags().Changed("url") {
 			newURL := flagEditURL
 
-			// add scheme to url if non empty and not present
-			lowerURL := strings.ToLower(newURL)
-			if newURL != "" && !strings.HasPrefix(lowerURL, "http://") && !strings.HasPrefix(lowerURL, "https://") {
-				newURL = "http://" + newURL
-			}
-
 			opts.url = optional[string]{set: true, v: newURL}
 		}
 

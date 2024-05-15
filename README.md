@@ -275,6 +275,30 @@ PATCH  update-user
 
 #### Using Variables
 
+MORC supports the use of *variables* in requests. These are values in requests
+that are filled in only when actually sending the request, and they can be
+changed in between sends. Perhaps, for instance, you'd like to be able to swap
+whether a request is sent via a plaintext HTTP request or using TLS (HTTPS). You
+could do that by declaring a variable called `${SCHEME}` in the URL of the
+request:
+
+```shell
+morc reqs edit get-user --url '${SCHEME}://localhost:8080/users'
+
+# make sure to put text with a variable in it in single quotes so your shell
+# doesn't try to interpret it itself
+```
+
+Then, you just need to make sure that the value for the variable is available
+when sending it.
+
+The simplest way is to provide it with `-V` when sending the request:
+
+```
+morc send get-user -V SCHEME=https
+
+A variable is added to a request 
+
 Templating within a body or url or header is supported. Use variables in form of
 `${NAME}` and supply values during a call to `morc send` with `-V`.
 

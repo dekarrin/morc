@@ -32,7 +32,7 @@ morc send get-google  # actually fire it off
 ```
 
 Usage
------
+=====
 
 MORC has two primary ways that it can be used: project-oriented, or standalone
 request sending. With project-oriented use, MORC operates within the context of
@@ -43,7 +43,7 @@ use of separate project but requires that the entire request be specified every
 time it is sent; using this mode is more similar to raw curl usage, with some
 optional support for saving basic state info in between requests.
 
-### Project-Oriented Use
+## Project-Oriented Use
 
 MORC is generally designed to operate on a MORC *project*. A project has
 requests and flows of requests defined within it that can be sent multiple times
@@ -57,7 +57,7 @@ later requests. This, combined with defining sequences of requests in *flows*,
 allows entire testing sequences to be defined and then run on-demand, which can
 be useful for automated testing scenarios.
 
-#### Initializing A MORC Project
+### Initializing A MORC Project
 
 A MORC project is created with `morc init`. This puts all project files by
 default in a new `.morc` directory in the directory that `morc` is called from,
@@ -109,7 +109,7 @@ Or if you are looking for *very* fine-grained control over new project creation,
 you can use the `morc proj new` command. See `morc help proj new` for
 information on running it.
 
-#### Project Requests
+### Project Requests
 
 So, you've got a project rolling! Congrats. Now you can take a look at all the
 requests that are loaded into it:
@@ -120,7 +120,7 @@ morc reqs
 
 If this is in a brand new project, there won't be anything there.
 
-##### Request Creation
+#### Request Creation
 
 You can add a new request with the `new` subcommand:
 
@@ -156,7 +156,7 @@ PATCH  update-user
 Each request name is listed along with the HTTP method that the request is
 configured to use.
 
-##### Request Sending
+#### Request Sending
 
 Once a request is set up in a project and has at least a method and a URL
 defined on it, it can be sent to the remote server and the response can be
@@ -189,7 +189,7 @@ If there are any variables in the request body, URL, or headers, they are filled
 with their current values before the request is sent. See the section on Using
 Variables below for more information on using variables within requests.
 
-##### Request Viewing
+#### Request Viewing
 
 You can examine a request in detail with the `show` subcommand:
 
@@ -229,7 +229,7 @@ Ouput:
 {"name": "Vriska Serket"}
 ```
 
-##### Request Editing
+#### Request Editing
 
 If you need to update a request, use the `edit` subcommand:
 
@@ -249,7 +249,7 @@ Output:
 {"name": "Nepeta Leijon"}
 ```
 
-##### Request Deletion
+#### Request Deletion
 
 If you're totally done with a request and want to permanently remove it from the
 project, use the `delete` subcommand:
@@ -273,7 +273,7 @@ DELETE remove-user
 PATCH  update-user
 ```
 
-#### Using Variables
+### Using Variables
 
 MORC supports the use of *variables* in requests. These are values in requests
 that are filled in only when actually sending the request, and they can be
@@ -294,13 +294,51 @@ when sending it.
 
 The simplest way is to provide it with `-V` when sending the request:
 
+```shell
+morc send get-user -V SCHEME=https --request  # --request will print the request as it is sent
 ```
-morc send get-user -V SCHEME=https
 
-A variable is added to a request 
+Output:
 
-Templating within a body or url or header is supported. Use variables in form of
-`${NAME}` and supply values during a call to `morc send` with `-V`.
+```
+------------------- REQUEST -------------------
+(https://localhost:8080/users)
+GET /users HTTP/1.1
+Host: localhost:8080
+User-Agent: Go-http-client/1.1
+Accept-Encoding: gzip
+
+
+(no request body)
+----------------- END REQUEST -----------------
+HTTP/1.1 200 OK
+(no response body)
+```
+
+The scheme isn't included in the HTTP request itself, but it is shown in the
+line just above the request proper. It's set to HTTPS, because `${SCHEME}` was
+substituted with the user-supplied variable.
+
+All variables have the form `${SOME_NAME}` when used inside a request, with
+SOME_NAME replaced by the actual name of the variable (or `var` for short). They
+are supported in the URL, body data, and headers of a request.
+
+When substituting a var in a request in preperation for sending, MORC will check
+in a few different places for values for that var. First, it will use any value
+directly given by the CLI invocation with `-V`; this will override any values
+stored within the project. Next, it will check to see if there are any *stored*
+variables in the project that match, in the current variable environment. If
+there are none, and the current variable environment is not the default, it will
+check in the *default* variable environment. If it still can't find any values,
+MORC will refuse to send the request.
+
+#### Stored Variables
+
+
+
+#### Variable Environments
+
+#### Variable Capturing
 
 Request templates within Morc can have variables within them that are filled at
 send time. Variables are given in the format `${NAME}`, with NAME replaced by

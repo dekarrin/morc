@@ -1111,6 +1111,9 @@ func OutputRequest(req *http.Request, opts OutputControl) error {
 			fmt.Fprintln(w, lineDelimStart+" REQUEST")
 		}
 
+		// make shore to print the full URL in pretty format
+		fmt.Fprintf(w, "(%s)\n", req.URL)
+
 		fmt.Fprintln(w, string(reqBytes))
 
 		if opts.Format == FormatPretty && req.Body == nil || req.Body == http.NoBody {

@@ -105,11 +105,23 @@ func invokeExec(io cmdio.IO, flowName string, opts execOptions) error {
 		templates = append(templates, tmpl)
 	}
 
+	varOverrides := make(map[string]string)
+	// copy in the one-time vars
+	for k, v := range opts.oneTimeVars {
+		varOverrides[strings.ToUpper(k)] = v
+	}
+
 	opts.outputCtrl.Writer = io.Out
 	for i, tmpl := range templates {
-		err := sendTemplate(p, tmpl, opts.oneTimeVars, opts.outputCtrl)
+		result, err := sendTemplate(&p, tmpl, p.Vars.MergedSet(varOverrides), opts.outputCtrl)
 		if err != nil {
 			return fmt.Errorf("step #%d: %w", i, err)
+		}
+
+		// okay, need to update the varOverrides because if any were just
+		// captured, THAT is the new canonical value of the var
+		for k := range result.Captures {
+			delete(varOverrides, strings.ToUpper(k))
 		}
 	}
 

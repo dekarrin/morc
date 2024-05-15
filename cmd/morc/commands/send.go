@@ -97,17 +97,19 @@ func invokeSend(io cmdio.IO, reqName string, opts sendOptions) error {
 	}
 
 	opts.outputCtrl.Writer = io.Out
-
-	return sendTemplate(p, tmpl, opts.oneTimeVars, opts.outputCtrl)
+	_, err = sendTemplate(&p, tmpl, p.Vars.MergedSet(opts.oneTimeVars), opts.outputCtrl)
+	return err
 }
 
-func sendTemplate(p morc.Project, tmpl morc.RequestTemplate, vars map[string]string, oc morc.OutputControl) error {
+func sendTemplate(p *morc.Project, tmpl morc.RequestTemplate, vars map[string]string, oc morc.OutputControl) (morc.SendResult, error) {
+	// TODO: flows will call this and persist on EVERY request which is probably not needed.
+
 	if tmpl.Method == "" {
-		return fmt.Errorf("request template %s has no method set", tmpl.Name)
+		return morc.SendResult{}, fmt.Errorf("request template %s has no method set", tmpl.Name)
 	}
 
 	if tmpl.URL == "" {
-		return fmt.Errorf("request template %s has no URL set", tmpl.Name)
+		return morc.SendResult{}, fmt.Errorf("request template %s has no URL set", tmpl.Name)
 	}
 
 	varSymbol := "$"
@@ -138,7 +140,7 @@ func sendTemplate(p morc.Project, tmpl morc.RequestTemplate, vars map[string]str
 
 	result, err := morc.Send(tmpl.Method, tmpl.URL, varSymbol, sendOpts)
 	if err != nil {
-		return err
+		return result, err
 	}
 
 	// if any variable changes occurred, persist to disk
@@ -148,7 +150,7 @@ func sendTemplate(p morc.Project, tmpl morc.RequestTemplate, vars map[string]str
 		}
 		err := p.PersistToDisk(false)
 		if err != nil {
-			return fmt.Errorf("save project to disk: %w", err)
+			return result, fmt.Errorf("save project to disk: %w", err)
 		}
 	}
 
@@ -166,7 +168,7 @@ func sendTemplate(p morc.Project, tmpl morc.RequestTemplate, vars map[string]str
 		p.History = append(p.History, entry)
 		err := p.PersistHistoryToDisk()
 		if err != nil {
-			return fmt.Errorf("save history to disk: %w", err)
+			return result, fmt.Errorf("save history to disk: %w", err)
 		}
 	}
 
@@ -176,9 +178,9 @@ func sendTemplate(p morc.Project, tmpl morc.RequestTemplate, vars map[string]str
 
 		err := p.PersistSessionToDisk()
 		if err != nil {
-			return fmt.Errorf("save session to disk: %w", err)
+			return result, fmt.Errorf("save session to disk: %w", err)
 		}
 	}
 
-	return nil
+	return result, nil
 }

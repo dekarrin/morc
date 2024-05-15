@@ -543,6 +543,27 @@ func (v *VarStore) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// MergedSet returns the set of keys and values of all variables accessible from
+// the current environment, with the given map of vars taking precedence over
+// any that it has stored.
+func (v VarStore) MergedSet(overrides map[string]string) map[string]string {
+	merged := make(map[string]string)
+
+	// get all vars that are about to be included, and add them first
+	all := v.All()
+
+	for _, k := range all {
+		merged[k] = v.Get(k)
+	}
+
+	// now apply the overrides
+	for k, v := range overrides {
+		merged[strings.ToUpper(k)] = v
+	}
+
+	return merged
+}
+
 // Count returns the number of variables accessible from the current
 // environment. This includes any in the default environment that are not
 // overridden by the current environment. This will match the number of elements

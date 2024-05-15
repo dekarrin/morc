@@ -109,7 +109,7 @@ Or if you are looking for *very* fine-grained control over new project creation,
 you can use the `morc proj new` command. See `morc help proj new` for
 information on running it.
 
-#### Creating Requests
+#### Project Requests
 
 So, you've got a project rolling! Congrats. Now you can take a look at all the
 requests that are loaded into it:
@@ -118,8 +118,11 @@ requests that are loaded into it:
 morc reqs
 ```
 
-If this is in a brand new project, there won't be anything there. You can add a
-new request with the `new` subcommand:
+If this is in a brand new project, there won't be anything there.
+
+##### Creating
+
+You can add a new request with the `new` subcommand:
 
 ```shell
 morc reqs new create-user --url localhost:8080/users -X POST -d '{"name":"Vriska Serket"}' -H 'Content-Type: application/json'
@@ -150,14 +153,65 @@ DELETE remove-user
 PATCH  update-user
 ```
 
+##### Sending
 
+WIP
+
+```shell
+morc send list-users
+```
+
+##### Viewing
+
+You can examine a request in detail with the `show` subcommand:
+
+```shell
+morc reqs show create-user
+```
+
+```
+WIP OUTPUT
+```
+
+##### Editing
+
+If you need to update a request, use the `edit` subcommand:
+
+```shell
+morc reqs edit create-user -d '{"name": "Nepeta Leijon"}'
+```
+
+```
+WIP OUTPUT
+```
+
+##### Deleting
+
+If you're totally done with a request and want to permanently remove it from the project, use the `delete` subcommand:
+
+```shell
+morc reqs delete get-token
+```
+
+```
+WIP OUTPUT
+```
+
+Now it will be cleared from the project, which you can confirm by listing the requests:
+
+```shell
+morc reqs
+```
+
+```
+POST   create-user
+GET    get-user
+GET    list-users
+DELETE remove-user
+PATCH  update-user
+```
 
 WIP:
-* `morc reqs new`
-* `morc reqs`
-* `morc reqs show`
-* `morc reqs edit`
-* `morc reqs delete`
 * `morc send`
 
 #### Using Variables

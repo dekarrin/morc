@@ -174,12 +174,32 @@ func invokeVarGet(io cmdio.IO, varName string, opts varOptions) error {
 
 	var val string
 	if opts.envDefaultOverride {
+		if !p.Vars.IsDefinedIn(varName, "") {
+			io.PrintErrf("%q is not defined in default environment\n", varName)
+			return nil
+		}
+
 		val = p.Vars.GetFrom(varName, "")
 	} else if opts.envOverride != "" {
+		if !p.Vars.IsDefinedIn(varName, opts.envOverride) {
+			io.PrintErrf("%q is not defined in environment %q\n", varName, opts.envOverride)
+			return nil
+		}
+
 		val = p.Vars.GetFrom(varName, opts.envOverride)
 	} else if opts.envCurrentOverride {
+		if !p.Vars.IsDefinedIn(varName, p.Vars.Environment) {
+			io.PrintErrf("%q is not defined in environment %q\n", varName, p.Vars.Environment)
+			return nil
+		}
+
 		val = p.Vars.GetFrom(varName, p.Vars.Environment)
 	} else {
+		if !p.Vars.IsDefined(varName) {
+			io.PrintErrf("%q is not defined in current or default environment\n", varName)
+			return nil
+		}
+
 		val = p.Vars.Get(varName)
 	}
 

@@ -146,6 +146,8 @@ output:
 morc reqs
 ```
 
+Output:
+
 ```
 POST   create-user
 GET    get-token

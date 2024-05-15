@@ -237,8 +237,16 @@ If you need to update a request, use the `edit` subcommand:
 morc reqs edit create-user -d '{"name": "Nepeta Leijon"}'
 ```
 
+You can use `show` to confirm that the update was applied:
+
+```shell
+morc reqs show create-user --body
 ```
-WIP OUTPUT
+
+Output:
+
+```
+{"name": "Nepeta Leijon"}
 ```
 
 ##### Request Deletion
@@ -250,11 +258,8 @@ project, use the `delete` subcommand:
 morc reqs delete get-token
 ```
 
-```
-WIP OUTPUT
-```
-
-Now it will be cleared from the project, which you can confirm by listing the requests:
+It will be cleared from the project, which you can confirm by listing the
+requests:
 
 ```shell
 morc reqs

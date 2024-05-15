@@ -222,6 +222,10 @@ func invokeReqEdit(name string, opts editOptions) error {
 
 	// header modifications
 	if opts.deleteHeaders.set {
+		if req.Headers == nil {
+			req.Headers = make(http.Header)
+		}
+
 		for _, key := range opts.deleteHeaders.v {
 			vals := req.Headers.Values(key)
 			if len(vals) < 1 {
@@ -243,6 +247,10 @@ func invokeReqEdit(name string, opts editOptions) error {
 		}
 	}
 	if opts.headers.set {
+		if req.Headers == nil {
+			req.Headers = make(http.Header)
+		}
+
 		for key, vals := range opts.headers.v {
 			for _, v := range vals {
 				req.Headers.Add(key, v)

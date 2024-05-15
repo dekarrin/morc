@@ -120,7 +120,7 @@ morc reqs
 
 If this is in a brand new project, there won't be anything there.
 
-##### Creating
+##### Request Creation
 
 You can add a new request with the `new` subcommand:
 
@@ -153,15 +153,43 @@ DELETE remove-user
 PATCH  update-user
 ```
 
-##### Sending
+Each request name is listed along with the HTTP method that the request is
+configured to use.
 
-WIP
+##### Request Sending
+
+Once a request is set up in a project and has at least a method and a URL
+defined on it, it can be sent to the remote server and the response can be
+viewed.
+
+Use the `send` subcommand with the name of the request to be send.
 
 ```shell
 morc send list-users
 ```
 
-##### Viewing
+Output:
+
+```
+HTTP/1.1 200 OK
+[
+    {"name": "Vriska"},
+    {"name": "Nepeta"},
+    {"name": "Kanaya"},
+    {"name": "Terezi"}
+]
+```
+
+The remote server's response as well as any body in the payload will be shown.
+There's a lot of options to view additional details, such as seeing the headers
+in the response, outputting the request, and format selection all available as
+CLI options; take a look at `morc help send` to see them all.
+
+If there are any variables in the request body, URL, or headers, they are filled
+with their current values before the request is sent. See the section on Using
+Variables below for more information on using variables within requests.
+
+##### Request Viewing
 
 You can examine a request in detail with the `show` subcommand:
 
@@ -169,11 +197,39 @@ You can examine a request in detail with the `show` subcommand:
 morc reqs show create-user
 ```
 
+Output:
+
 ```
-WIP OUTPUT
+POST http://example.com
+
+HEADERS:
+Content-Type: application/json
+
+BODY:
+{"name": "Vriska Serket"}
+
+VAR CAPTURES: (NONE)
+
+AUTH FLOW: (NONE)
 ```
 
-##### Editing
+The request method and URL are shown first, along with any headers, body, and
+variable captures. Auth flow is for an upcoming feature and is not currently
+used.
+
+To see only one of the items in a request, you can specify it as a CLI flag:
+
+```shell
+morc reqs show create-user --body
+```
+
+Ouput:
+
+```
+{"name": "Vriska Serket"}
+```
+
+##### Request Editing
 
 If you need to update a request, use the `edit` subcommand:
 
@@ -185,9 +241,10 @@ morc reqs edit create-user -d '{"name": "Nepeta Leijon"}'
 WIP OUTPUT
 ```
 
-##### Deleting
+##### Request Deletion
 
-If you're totally done with a request and want to permanently remove it from the project, use the `delete` subcommand:
+If you're totally done with a request and want to permanently remove it from the
+project, use the `delete` subcommand:
 
 ```shell
 morc reqs delete get-token
@@ -210,9 +267,6 @@ GET    list-users
 DELETE remove-user
 PATCH  update-user
 ```
-
-WIP:
-* `morc send`
 
 #### Using Variables
 

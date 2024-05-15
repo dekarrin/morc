@@ -81,6 +81,8 @@ directory:
 morc proj
 ```
 
+Output:
+
 ```
 Project: Unnamed Project
 0 requests, 0 flows

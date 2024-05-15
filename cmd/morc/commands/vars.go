@@ -274,7 +274,7 @@ func invokeVarList(io cmdio.IO, opts varOptions) error {
 		io.Println("(none)")
 	} else {
 		for _, name := range vars {
-			io.Printf("$%s = %q\n", name, p.Vars.Get(name))
+			io.Printf("${%s} = %q\n", name, p.Vars.Get(name))
 		}
 	}
 

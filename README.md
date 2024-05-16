@@ -653,7 +653,7 @@ Output:
 <DEFAULT>
 ```
 
-It gives the special string "<DEFAULT>" to indicate that MORC is currently set
+It gives the special string `<DEFAULT>` to indicate that MORC is currently set
 to use the default environment.
 
 To swap to a new environment, give the name of the environment to swap to.

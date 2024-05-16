@@ -65,11 +65,15 @@ var varsCmd = &cobra.Command{
 			return fmt.Errorf("project file is set to empty string")
 		}
 
+		var varName string
+		var varValue string
+		var err error
 		action := varsActionList
 
 		// what mode are we in? listing, reading, or writing? infer by arg count
 		if len(args) == 0 {
 			// listing mode
+
 			if opts.deleteVar {
 				return fmt.Errorf("must specify name of variable to delete")
 			}
@@ -84,6 +88,13 @@ var varsCmd = &cobra.Command{
 			action = varsActionList
 		} else if len(args) == 1 {
 			// value get mode, or a delete
+
+			varName = args[0]
+
+			// don't check varName; deletion and getting should always be
+			// allowed in case the project got into a weird state, say due to
+			// direct editing of the project file.
+
 			if opts.deleteVar {
 				if opts.envDefaultOverride {
 					return fmt.Errorf("cannot specify --default with --delete/-d; use --all to delete from all envs")
@@ -94,6 +105,14 @@ var varsCmd = &cobra.Command{
 
 				action = varsActionDelete
 			} else {
+				// don't check varName; getting should always be allowed in
+				// case the project got into a weird state, say due to direct
+				// editing of the project file.
+
+				if err != nil {
+					return err
+				}
+
 				if opts.envOverride == reservedDefaultEnvName {
 					return fmt.Errorf("cannot use reserved environment name %q; use --default to get the default env's value", reservedDefaultEnvName)
 				}
@@ -105,7 +124,10 @@ var varsCmd = &cobra.Command{
 				action = varsActionGet
 			}
 		} else if len(args) == 2 {
-			// value set mode.
+			// value set mode
+			varName = args[0]
+			varValue = args[1]
+
 			if opts.deleteVar {
 				return fmt.Errorf("cannot specify value when using --delete/-d flag")
 			}
@@ -126,11 +148,11 @@ var varsCmd = &cobra.Command{
 		case varsActionList:
 			return invokeVarList(io, opts)
 		case varsActionGet:
-			return invokeVarGet(io, args[0], opts)
+			return invokeVarGet(io, varName, opts)
 		case varsActionSet:
-			return invokeVarSet(io, args[0], args[1], opts)
+			return invokeVarSet(io, varName, varValue, opts)
 		case varsActionDelete:
-			return invokeVarDelete(io, args[0], opts)
+			return invokeVarDelete(io, varName, opts)
 		default:
 			panic(fmt.Sprintf("unhandled var action %q", action))
 		}
@@ -147,6 +169,12 @@ type varOptions struct {
 }
 
 func invokeVarSet(_ cmdio.IO, varName, value string, opts varOptions) error {
+	// dont even bother to load if the var name is invalid
+	varName, err := morc.ParseVarName(strings.ToUpper(varName))
+	if err != nil {
+		return err
+	}
+
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
 	if err != nil {
 		return err
@@ -189,14 +217,14 @@ func invokeVarGet(io cmdio.IO, varName string, opts varOptions) error {
 		val = p.Vars.GetFrom(varName, opts.envOverride)
 	} else if opts.envCurrentOverride {
 		if !p.Vars.IsDefinedIn(varName, p.Vars.Environment) {
-			io.PrintErrf("%q is not defined in environment %q\n", varName, p.Vars.Environment)
+			io.PrintErrf("%q is not defined in current environment (%q)\n", varName, p.Vars.Environment)
 			return nil
 		}
 
 		val = p.Vars.GetFrom(varName, p.Vars.Environment)
 	} else {
 		if !p.Vars.IsDefined(varName) {
-			io.PrintErrf("%q is not defined in current or default environment\n", varName)
+			io.PrintErrf("%q is not defined\n", varName)
 			return nil
 		}
 

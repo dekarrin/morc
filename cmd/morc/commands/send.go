@@ -71,7 +71,12 @@ func sendFlagsToOptions() (sendOptions, error) {
 			if len(parts) != 2 {
 				return opts, fmt.Errorf("var #%d (%q) is not in format key=value", idx+1, v)
 			}
-			oneTimeVars[parts[0]] = parts[1]
+
+			varName, err := morc.ParseVarName(strings.ToUpper(parts[0]))
+			if err != nil {
+				return opts, fmt.Errorf("var #%d (%q): %w", idx+1, v, err)
+			}
+			oneTimeVars[varName] = parts[1]
 		}
 		opts.oneTimeVars = oneTimeVars
 	}

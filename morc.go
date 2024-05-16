@@ -24,6 +24,10 @@ import (
 
 const Version = "0.1.1-dev"
 
+const (
+	varNamePattern = `[-a-zA-Z0-9_]+`
+)
+
 type TraversalStep struct {
 	Key   string // if set, index is ignored
 	Index int
@@ -215,10 +219,14 @@ func ParseVarScraperSpec(name, spec string) (VarScraper, error) {
 	}, nil
 }
 
-func ParseVarScraperName(name string) (string, error) {
+func ParseVarName(name string) (string, error) {
 	// validate that name does not contain any invalid characters; it must be
 	// alphanumeric or underscore
-	if !regexp.MustCompile(`^[a-zA-Z0-9_]+$`).MatchString(name) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "", fmt.Errorf("name is empty")
+	}
+	if !regexp.MustCompile(`^` + varNamePattern + `$`).MatchString(name) {
 		return "", fmt.Errorf("name %q contains invalid characters", name)
 	}
 
@@ -236,7 +244,7 @@ func ParseVarScraper(s string) (VarScraper, error) {
 		return VarScraper{}, fmt.Errorf("not in NAME:SPEC format")
 	}
 
-	name, err := ParseVarScraperName(parts[0])
+	name, err := ParseVarName(parts[0])
 	if err != nil {
 		return VarScraper{}, err
 	}
@@ -468,7 +476,7 @@ func (r *RESTClient) SendRequest(req *http.Request) (*http.Response, map[string]
 func (r *RESTClient) Substitute(s string) (string, error) {
 	// find every variable in s and replace it with the value from r.Vars (or return error if not)
 	expr := regexp.QuoteMeta(r.VarPrefix + "{")
-	expr += `([a-zA-Z0-9_]+)`
+	expr += `(` + varNamePattern + `)`
 	expr += regexp.QuoteMeta("}")
 
 	rx, err := regexp.Compile(expr)

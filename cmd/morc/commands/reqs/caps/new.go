@@ -68,7 +68,7 @@ func invokeReqCapsNew(name, varName, varCap string, opts newOptions) error {
 	}
 
 	// parse the var scraper
-	varName, err = morc.ParseVarScraperName(varName)
+	varName, err = morc.ParseVarName(varName)
 	if err != nil {
 		return err
 	}

@@ -50,7 +50,7 @@ var editCmd = &cobra.Command{
 			if flagEditVar == "" {
 				return fmt.Errorf("variable name cannot be empty")
 			}
-			newName, err := morc.ParseVarScraperName(flagEditVar)
+			newName, err := morc.ParseVarName(flagEditVar)
 			if err != nil {
 				return fmt.Errorf("var: %w", err)
 			}

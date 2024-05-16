@@ -289,8 +289,8 @@ request:
 ```shell
 morc reqs edit get-user --url '${SCHEME}://localhost:8080/users'
 
-# make sure to put text with a variable in it in single quotes so your shell
-# doesn't try to interpret it itself
+# MAKE SURE to put text with a dollar-leading ${variable} in it in single quotes
+# or your shell may mess with the variable
 ```
 
 Then, you just need to make sure that the value for the variable is available
@@ -300,6 +300,9 @@ The simplest way is to provide it with `-V` when sending the request:
 
 ```shell
 morc send get-user -V SCHEME=https --request  # --request will print the request as it is sent
+
+# note that when providing a var like this, it does NOT start with a $, so you
+# do not need to single-quote it.
 ```
 
 Output:
@@ -325,7 +328,9 @@ substituted with the user-supplied variable.
 
 All variables have the form `${SOME_NAME}` when used inside a request, with
 SOME_NAME replaced by the actual name of the variable (or `var` for short). They
-are supported in the URL, body data, and headers of a request.
+are supported in the URL, body data, and headers of a request. Variables are
+case-insensitive and their names can be made up of the letters, numbers,
+underscores, and hyphens.
 
 When substituting a var in a request in preperation for sending, MORC will check
 in a few different places for values for that var. First, it will use any value
@@ -338,7 +343,105 @@ MORC will refuse to send the request.
 
 #### Stored Variables
 
+Variables do not always need to be provided at the time that you send request.
+MORC maintains a variable store inside of project files that can hold the values
+of variables indefinitately; they'll exist until the project is deleted, they
+are deleted, or they are updated automatically via a variable capture.
 
+The variable store is accessed and manipulated with the `vars` subcommand. By
+itself, it will list all of the values that it would use for any sent request:
+
+```shell
+morc vars
+```
+
+With nothing defined, it will give output indicating that:
+
+```
+(none)
+```
+
+With variables set, it will them out:
+
+```
+${SCHEME} = "https"
+${TEST_CAP} = "octyp"
+${THETHING} = "doctyp"
+```
+
+Strictly speaking, there are actually *two* layers of variables possible within
+the store; a currently-selected one, and a default one. These are organized as
+separate *environments*, and they are covered in detail in the Variable
+Environments section below. Unless it mentioned otherwise, this README will
+assume you're working with the project set to use only the default environment,
+as that is the situation when a project is first created.
+
+#### Setting & Getting Variables
+
+To set the value of a variable, give the name of the variable and the value as
+arguments to `morc vars`:
+
+```shell
+morc vars USER_ID 24f6dc51-17ba-4aca-937c-52b40b9b715c
+```
+
+It will then be shown when listing all variables:
+
+```shell
+morc vars
+```
+
+Output:
+
+```
+${USER_ID} = "24f6dc51-17ba-4aca-937c-52b40b9b715c"
+```
+
+You can get only that variable's value by giving the name of the variable with
+no value:
+
+```shell
+morc vars USER_ID
+```
+
+Output:
+
+```
+24f6dc51-17ba-4aca-937c-52b40b9b715c
+```
+
+Note that there is a difference between a variable being undefined and a
+variable being defined and set to the empty string. Requests can use any
+variable defined at send time, including any that are set to the empty string,
+but they cannot be sent if they use variables that are undefined.
+
+```shell
+morc vars USER_ID ""
+
+# ${USER_ID} can still be used in templates, even though its value is being set to ""
+```
+
+If you want to actually remove (undefine) a variable from the project var store,
+use the `-d` option with the name of a variable:
+
+```shell
+morc vars USER_ID -d
+```
+
+Then the variable will be completely undefined:
+
+```shell
+morc vars USER_ID
+```
+
+Output:
+
+```
+"USER_ID" is not defined
+```
+
+The deleted (undefined) variable will be unusable in requests until it is
+re-defined, but it also will no longer take up space in the project file.
 
 #### Variable Environments
 

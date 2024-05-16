@@ -443,6 +443,42 @@ Output:
 The deleted (undefined) variable will be unusable in requests until it is
 re-defined, but it also will no longer take up space in the project file.
 
+#### Variable Capturing
+
+Request templates within Morc can have variables within them that are filled at
+send time. Variables are given in the format `${NAME}`, with NAME replaced by
+the actual name of the variable.
+
+When a template with one or more variables is sent, the values are substituted
+in by drawing from one or more sources. First, all `-V` flags are checked for a
+match. If found, that value is used. If there are no flags setting the value,
+the current variable environment is checked for a value. If none is set, the
+default environment is checked. If there is still no value, the template cannot
+be filled, and an error is emitted.
+
+Variables can also be set, viewed, and modified using the `morc vars` and
+`morc env` commands.
+
+WIP:
+* Use of -V in send
+* `morc vars` (etc)
+* Description of vars envs
+* `morc env`.
+
+Saving variables during a `morc send` automatically is supported via the
+concept of Variable Captures.
+
+Variable values can be taken from the response of a request.
+
+WIP:
+
+* `morc reqs caps new`
+* `morc reqs caps`
+* `morc reqs caps edit`
+* `morc reqs caps delete`
+
+
+
 #### Variable Environments
 
 The variable store in MORC supports having multiple sets of vars that you can
@@ -638,40 +674,6 @@ the --all flag as well:
 ```shell
 morc vars PASSWORD -d --all
 ```
-
-#### Variable Capturing
-
-Request templates within Morc can have variables within them that are filled at
-send time. Variables are given in the format `${NAME}`, with NAME replaced by
-the actual name of the variable.
-
-When a template with one or more variables is sent, the values are substituted
-in by drawing from one or more sources. First, all `-V` flags are checked for a
-match. If found, that value is used. If there are no flags setting the value,
-the current variable environment is checked for a value. If none is set, the
-default environment is checked. If there is still no value, the template cannot
-be filled, and an error is emitted.
-
-Variables can also be set, viewed, and modified using the `morc vars` and
-`morc env` commands.
-
-WIP:
-* Use of -V in send
-* `morc vars` (etc)
-* Description of vars envs
-* `morc env`.
-
-Saving variables during a `morc send` automatically is supported via the
-concept of Variable Captures.
-
-Variable values can be taken from the response of a request.
-
-WIP:
-
-* `morc reqs caps new`
-* `morc reqs caps`
-* `morc reqs caps edit`
-* `morc reqs caps delete`
 
 ### Creating Sequences Of Requests With Flows
 

@@ -889,7 +889,7 @@ func (v *VarStore) UnsetIn(key, env string) {
 		return
 	}
 
-	envUpper := strings.ToUpper(v.Environment)
+	envUpper := strings.ToUpper(env)
 	varEnv := v.envs[envUpper]
 	if varEnv != nil {
 		k := strings.ToUpper(key)

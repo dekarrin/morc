@@ -445,6 +445,78 @@ re-defined, but it also will no longer take up space in the project file.
 
 #### Variable Environments
 
+The variable store in MORC supports having multiple sets of vars that you can
+easily switch between. Each of these sets is called an *environment*; they might
+be set up to, say, change the requests to be applicable for testing different
+deploy scenarios.
+
+For instance, one might two sets of variables such as the following:
+
+```
+# set 1:
+
+${BASE} = "http://staging.internal.example.com/api/v2"
+${USER} = "myTestUser"
+
+# set 2:
+
+${BASE} = "https://example.com/api/v2"
+${USER} = "internalTesting"
+```
+
+These two sets of vars could be assigned to two different environments in the
+MORC var store to allow easy switching between testing against a staging server
+and testing against a production server.
+
+Whenever a variable in a MORC project is created, set, deleted, or used in a
+request, it will be done in whatever environment MORC is set to use. When a
+project is first started, this will be what is known as the
+*default environment*.
+
+You can check what environment MORC is in with the `env` subcommand:
+
+```shell
+morc env
+```
+
+Output:
+
+```
+<DEFAULT>
+```
+
+It gives the special string "<DEFAULT>" to indicate that MORC is currently set
+to use the default environment.
+
+To swap to a new environment, give the name of the environment to swap to.
+You can swap to one that doesn't yet exist; using it will automatically create
+it when necessary:
+
+```shell
+morc env STAGING
+```
+
+Names are case-insensitive, like variable names.
+
+Once swapped to the new environment, you can start defining variables!
+
+```shell
+morc vars BASE http://staging.internal.example.com/api/v2
+morc vars USER myTestUser
+```
+
+You can then swap to another environment to give them different values:
+
+```shell
+morc env PROD
+
+morc vars BASE https://example.com/api/v2
+morc vars USER internalTesting
+```
+
+##### Defaulting
+
+
 #### Variable Capturing
 
 Request templates within Morc can have variables within them that are filled at
@@ -479,7 +551,7 @@ WIP:
 * `morc reqs caps edit`
 * `morc reqs caps delete`
 
-#### Creating Sequences Of Requests With Flows
+### Creating Sequences Of Requests With Flows
 
 Flows are sequences of requests that will be fired one after another. It can be
 useful to use with variable captures to perform a full sequence of communication
@@ -492,15 +564,15 @@ used to set the values of subsequent requests.
 * `morc flows ...`
 * `morc exec`
 
-#### Request History
+### Request History
 
 * `morc hist`
 
-#### Cookie Store
+### Cookie Store
 
 * `morc cookies`
 
-### Standalone Use
+## Standalone Use
 
 MORC can send one-off requests by using `morc request`:
 

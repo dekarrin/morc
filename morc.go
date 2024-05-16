@@ -22,7 +22,7 @@ import (
 	"github.com/dekarrin/rezi/v2"
 )
 
-const Version = "0.1.1-dev"
+const Version = "0.2.0"
 
 const (
 	varNamePattern = `[-a-zA-Z0-9_]+`

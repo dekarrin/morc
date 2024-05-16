@@ -1,3 +1,15 @@
+v0.2.0 - May 16, 2024
+---------------------
+* Added `--url` flag to `morc cookies` to see only cookies for that URL.
+* Required Go version for dev is now minimum 1.20 so we get unwrappable errors.
+* Updated README.md to actually be a reasonable description of use that isn't
+  just "go read the online help".
+* Fixed numerous bugs and edge cases that made examples in README not work.
+* Added new commands:
+  * `morc proj edit` to edit a project.
+  * `morc reqs edit` to edit a request template.
+  * `morc reqs caps edit` to edit a var capture.
+
 v0.1.0 - May 10, 2024
 ----------------------
 * The name has been updated from `suyac` to `morc`, MORe than just Curl, the

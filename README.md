@@ -277,91 +277,6 @@ DELETE remove-user
 PATCH  update-user
 ```
 
-### Request History
-
-MORC projects maintain a history of requests and responses that were sent. If
-the project was created with `morc init`, history will be enabled by default.
-
-To view a list of all requests that the project has in its history, use `hist`
-with no other options:
-
-```shell
-morc hist
-```
-
-Output:
-
-```
-0: 2024-05-12T08:13:09-05:00 - create-user - POST http://localhost:8080/users - 201 Created - 0s
-1: 2024-05-13T08:50:57-05:00 - get-user - GET http://localhost:8080/users/c2328061-da05-4241-9a42-012f2e39ff72 - 200 OK - 0s
-2: 2024-05-15T07:49:12-05:00 - list-users - GET http://localhost:8080/users - 200 OK - 1s
-3: 2024-05-15T11:37:02-05:00 - update-user - PATCH http://localhost:8080/users/c2328061-da05-4241-9a42-012f2e39ff72 - 200 OK - 1s
-4: 2024-05-15T11:39:32-05:00 - delete-user - DELETE http://localhost:8080/users/c2328061-da05-4241-9a42-012f2e39ff7 - 404 Not Found - 0s
-4: 2024-05-15T11:39:38-05:00 - delete-user - DELETE http://localhost:8080/users/c2328061-da05-4241-9a42-012f2e39ff72 - 204 No Content - 1s
-8: 2024-05-16T11:00:58-05:00 - create-user - POST http://localhost:8080/users - 200 OK - 0s
-```
-
-Each history entry begins with an entry index. A particular entry can be played
-back by giving an entry index number, along with any other output formatting
-options as would be accepted by `morc send` or `morc request`:
-
-```shell
-morc hist 0
-```
-
-Output:
-
-```
-Request template: create-user
-Request sent:          2024-05-12T08:13:09-05:00
-Response received:     2024-05-12T08:13:09-05:00
-Total round-trip time: 0s
-HTTP/1.1 201 Created
-{
-    "id": "c2328061-da05-4241-9a42-012f2e39ff72",
-    "name": "Vriska Serket"
-}
-```
-
-To turn off history recording, use the --off flag:
-
-```shell
-morc hist --off
-```
-
-To turn history recording on, use the --on flag:
-
-```shell
-morc hist --on
-```
-
-To check the current status of history and see a summary of the store, use the
---info flag:
-
-```shell
-morc hist --info
-```
-
-Output:
-
-```
-9 entries in .morc/history.json
-
-History is ON
-```
-
-To clear out the current history store, either delete the file listed in
-`--info` output from the filesystem, or use the `--clear` flag:
-
-```shell
-morc hist --clear
-```
-
-### Cookie Store
-
-* `morc cookies`
-
-
 ### Using Variables
 
 MORC supports the use of *variables* in requests. These are values in requests
@@ -901,6 +816,166 @@ with a server.
 Use `morc flows new` to create a new one. Once created, `morc exec FLOW` will
 actually send off each request. Any variable captures from request sends are
 used to set the values of subsequent requests.
+
+
+
+### Request History
+
+MORC projects maintain a history of requests and responses that were sent. If
+the project was created with `morc init`, history will be enabled by default.
+
+To view a list of all requests that the project has in its history, use `hist`
+with no other options:
+
+```shell
+morc hist
+```
+
+Output:
+
+```
+0: 2024-05-12T08:13:09-05:00 - create-user - POST http://localhost:8080/users - 201 Created - 0s
+1: 2024-05-13T08:50:57-05:00 - get-user - GET http://localhost:8080/users/c2328061-da05-4241-9a42-012f2e39ff72 - 200 OK - 0s
+2: 2024-05-15T07:49:12-05:00 - list-users - GET http://localhost:8080/users - 200 OK - 1s
+3: 2024-05-15T11:37:02-05:00 - update-user - PATCH http://localhost:8080/users/c2328061-da05-4241-9a42-012f2e39ff72 - 200 OK - 1s
+4: 2024-05-15T11:39:32-05:00 - delete-user - DELETE http://localhost:8080/users/c2328061-da05-4241-9a42-012f2e39ff7 - 404 Not Found - 0s
+4: 2024-05-15T11:39:38-05:00 - delete-user - DELETE http://localhost:8080/users/c2328061-da05-4241-9a42-012f2e39ff72 - 204 No Content - 1s
+8: 2024-05-16T11:00:58-05:00 - create-user - POST http://localhost:8080/users - 200 OK - 0s
+```
+
+Each history entry begins with an entry index. A particular entry can be played
+back by giving an entry index number, along with any other output formatting
+options as would be accepted by `morc send` or `morc request`:
+
+```shell
+morc hist 0
+```
+
+Output:
+
+```
+Request template: create-user
+Request sent:          2024-05-12T08:13:09-05:00
+Response received:     2024-05-12T08:13:09-05:00
+Total round-trip time: 0s
+HTTP/1.1 201 Created
+{
+    "id": "c2328061-da05-4241-9a42-012f2e39ff72",
+    "name": "Vriska Serket"
+}
+```
+
+To turn off history recording, use the --off flag:
+
+```shell
+morc hist --off
+```
+
+To turn history recording on, use the --on flag:
+
+```shell
+morc hist --on
+```
+
+To check the current status of history and see a summary of the store, use the
+--info flag:
+
+```shell
+morc hist --info
+```
+
+Output:
+
+```
+9 entries in .morc/history.json
+
+History is ON
+```
+
+To clear out the current history store, either delete the file listed in
+`--info` output from the filesystem, or use the `--clear` flag:
+
+```shell
+morc hist --clear
+```
+
+### Cookie Store
+
+MORC projects save cookies received in responses from remote servers. Due to
+internal limitations, it specifically tracks all cookies requested to be set by
+a Set-Cookie header, not necessarily whether it would actually be sent.
+
+MORC will save cookies for only as long as the currently-configured cookie
+lifetime in the project is, regardless of when their expiry is set.
+
+In a project created by `morc init`, cookie recording will be on and the cookie
+lifetime will be defaulted to 24 hours.
+
+To list all cookies that are currently in the session store, use the `cookies`
+subcommand with no other arguments:
+
+```shell
+morc cookies
+```
+
+Output:
+
+```
+http://www.google.com/:
+2024-05-15T11:37:03-05:00 1P_JAR=2024-05-15-16; Path=/; Domain=google.com; Expires=Fri, 14 Jun 2024 16:37:03 GMT; Secure
+2024-05-15T11:37:03-05:00 AEC=AQTF6HwJeI71s5iqRHg95Jus2P9Vlc-e-eBtv9yCD0etgcjVzKxJPPo5upY; Path=/; Domain=google.com; Expires=Mon, 11 Nov 2024 16:37:03 GMT; HttpOnly; Secure; SameSite=Lax
+
+https://www.google.com/:
+2024-05-15T11:40:04-05:00 1P_JAR=2024-05-15-16; Path=/; Domain=google.com; Expires=Fri, 14 Jun 2024 16:40:04 GMT; Secure
+```
+
+If you want to see the exact cookies that would be sent in `Cookie:` headers on
+a request to a particular URL, you can give it with `--url`:
+
+```shell
+morc cookies --url https://google.com/
+```
+
+Output:
+
+```
+1P_JAR=2024-05-15-16
+AEC=AQTF6Hzwnh-yB8n0D7lG6i_2d9XqUyun2su9vCd_rTOQDFr1r3BQnpXN7Q
+```
+
+To turn session (cookie) recording off, use the --off flag:
+
+```shell
+morc cookies --off
+```
+
+To turn session (cookie) recording on, use the --on flag:
+
+```shell
+morc hist --on
+```
+
+To check the current status of cookies and see a summary of the session store,
+use the --info flag:
+
+```shell
+morc cookies --info
+```
+
+Output:
+
+```
+3 cookies across 2 domains in .morc/session.json
+
+Cookie recording is ON
+```
+
+To clear out the current session store, either delete the file listed in
+`--info` output from the filesystem, or use the `--clear` flag:
+
+```shell
+morc cookies --clear
+```
 
 ## Standalone Use
 

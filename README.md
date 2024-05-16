@@ -445,39 +445,171 @@ re-defined, but it also will no longer take up space in the project file.
 
 #### Variable Capturing
 
-Request templates within Morc can have variables within them that are filled at
-send time. Variables are given in the format `${NAME}`, with NAME replaced by
-the actual name of the variable.
+MORC has the ability to automatically set the values of variables in the store
+from data that it receives in response to a sent request. This makes MORC
+capable of automating entire sequences of request activity; it could, for
+instance, POST a new user with one request, then save the generated UUID of the
+user in a var, then use that same UUID in subsequent requests that operate on
+the user.
 
-When a template with one or more variables is sent, the values are substituted
-in by drawing from one or more sources. First, all `-V` flags are checked for a
-match. If found, that value is used. If there are no flags setting the value,
-the current variable environment is checked for a value. If none is set, the
-default environment is checked. If there is still no value, the template cannot
-be filled, and an error is emitted.
+This is known as *Variable Capturing*. Each request in a project can have one or
+more variables that it saves data to, known as "Variable Captures" or just
+"caps" for short.
 
-Variables can also be set, viewed, and modified using the `morc vars` and
-`morc env` commands.
+For the examples in this section, we will assume there is a Users API in a local
+server that allows basic CRUD operations on its resources.
 
-WIP:
-* Use of -V in send
-* `morc vars` (etc)
-* Description of vars envs
-* `morc env`.
+First, we will make a creation request:
 
-Saving variables during a `morc send` automatically is supported via the
-concept of Variable Captures.
+```shell
+morc reqs new create-user             \
+  --url http://localhost:8080/users   \
+  -X POST                             \
+  -d '{"name": "Vriska Serket"}'      \
+  -H 'Content-Type: application/json'
+```
 
-Variable values can be taken from the response of a request.
+And a deletion request that uses a variable in the URL to indicate
+which user to delete:
 
-WIP:
+```shell
+morc reqs new delete-user                          \
+  --url 'http://localhost:8080/users/${USER_ID}'   \
+  -X DELETE                                        \
+  -H 'Content-Type: application/json'
 
-* `morc reqs caps new`
-* `morc reqs caps`
-* `morc reqs caps edit`
-* `morc reqs caps delete`
+# note that the URL is in single-quotes because it contains a variable
+```
 
+Now, with those requests, we certainly manually run the first:
 
+```shell
+morc send create-user
+```
+
+Output:
+
+```
+HTTP/1.1 201 Created
+{
+    "id": "92ed835e-252e-40e4-8aa3-423b496bf33d",
+    "name": "Vriska Serket"
+}
+```
+
+Then we could note the user ID of the new user, and supply it to the delete
+request manually:
+
+```shell
+morc send delete-user -V USER_ID=92ed835e-252e-40e4-8aa3-423b496bf33d
+```
+
+Output:
+
+```
+HTTP/1.1 204 No Content
+(no response body)
+```
+
+But we could also do the same thing automatically by adding a var capture to
+the first request.
+
+Captures on a request are accessed by using the `caps` subcommand of `reqs`. By
+itself, it will list out all defined captures on the request, which will be
+none so far:
+
+```shell
+morc reqs caps create-user
+```
+
+Output:
+
+```
+(none)
+```
+
+To add a new capture, use `caps new` followed by the name of the request, the
+name of a variable to save the data to, and a *capture spec*. The capture spec
+gives where in the response to retrieve the value from, and supports byte
+offsets in format `:START,END` where START and END are byte offsets, or in
+format of a JSON path specified by giving keys and array slices needed to
+navigate from the top level of a JSON body in the response to the desired value,
+such as `.top-level-key.next-level-key.some_array[3].item`.
+
+In this example, we will add a new cap that gets its value from the 'id' field
+of the JSON object in the response:
+
+```shell
+morc reqs caps new create-user USER_ID .id   # or just id with no period; the leading period is not required
+```
+
+Then, it will be created:
+
+```shell
+morc reqs caps create-user
+```
+
+Output:
+
+```
+USER_ID from .id
+```
+
+Now when the first request is sent, the value in .id is saved to USER_ID in the
+variable store:
+
+```shell
+morc send create-user
+```
+
+Output:
+
+```
+HTTP/1.1 201 Created
+{
+    "id": "c2328061-da05-4241-9a42-012f2e39ff72",
+    "name": "Vriska Serket"
+}
+```
+
+You can check the var store to be sure:
+
+```shell
+morc vars
+```
+
+Output:
+
+```
+USER_ID = "c2328061-da05-4241-9a42-012f2e39ff72"
+```
+
+And now you can send the delete request without having to manually specify the
+user:
+
+```shell
+morc send delete-user
+```
+
+Output:
+
+```
+HTTP/1.1 204 No Content
+(no response body)
+```
+
+If you ever need to update a capture, you can do so with `caps delete`:
+
+```shell
+morc reqs caps delete create-user USER_ID
+```
+
+And if you want to update one without deleting it, you can use `caps edit`:
+
+```shell
+morc reqs caps edit create-user USER_ID --spec :3,8       # capture data from the 3rd to 8th byte instead of the JSON path
+morc reqs caps edit create-user USER_ID --var USER_UUID   # save it to USER_UUID instead
+```
 
 #### Variable Environments
 
@@ -668,7 +800,7 @@ Error: current env is default and "PASSWORD" is defined in other envs: STAGING
 Use --all to delete from all environments
 ```
 
-If you're aboslutely sure that you want to clear it from all environments, give
+If you're absolutely sure that you want to clear it from all environments, give
 the --all flag as well:
 
 ```shell

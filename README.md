@@ -817,8 +817,6 @@ Use `morc flows new` to create a new one. Once created, `morc exec FLOW` will
 actually send off each request. Any variable captures from request sends are
 used to set the values of subsequent requests.
 
-
-
 ### Request History
 
 MORC projects maintain a history of requests and responses that were sent. If

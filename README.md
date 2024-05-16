@@ -514,15 +514,130 @@ morc vars BASE https://example.com/api/v2
 morc vars USER internalTesting
 ```
 
-WIP show env swap
+Now the values can be easily swapped to be appropriate for each environment:
 
-WIP show request sends
+```shell
+morc env STAGING
 
-WIP as shorthand show setting without swapping envs explicitly
+morc vars
+```
 
+Output:
+
+```
+${BASE} = "http://staging.internal.example.com/api/v2"
+${USER} = "myTestUser"
+```
+
+```shell
+morc env PROD
+
+morc vars
+```
+
+Output:
+
+```
+${BASE} = "https://example.com/api/v2"
+${USER} = "internalTest"
+```
+
+You can swap back to the default environment by giving `--default` as an option
+to `env`:
+
+```shell
+morc env --default
+
+morc vars
+```
+
+Output:
+
+```
+${BASE} = ""
+${USER} = ""
+```
+
+The default environment will have a copy of every var that is set on any other
+environment, but it will be set to the empty string unless explicitly set. More
+info on the interactions between variables in the default environment and those
+in others is available in the Defaulting section below.
+
+There is shorthand for setting or viewing vars in a particular environment so
+you do not need to swap *every* time just to perform a few operatoins. For
+instance, when listing vars, you can pass in --env to list variable values
+defined only in that environment, or --default to see it for the default
+environment:
+
+```shell
+morc env STAGING
+morc vars --env PROD
+```
+
+Output:
+```
+${BASE} = "http://staging.internal.example.com/api/v2"
+${USER} = "myTestUser"
+```
+
+The same flag is available when setting or retrieving a particular variable's
+value:
+
+```shell
+morc vars BASE http://staging.internal.example.com/api/v3 --env PROD
+```
 
 ##### Defaulting
 
+When MORC is in a non-default environment, the default environment still exists
+and is used for getting "default" values of a variable. The default environment
+will contain at least one copy of every single var that is defined in at least
+one other environment, or put more simply, every time you set a variable in a
+non-default environment, if it doesn't already exist in the default, it is added
+there as well with a value of the empty string.
+
+When in a non-default environment, it's possible to send a request that has
+variables in it that are not defined in the current environment. In that case,
+the default environment is consulted for its value on it and that is used if it
+exists. This can make it easier when creating new environments in cases where
+there are already several variables defined; instead of requiring you to
+redefine every single one in the new environment, you only need to redefine the
+ones you wish to update.
+
+It's an invariant that if a variable is defined in at least one environment, it
+will be defined in the default environment. As a result, *deleting* a variable
+from the default environment is only possible if you also want to delete it from
+every other environment that defines it, and this is required to be explicitly
+stated via command line flags, or MORC will return an error.
+
+```shell
+# swap to env staging:
+morc env staging
+
+# create a new variable called PASSWORD in staging env; this will *also* create
+# a var PASSWORD="" in the default environment
+morc vars PASSWORD grimAuxiliatrix
+
+# swap back to default environment
+morc env --default
+
+# attempt to delete PASSWORD from the default env:
+morc vars PASSWORD -d
+```
+
+Output:
+
+```
+Error: current env is default and "PASSWORD" is defined in other envs: STAGING
+Use --all to delete from all environments
+```
+
+If you're aboslutely sure that you want to clear it from all environments, give
+the --all flag as well:
+
+```shell
+morc vars PASSWORD -d --all
+```
 
 #### Variable Capturing
 

@@ -258,6 +258,17 @@ func invokeVarDelete(_ cmdio.IO, varName string, opts varOptions) error {
 		return p.PersistToDisk(false)
 	}
 
+	// is the user currently in the default environment *and* at least one other
+	// env with the to-be-deleted var is defined? if so, opts.envAll is required
+	// and they should have provided that if this is what they really want
+	if p.Vars.Environment == "" {
+		otherEnvs := p.Vars.NonDefaultEnvsWith(varName)
+
+		if len(otherEnvs) > 0 {
+			return fmt.Errorf("current env is default and %q is defined in other envs: %s\nUse --all to delete from all environments", varName, strings.Join(otherEnvs, ", "))
+		}
+	}
+
 	if opts.envOverride != "" && !strings.EqualFold(p.Vars.Environment, strings.ToUpper(opts.envOverride)) {
 		p.Vars.UnsetIn(opts.envOverride, varName)
 	} else if opts.envCurrentOverride {
@@ -276,17 +287,21 @@ func invokeVarList(io cmdio.IO, opts varOptions) error {
 	}
 
 	var vars []string
+
+	var targetEnv string
+	inSpecificEnv := opts.envOverride != "" || opts.envDefaultOverride || opts.envCurrentOverride
+
 	// are we looking to get from a specific environment?
-	if opts.envOverride != "" || opts.envDefaultOverride || opts.envCurrentOverride {
+	if inSpecificEnv {
 		// we want a specific environment only.
 
 		// either envDefaultOverride is set, meaning we should use the default,
 		// so envOverride will be empty. Or, envOverride will never be empty if
 		// envDefaultOverride is not set.
-		targetEnv := opts.envOverride
+		targetEnv = opts.envOverride
 
-		// ...unless we have a default env override set, in which case targetEnv
-		// is simply the current one.")
+		// ...unless we have a current env override set, in which case targetEnv
+		// is simply the current one.
 		if opts.envCurrentOverride {
 			targetEnv = p.Vars.Environment
 		}
@@ -301,8 +316,14 @@ func invokeVarList(io cmdio.IO, opts varOptions) error {
 	if len(vars) == 0 {
 		io.Println("(none)")
 	} else {
+		var v string
 		for _, name := range vars {
-			io.Printf("${%s} = %q\n", name, p.Vars.Get(name))
+			if inSpecificEnv {
+				v = p.Vars.GetFrom(name, targetEnv)
+			} else {
+				v = p.Vars.Get(name)
+			}
+			io.Printf("${%s} = %q\n", name, v)
 		}
 	}
 

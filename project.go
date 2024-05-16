@@ -543,6 +543,26 @@ func (v *VarStore) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (v VarStore) NonDefaultEnvsWith(name string) []string {
+	if v.envs == nil {
+		return nil
+	}
+
+	name = strings.ToUpper(name)
+
+	var envs []string
+	for k := range v.envs {
+		if k == "" {
+			continue
+		}
+		if v.IsDefinedIn(name, k) {
+			envs = append(envs, k)
+		}
+	}
+
+	return envs
+}
+
 // MergedSet returns the set of keys and values of all variables accessible from
 // the current environment, with the given map of vars taking precedence over
 // any that it has stored.

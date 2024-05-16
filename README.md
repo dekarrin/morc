@@ -514,6 +514,13 @@ morc vars BASE https://example.com/api/v2
 morc vars USER internalTesting
 ```
 
+WIP show env swap
+
+WIP show request sends
+
+WIP as shorthand show setting without swapping envs explicitly
+
+
 ##### Defaulting
 
 

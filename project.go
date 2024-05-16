@@ -853,6 +853,21 @@ func (v *VarStore) SetIn(key, value, env string) {
 	}
 }
 
+// DeleteEnv immediately removes the given environment and all of its variables.
+// The given environment must not be the default environment.
+func (v *VarStore) DeleteEnv(env string) {
+	if v.envs == nil {
+		return
+	}
+
+	if env == "" {
+		panic("cannot delete the default env")
+	}
+
+	envUpper := strings.ToUpper(env)
+	delete(v.envs, envUpper)
+}
+
 // Unset removes the variable from the current environemnt. If the current
 // environment is not the default environment, the variable will not be removed
 // from the default environment. Use Remove to remove the variable from all

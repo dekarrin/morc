@@ -184,6 +184,14 @@ func invokeEnvDelete(_ cmdio.IO, env string, opts envOptions) error {
 		for _, varName := range allVars {
 			p.Vars.Remove(varName)
 		}
+
+		// clear the environments
+		for _, envName := range p.Vars.EnvNames() {
+			if envName == "" {
+				continue
+			}
+			p.Vars.DeleteEnv(envName)
+		}
 	} else {
 		// delete in the specified environment
 
@@ -192,6 +200,8 @@ func invokeEnvDelete(_ cmdio.IO, env string, opts envOptions) error {
 		for _, varName := range allVars {
 			p.Vars.UnsetIn(varName, env)
 		}
+
+		p.Vars.DeleteEnv(env)
 	}
 
 	return p.PersistToDisk(false)

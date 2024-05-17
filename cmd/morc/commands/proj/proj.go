@@ -23,6 +23,9 @@ var (
 	flagProjCookieLifetime string
 	flagProjRecordCookies  bool
 	flagProjRecordHistory  bool
+
+	flagProjEdit bool
+	flagProjNew  bool
 )
 
 func init() {
@@ -36,7 +39,11 @@ func init() {
 	RootCmd.PersistentFlags().BoolVar(&flagProjRecordCookies, "cookies", false, "Show whether cookie recording is currently enabled.\nWhen used with --edit or --new: Enable or disable cookie recording. `OFF/ON` must be either the string \"OFF\" or \"ON\", case-insensitive. Equivalent to 'morc cookies --on' or 'morc cookies --off'.")
 	RootCmd.PersistentFlags().BoolVar(&flagProjRecordHistory, "history", false, "Show whether history recording is currently enabled.\nWhen used with --edit or --new: Enable or disable history recording. `OFF/ON` must be either the string \"OFF\" or \"ON\", case-insensitive. Equivalent to 'morc hist --on' or 'morc hist --off'.")
 
-	RootCmd.PersistentFlags().Lookup("history-file").NoOptDefVal = morc.ProjDirVar
+	RootCmd.PersistentFlags().BoolVarP(&flagProjEdit, "edit", "", false, "Edit the project. Combine with other options to select item(s) to be modified and give values.")
+	RootCmd.PersistentFlags().BoolVarP(&flagProjNew, "new", "", false, "Create a new project. Combine with other options to specify values for the new project.")
+
+	// mark above two as mutually exclusive
+	RootCmd.MarkFlagsMutuallyExclusive("edit", "new")
 }
 
 var RootCmd = &cobra.Command{

@@ -13,6 +13,7 @@ var (
 	flagHistoryFile    string
 	flagSessionFile    string
 	flagCookieLifetime string
+	flagProjectFile    string
 )
 
 func init() {
@@ -20,7 +21,7 @@ func init() {
 	newCmd.LocalFlags().StringVarP(&flagSessionFile, "session", "S", "", "Create and save session in the given file")
 	newCmd.LocalFlags().StringVarP(&flagCookieLifetime, "cookie-lifetime", "C", "24h", "Set the lifetime of recorded Set-Cookie calls in notation like \"24h\" or \"1h30m\"")
 
-	RootCmd.AddCommand(newCmd)
+	//RootCmd.AddCommand(newCmd)
 }
 
 var newCmd = &cobra.Command{

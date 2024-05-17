@@ -33,7 +33,7 @@ func init() {
 	editCmd.MarkFlagsMutuallyExclusive("cookies-on", "cookies-off")
 	editCmd.MarkFlagsMutuallyExclusive("hist-on", "hist-off")
 
-	RootCmd.AddCommand(editCmd)
+	//RootCmd.AddCommand(editCmd)
 }
 
 var editCmd = &cobra.Command{

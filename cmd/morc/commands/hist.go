@@ -138,7 +138,6 @@ var histCmd = &cobra.Command{
 type histAction int
 
 const (
-	// list all environments
 	histList histAction = iota
 	histDetail
 	histInfo

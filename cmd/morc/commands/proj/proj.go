@@ -9,14 +9,34 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type projAction int
+
+const (
+	projInfo projAction = iota
+	projNew
+	projEdit
+)
+
 var (
-	flagProjectFile string
+	flagProjHistoryFile    string
+	flagProjSessionFile    string
+	flagProjCookieLifetime string
+	flagProjRecordCookies  bool
+	flagProjRecordHistory  bool
 )
 
 func init() {
-	// TODO: specific item flags
+	// TODO: get specific item flags
 
 	RootCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+
+	RootCmd.PersistentFlags().StringVarP(&flagProjHistoryFile, "history-file", "H", "", "Show the currently-set path for the history file.\nWhen used with --edit or --new: Set history file to `PATH`. Does not affect whether history is actually recorded; use --hist-on and --hist-off for that. If the special string '"+morc.ProjDirVar+"' is in the path given, it is replaced with the relative directory of the project file whenever morc is executed.")
+	RootCmd.PersistentFlags().StringVarP(&flagProjSessionFile, "session-file", "S", "", "Show the currently-set path for the session file.\nWhen used with --edit or --new: Set session file to `PATH`. Does not affect whether session data (cookies) is actually recorded; use --cookies-on and --cookies-off for that.\nIf the special string '"+morc.ProjDirVar+"' is in the path given, it is replaced with the relative directory of the project file whenever morc is executed.")
+	RootCmd.PersistentFlags().StringVarP(&flagProjCookieLifetime, "cookie-lifetime", "C", "24h", "Get the lifetime of recorded Set-Cookie calls.\nWhen used with --edit or --new: Set the lifetime of recorded Set-Cookie calls to the given duration. `DUR` must be a string in notation like \"24h\" or \"1h30m\". If set to 0 or less, will be interpreted as 24h. Altering this will immediately apply an eviction check to all current cookies; this may result in some being purged.")
+	RootCmd.PersistentFlags().BoolVar(&flagProjRecordCookies, "cookies", false, "Show whether cookie recording is currently enabled.\nWhen used with --edit or --new: Enable or disable cookie recording. `OFF/ON` must be either the string \"OFF\" or \"ON\", case-insensitive. Equivalent to 'morc cookies --on' or 'morc cookies --off'.")
+	RootCmd.PersistentFlags().BoolVar(&flagProjRecordHistory, "history", false, "Show whether history recording is currently enabled.\nWhen used with --edit or --new: Enable or disable history recording. `OFF/ON` must be either the string \"OFF\" or \"ON\", case-insensitive. Equivalent to 'morc hist --on' or 'morc hist --off'.")
+
+	RootCmd.PersistentFlags().Lookup("history-file").NoOptDefVal = morc.ProjDirVar
 }
 
 var RootCmd = &cobra.Command{

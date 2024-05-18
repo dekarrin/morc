@@ -276,3 +276,29 @@ func invokeCapsList(io cmdio.IO, reqName string, opts capsOptions) error {
 
 	return nil
 }
+
+func invokeCapsShow(io cmdio.IO, reqName, capName string, opts capsOptions) error {
+	// load the project file
+	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+	if err != nil {
+		return err
+	}
+
+	// case doesn't matter for request template names
+	reqName = strings.ToLower(reqName)
+	req, ok := p.Templates[reqName]
+	if !ok {
+		return fmt.Errorf("no request template %s", reqName)
+	}
+
+	capName = strings.ToUpper(capName)
+	cap, ok := req.Captures[capName]
+	if !ok {
+		return fmt.Errorf("no capture to %s exists on request template %s", capName, reqName)
+	}
+
+	fmt.Printf("%s\n", cap.String())
+
+	io.PrintLoudln(cap)
+	return nil
+}

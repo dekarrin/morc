@@ -1,4 +1,4 @@
-package proj
+package commands
 
 import (
 	"fmt"
@@ -13,8 +13,10 @@ import (
 )
 
 func init() {
-	ProjCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
-	ProjCmd.PersistentFlags().BoolVarP(&flagProjNew, "new", "", false, "Create a new project instead of reading/editing one. Combine with other arguments to specify values for the new project.")
+	projCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+	projCmd.PersistentFlags().BoolVarP(&flagProjNew, "new", "", false, "Create a new project instead of reading/editing one. Combine with other arguments to specify values for the new project.")
+
+	rootCmd.AddCommand(projCmd)
 }
 
 var (
@@ -29,7 +31,6 @@ var (
 		s += "existing one.\n"
 		s += "\n"
 		s += "Attributes:\n"
-		s += "\n"
 
 		// above is starting string, load it into a roseditor and then insert
 		// the attributes as definitions list
@@ -49,12 +50,13 @@ var (
 				PreserveParagraphs: true,
 			}).
 			Wrap(80).
+			Insert(rosed.End, "\n"). // wrap clobbers above newline for some reason
 			InsertDefinitionsTable(rosed.End, attributes, 80).
 			String()
 	}()
 )
 
-var ProjCmd = &cobra.Command{
+var projCmd = &cobra.Command{
 	Use:     "proj [ATTR [VALUE [ATTR2 VALUE2]...]] [-F project_file] [--new]",
 	GroupID: "project",
 	Short:   "Show or manipulate project attributes and config",

@@ -12,6 +12,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	flagProjNew bool
+)
+
 func init() {
 	projCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
 	projCmd.PersistentFlags().BoolVarP(&flagProjNew, "new", "", false, "Create a new project instead of reading/editing one. Combine with other arguments to specify values for the new project.")
@@ -218,10 +222,6 @@ const (
 	projGet
 	projNew
 	projEdit
-)
-
-var (
-	flagProjNew bool
 )
 
 type projKey string

@@ -8,33 +8,57 @@ import (
 	"github.com/dekarrin/morc"
 	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/dekarrin/morc/cmd/morc/commonflags"
+	"github.com/dekarrin/rosed"
 	"github.com/spf13/cobra"
 )
 
 func init() {
 	ProjCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
-
-	// DO NOT DELETE BELOW UNTIL NOTES ARE MOVED TO MAIN HELP
-	// RootCmd.PersistentFlags().StringVarP(&flagEditName, "name", "n", "", "Change the name of the project.")
-	// RootCmd.PersistentFlags().StringVarP(&flagProjHistoryFile, "history-file", "H", "", "Show the currently-set path for the history file.\nWhen used with --edit or --new: Set history file to `PATH`. Does not affect whether history is actually recorded; use --hist-on and --hist-off for that. If the special string '"+morc.ProjDirVar+"' is in the path given, it is replaced with the relative directory of the project file whenever morc is executed.")
-	// RootCmd.PersistentFlags().StringVarP(&flagProjSessionFile, "session-file", "S", "", "Show the currently-set path for the session file.\nWhen used with --edit or --new: Set session file to `PATH`. Does not affect whether session data (cookies) is actually recorded; use --cookies-on and --cookies-off for that.\nIf the special string '"+morc.ProjDirVar+"' is in the path given, it is replaced with the relative directory of the project file whenever morc is executed.")
-	// RootCmd.PersistentFlags().StringVarP(&flagProjCookieLifetime, "cookie-lifetime", "C", "24h", "Get the lifetime of recorded Set-Cookie calls.\nWhen used with --edit or --new: Set the lifetime of recorded Set-Cookie calls to the given duration. `DUR` must be a string in notation like \"24h\" or \"1h30m\". If set to 0 or less, will be interpreted as 24h. Altering this will immediately apply an eviction check to all current cookies; this may result in some being purged.")
-	// RootCmd.PersistentFlags().BoolVarP(&flagProjRecordCookies, "cookies", "c", false, "Show whether cookie recording is currently enabled.\nWhen used with --edit or --new: Enable or disable cookie recording. `ON|OFF` must be either the string \"ON\" or \"OFF\", case-insensitive. Equivalent to 'morc cookies --on' or 'morc cookies --off'.")
-	// RootCmd.PersistentFlags().BoolVarP(&flagProjRecordHistory, "history", "r", false, "Show whether history recording is currently enabled.\nWhen used with --edit or --new: Enable or disable history recording. `ON|OFF` must be either the string \"ON\" or \"OFF\", case-insensitive. Equivalent to 'morc hist --on' or 'morc hist --off'.")
-
-	// RootCmd.PersistentFlags().BoolVarP(&flagProjEdit, "edit", "", false, "Edit the project. Combine with other options to select item(s) to be modified and give values.")
 	ProjCmd.PersistentFlags().BoolVarP(&flagProjNew, "new", "", false, "Create a new project instead of reading/editing one. Combine with other arguments to specify values for the new project.")
-
-	// proj [--edit|--new ITEM=value ITEM=value...] OR proj --thing
-	// NOPE
-	// proj ITEM, proj ITEM VALUE. --new is the only required option.
 }
+
+var (
+	projCmdHelp = func() string {
+		s := "Show the contents of the morc project in the .morc dir in the "
+		s += "current directory, or use -F to read a file in another location. "
+		s += "If the name of a project attribute is given as an arg, only its "
+		s += "current value is printed out. If a second argument is given, "
+		s += "then the attribute is set to that value. Multiple pairs of "
+		s += "arguments can be given to specify multiple values. If --new is "
+		s += "given, a new project file is created instead of editing an "
+		s += "existing one.\n"
+		s += "\n"
+		s += "Attributes:\n"
+		s += "\n"
+
+		// above is starting string, load it into a roseditor and then insert
+		// the attributes as definitions list
+		attributes := [][2]string{
+			{projKeyName.Name(), "The name of the project. There are no restrictions on what value this can be."},
+			{projKeyHistFile.Name(), "The path to the history file. Does not affect whether request history is actually recorded; use " + projKeyHistory.Name() + " for that. If the special string '" + morc.ProjDirVar + "' is in the path, it is replaced with the directory containing the project file whenever morc is executed, allowing the history file path to still function even if the containing directory is moved."},
+			{projKeyHistory.Name(), "Whether history recording is enabled. When setting, the value must the string 'ON' or 'OFF' (case-insensitive). Setting this is equivalent to calling 'morc hist --on' or 'morc hist --off'"},
+			{projKeySeshFile.Name(), "The path to the session file. Does not affect whether sessions (cookies) are actually recorded; use " + projKeyCookies.Name() + " for that. If the special string '" + morc.ProjDirVar + "' is in the path, it is replaced with the directory containing the project file whenever morc is executed, allowing the session file path to still function even if the containing directory is moved."},
+			{projKeyHistory.Name(), "Whether cookie recording is enabled. When setting, the value must must be the string 'ON' or 'OFF' (case-insensitive). Setting this is equivalent to calling 'morc cookies --on' or 'morc cookies --off'"},
+			{projKeyCookieLifetime.Name(), "The lifetime of recorded Set-Cookie calls. When setting, the value must be a duration such as '24h' or '1h30m'. If set to 0 or less, it will be interpreted as 24h. Altering this will immediately apply an eviction check to all current cookies; this may result in some being purged."},
+		}
+
+		// plop it in the rosed Editor and start formatting
+		return rosed.
+			Edit(s).
+			WithOptions(rosed.Options{
+				PreserveParagraphs: true,
+			}).
+			Wrap(80).
+			InsertDefinitionsTable(rosed.End, attributes, 80).
+			String()
+	}()
+)
 
 var ProjCmd = &cobra.Command{
 	Use:     "proj [ATTR [VALUE [ATTR2 VALUE2]...]] [-F project_file] [--new]",
 	GroupID: "project",
 	Short:   "Show or manipulate project attributes and config",
-	Long:    "Show the contents of the morc project referred to in the .morc dir in the current directory, or use -F to read a file in another location. If the name of a project attribute is given as an arg, only its current value is printed out. If a second argument is given, then the attribute is set to that value. Multiple pairs of arguments can be given to specify multiple values. If --new is given, a new project file is created instead of editing an existing one.\nThe valid attributes are case-insensitive and are: " + strings.Join(projAttrKeyNames(), ", ") + ".",
+	Long:    projCmdHelp,
 	Args:    cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := projOptions{

@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -25,6 +26,11 @@ type IO struct {
 	In  io.Reader
 	Out io.Writer
 	Err io.Writer
+
+	// Quiet is set to true if the command should not print anything to the
+	// output stream for PrintLoud functions. Other Print functions will still
+	// print to their repspective streams (out or err).
+	Quiet bool
 }
 
 // From returns an IO struct taken by retrieving streams from the given command.
@@ -66,6 +72,57 @@ func (io IO) PrintErrf(format string, args ...interface{}) {
 	} else {
 		fmt.Fprintf(io.Err, format, args...)
 	}
+}
+
+func (io IO) PrintLoudln(args ...interface{}) {
+	if !io.Quiet {
+		io.Println(args...)
+	}
+}
+
+func (io IO) PrintLoudf(format string, args ...interface{}) {
+	if !io.Quiet {
+		io.Printf(format, args...)
+	}
+}
+
+func (io IO) PrintLoudErrln(args ...interface{}) {
+	if !io.Quiet {
+		io.PrintErrln(args...)
+	}
+}
+
+func (io IO) PrintLoudErrf(format string, args ...interface{}) {
+	if !io.Quiet {
+		io.PrintErrf(format, args...)
+	}
+}
+
+func (io IO) OxfordCommaJoin(items []string) string {
+	if len(items) == 0 {
+		return ""
+	}
+	if len(items) == 1 {
+		return items[0]
+	}
+	if len(items) == 2 {
+		return items[0] + " and " + items[1]
+	}
+
+	// more than 2 items means commas
+	var sb strings.Builder
+	for i, item := range items {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		if i+1 == len(items) {
+			sb.WriteString("and ")
+		}
+
+		sb.WriteString(item)
+	}
+
+	return sb.String()
 }
 
 func (io IO) OnOrOff(on bool) string {

@@ -30,7 +30,7 @@ func init() {
 	rootCmd.AddGroup(projMetaCommands)
 	rootCmd.AddGroup(sendingCommands)
 	rootCmd.AddGroup(quickreqCommands)
-	rootCmd.AddCommand(proj.RootCmd)
+	rootCmd.AddCommand(proj.ProjCmd)
 	rootCmd.AddCommand(reqs.RootCmd)
 	rootCmd.AddCommand(flows.RootCmd)
 }

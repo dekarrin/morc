@@ -11,6 +11,156 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func init() {
+	ProjCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+
+	// DO NOT DELETE BELOW UNTIL NOTES ARE MOVED TO MAIN HELP
+	// RootCmd.PersistentFlags().StringVarP(&flagEditName, "name", "n", "", "Change the name of the project.")
+	// RootCmd.PersistentFlags().StringVarP(&flagProjHistoryFile, "history-file", "H", "", "Show the currently-set path for the history file.\nWhen used with --edit or --new: Set history file to `PATH`. Does not affect whether history is actually recorded; use --hist-on and --hist-off for that. If the special string '"+morc.ProjDirVar+"' is in the path given, it is replaced with the relative directory of the project file whenever morc is executed.")
+	// RootCmd.PersistentFlags().StringVarP(&flagProjSessionFile, "session-file", "S", "", "Show the currently-set path for the session file.\nWhen used with --edit or --new: Set session file to `PATH`. Does not affect whether session data (cookies) is actually recorded; use --cookies-on and --cookies-off for that.\nIf the special string '"+morc.ProjDirVar+"' is in the path given, it is replaced with the relative directory of the project file whenever morc is executed.")
+	// RootCmd.PersistentFlags().StringVarP(&flagProjCookieLifetime, "cookie-lifetime", "C", "24h", "Get the lifetime of recorded Set-Cookie calls.\nWhen used with --edit or --new: Set the lifetime of recorded Set-Cookie calls to the given duration. `DUR` must be a string in notation like \"24h\" or \"1h30m\". If set to 0 or less, will be interpreted as 24h. Altering this will immediately apply an eviction check to all current cookies; this may result in some being purged.")
+	// RootCmd.PersistentFlags().BoolVarP(&flagProjRecordCookies, "cookies", "c", false, "Show whether cookie recording is currently enabled.\nWhen used with --edit or --new: Enable or disable cookie recording. `ON|OFF` must be either the string \"ON\" or \"OFF\", case-insensitive. Equivalent to 'morc cookies --on' or 'morc cookies --off'.")
+	// RootCmd.PersistentFlags().BoolVarP(&flagProjRecordHistory, "history", "r", false, "Show whether history recording is currently enabled.\nWhen used with --edit or --new: Enable or disable history recording. `ON|OFF` must be either the string \"ON\" or \"OFF\", case-insensitive. Equivalent to 'morc hist --on' or 'morc hist --off'.")
+
+	// RootCmd.PersistentFlags().BoolVarP(&flagProjEdit, "edit", "", false, "Edit the project. Combine with other options to select item(s) to be modified and give values.")
+	ProjCmd.PersistentFlags().BoolVarP(&flagProjNew, "new", "", false, "Create a new project instead of reading/editing one. Combine with other arguments to specify values for the new project.")
+
+	// proj [--edit|--new ITEM=value ITEM=value...] OR proj --thing
+	// NOPE
+	// proj ITEM, proj ITEM VALUE. --new is the only required option.
+}
+
+var ProjCmd = &cobra.Command{
+	Use:     "proj [ATTR [VALUE [ATTR2 VALUE2]...]] [-F project_file] [--new]",
+	GroupID: "project",
+	Short:   "Show or manipulate project attributes and config",
+	Long:    "Show the contents of the morc project referred to in the .morc dir in the current directory, or use -F to read a file in another location. If the name of a project attribute is given as an arg, only its current value is printed out. If a second argument is given, then the attribute is set to that value. Multiple pairs of arguments can be given to specify multiple values. If --new is given, a new project file is created instead of editing an existing one.\nThe valid attributes are case-insensitive and are: " + strings.Join(projAttrKeyNames(), ", ") + ".",
+	Args:    cobra.ArbitraryArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		opts := projOptions{
+			projFile: commonflags.ProjectFile,
+		}
+
+		if opts.projFile == "" {
+			return fmt.Errorf("project file cannot be set to empty string")
+		}
+
+		// find out our action and do action-specific flag checks
+		var getItem projKey
+
+		if len(args) == 0 {
+			// either the user wants all the info or new is set and we are making
+			// a new project with all defaults.
+
+			if flagProjNew {
+				opts.action = projNew
+			} else {
+				opts.action = projInfo
+			}
+		} else {
+			// begin parsing each of the args
+
+			var curKey projKey
+			var err error
+
+			for i, arg := range args {
+				if i%2 == 0 {
+					// if even, should be an attribute.
+					curKey, err = parseProjAttrKey(arg)
+					if err != nil {
+						return fmt.Errorf("attribute #%d: %w", (i/2)+1, err)
+					}
+
+					// do an "already set" check
+					setTwice := false
+					switch curKey {
+					case projKeyName:
+						setTwice = opts.name.set
+					case projKeyHistFile:
+						setTwice = opts.histFile.set
+					case projKeySeshFile:
+						setTwice = opts.seshFile.set
+					case projKeyCookieLifetime:
+						setTwice = opts.cookieLifetime.set
+					case projKeyCookies:
+						setTwice = opts.recordCookies.set
+					case projKeyHistory:
+						setTwice = opts.recordHistory.set
+					}
+
+					if setTwice {
+						return fmt.Errorf("%s is set more than once", curKey)
+					}
+				} else {
+					// if odd, it is a value
+					switch curKey {
+					case projKeyName:
+						opts.name = optionalC[string]{set: true, v: arg}
+					case projKeyHistFile:
+						opts.histFile = optionalC[string]{set: true, v: arg}
+					case projKeySeshFile:
+						opts.seshFile = optionalC[string]{set: true, v: arg}
+					case projKeyCookieLifetime:
+						cl, err := time.ParseDuration(arg)
+						if err != nil {
+							return fmt.Errorf("value for %s: %w", curKey, err)
+						}
+						opts.cookieLifetime = optionalC[time.Duration]{set: true, v: cl}
+					case projKeyCookies:
+						isOn, err := parseOnOff(arg)
+						if err != nil {
+							return fmt.Errorf("value for %s: %w", curKey, err)
+						}
+						opts.recordCookies = optionalC[bool]{set: true, v: isOn}
+					case projKeyHistory:
+						isOn, err := parseOnOff(arg)
+						if err != nil {
+							return fmt.Errorf("value for %s: %w", curKey, err)
+						}
+						opts.recordHistory = optionalC[bool]{set: true, v: isOn}
+					}
+				}
+			}
+
+			// now that we are done, do an arg-count check and use it to set
+			// action.
+			// doing AFTER parsing so that we can give a betta error message if
+			// missing last value
+			if len(args) == 1 {
+				// that's fine, we just want to get the one item
+				opts.action = projGet
+				getItem = curKey
+			} else if len(args)%2 != 0 {
+				return fmt.Errorf("%s is missing a value", curKey)
+			} else {
+				if flagProjNew {
+					opts.action = projNew
+				} else {
+					opts.action = projEdit
+				}
+			}
+
+		}
+
+		// done checking args, don't show usage on error
+		cmd.SilenceUsage = true
+		io := cmdio.From(cmd)
+
+		switch opts.action {
+		case projInfo:
+			return invokeProjShow(io, opts)
+		case projGet:
+			return invokeProjGet(io, getItem, opts)
+		case projNew:
+			return invokeProjNew(io, opts.name.v, opts)
+		case projEdit:
+			return invokeProjEdit(io, opts)
+		default:
+			panic(fmt.Sprintf("unhandled proj action %q", opts.action))
+		}
+	},
+}
+
 type optional[E any] struct {
 	set bool
 	v   E
@@ -145,156 +295,6 @@ func parseOnOff(s string) (bool, error) {
 	}
 
 	return false, fmt.Errorf("invalid value %q; must be ON or OFF (case-insensitive)", s)
-}
-
-func init() {
-	RootCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
-
-	// DO NOT DELETE BELOW UNTIL NOTES ARE MOVED TO MAIN HELP
-	// RootCmd.PersistentFlags().StringVarP(&flagEditName, "name", "n", "", "Change the name of the project.")
-	// RootCmd.PersistentFlags().StringVarP(&flagProjHistoryFile, "history-file", "H", "", "Show the currently-set path for the history file.\nWhen used with --edit or --new: Set history file to `PATH`. Does not affect whether history is actually recorded; use --hist-on and --hist-off for that. If the special string '"+morc.ProjDirVar+"' is in the path given, it is replaced with the relative directory of the project file whenever morc is executed.")
-	// RootCmd.PersistentFlags().StringVarP(&flagProjSessionFile, "session-file", "S", "", "Show the currently-set path for the session file.\nWhen used with --edit or --new: Set session file to `PATH`. Does not affect whether session data (cookies) is actually recorded; use --cookies-on and --cookies-off for that.\nIf the special string '"+morc.ProjDirVar+"' is in the path given, it is replaced with the relative directory of the project file whenever morc is executed.")
-	// RootCmd.PersistentFlags().StringVarP(&flagProjCookieLifetime, "cookie-lifetime", "C", "24h", "Get the lifetime of recorded Set-Cookie calls.\nWhen used with --edit or --new: Set the lifetime of recorded Set-Cookie calls to the given duration. `DUR` must be a string in notation like \"24h\" or \"1h30m\". If set to 0 or less, will be interpreted as 24h. Altering this will immediately apply an eviction check to all current cookies; this may result in some being purged.")
-	// RootCmd.PersistentFlags().BoolVarP(&flagProjRecordCookies, "cookies", "c", false, "Show whether cookie recording is currently enabled.\nWhen used with --edit or --new: Enable or disable cookie recording. `ON|OFF` must be either the string \"ON\" or \"OFF\", case-insensitive. Equivalent to 'morc cookies --on' or 'morc cookies --off'.")
-	// RootCmd.PersistentFlags().BoolVarP(&flagProjRecordHistory, "history", "r", false, "Show whether history recording is currently enabled.\nWhen used with --edit or --new: Enable or disable history recording. `ON|OFF` must be either the string \"ON\" or \"OFF\", case-insensitive. Equivalent to 'morc hist --on' or 'morc hist --off'.")
-
-	// RootCmd.PersistentFlags().BoolVarP(&flagProjEdit, "edit", "", false, "Edit the project. Combine with other options to select item(s) to be modified and give values.")
-	RootCmd.PersistentFlags().BoolVarP(&flagProjNew, "new", "", false, "Create a new project instead of reading/editing one. Combine with other arguments to specify values for the new project.")
-
-	// proj [--edit|--new ITEM=value ITEM=value...] OR proj --thing
-	// NOPE
-	// proj ITEM, proj ITEM VALUE. --new is the only required option.
-}
-
-var RootCmd = &cobra.Command{
-	Use:     "proj [ATTR [VALUE [ATTR2 VALUE2]...]] [-F project_file] [--new]",
-	GroupID: "project",
-	Short:   "Show or manipulate project attributes and config",
-	Long:    "Show the contents of the morc project referred to in the .morc dir in the current directory, or use -F to read a file in another location. If the name of a project attribute is given as an arg, only its current value is printed out. If a second argument is given, then the attribute is set to that value. Multiple pairs of arguments can be given to specify multiple values. If --new is given, a new project file is created instead of editing an existing one.\nThe valid attributes are case-insensitive and are: " + strings.Join(projAttrKeyNames(), ", ") + ".",
-	Args:    cobra.ArbitraryArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		opts := projOptions{
-			projFile: commonflags.ProjectFile,
-		}
-
-		if opts.projFile == "" {
-			return fmt.Errorf("project file cannot be set to empty string")
-		}
-
-		// find out our action and do action-specific flag checks
-		var getItem projKey
-
-		if len(args) == 0 {
-			// either the user wants all the info or new is set and we are making
-			// a new project with all defaults.
-
-			if flagProjNew {
-				opts.action = projNew
-			} else {
-				opts.action = projInfo
-			}
-		} else {
-			// begin parsing each of the args
-
-			var curKey projKey
-			var err error
-
-			for i, arg := range args {
-				if i%2 == 0 {
-					// if even, should be an attribute.
-					curKey, err = parseProjAttrKey(arg)
-					if err != nil {
-						return fmt.Errorf("attribute #%d: %w", (i/2)+1, err)
-					}
-
-					// do an "already set" check
-					setTwice := false
-					switch curKey {
-					case projKeyName:
-						setTwice = opts.name.set
-					case projKeyHistFile:
-						setTwice = opts.histFile.set
-					case projKeySeshFile:
-						setTwice = opts.seshFile.set
-					case projKeyCookieLifetime:
-						setTwice = opts.cookieLifetime.set
-					case projKeyCookies:
-						setTwice = opts.recordCookies.set
-					case projKeyHistory:
-						setTwice = opts.recordHistory.set
-					}
-
-					if setTwice {
-						return fmt.Errorf("%s is set more than once", curKey)
-					}
-				} else {
-					// if odd, it is a value
-					switch curKey {
-					case projKeyName:
-						opts.name = optionalC[string]{set: true, v: arg}
-					case projKeyHistFile:
-						opts.histFile = optionalC[string]{set: true, v: arg}
-					case projKeySeshFile:
-						opts.seshFile = optionalC[string]{set: true, v: arg}
-					case projKeyCookieLifetime:
-						cl, err := time.ParseDuration(arg)
-						if err != nil {
-							return fmt.Errorf("value for %s: %w", curKey, err)
-						}
-						opts.cookieLifetime = optionalC[time.Duration]{set: true, v: cl}
-					case projKeyCookies:
-						isOn, err := parseOnOff(arg)
-						if err != nil {
-							return fmt.Errorf("value for %s: %w", curKey, err)
-						}
-						opts.recordCookies = optionalC[bool]{set: true, v: isOn}
-					case projKeyHistory:
-						isOn, err := parseOnOff(arg)
-						if err != nil {
-							return fmt.Errorf("value for %s: %w", curKey, err)
-						}
-						opts.recordHistory = optionalC[bool]{set: true, v: isOn}
-					}
-				}
-			}
-
-			// now that we are done, do an arg-count check and use it to set
-			// action.
-			// doing AFTER parsing so that we can give a betta error message if
-			// missing last value
-			if len(args) == 1 {
-				// that's fine, we just want to get the one item
-				opts.action = projGet
-				getItem = curKey
-			} else if len(args)%2 != 0 {
-				return fmt.Errorf("%s is missing a value", curKey)
-			} else {
-				if flagProjNew {
-					opts.action = projNew
-				} else {
-					opts.action = projEdit
-				}
-			}
-
-		}
-
-		// done checking args, don't show usage on error
-		cmd.SilenceUsage = true
-		io := cmdio.From(cmd)
-
-		switch opts.action {
-		case projInfo:
-			return invokeProjShow(io, opts)
-		case projGet:
-			return invokeProjGet(io, getItem, opts)
-		case projNew:
-			return invokeProjNew(io, opts.name.v, opts)
-		case projEdit:
-			return invokeProjEdit(io, opts)
-		default:
-			panic(fmt.Sprintf("unhandled proj action %q", opts.action))
-		}
-	},
 }
 
 type projOptions struct {

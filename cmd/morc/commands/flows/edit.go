@@ -24,7 +24,7 @@ func init() {
 
 	// TODO: enforce at least one flag needing to be on
 
-	RootCmd.AddCommand(editCmd)
+	FlowCmd.AddCommand(editCmd)
 }
 
 var editCmd = &cobra.Command{

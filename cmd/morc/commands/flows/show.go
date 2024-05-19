@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	RootCmd.AddCommand(showCmd)
+	FlowCmd.AddCommand(showCmd)
 }
 
 var showCmd = &cobra.Command{

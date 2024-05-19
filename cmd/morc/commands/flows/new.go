@@ -11,7 +11,7 @@ import (
 
 // TODO: swap all project file references to -P.
 func init() {
-	RootCmd.AddCommand(newCmd)
+	FlowCmd.AddCommand(newCmd)
 }
 
 var newCmd = &cobra.Command{

@@ -30,7 +30,7 @@ func init() {
 	rootCmd.AddGroup(sendingCommands)
 	rootCmd.AddGroup(quickreqCommands)
 	rootCmd.AddCommand(reqs.RootCmd)
-	rootCmd.AddCommand(flows.RootCmd)
+	rootCmd.AddCommand(flows.FlowCmd)
 }
 
 var rootCmd = &cobra.Command{

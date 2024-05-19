@@ -191,30 +191,6 @@ var projCmd = &cobra.Command{
 	},
 }
 
-type optional[E any] struct {
-	set bool
-	v   E
-}
-
-func (o optional[E]) Or(v E) E {
-	if o.set {
-		return o.v
-	}
-	return v
-}
-
-type optionalC[E comparable] optional[E]
-
-// Is returns whether the optional is validly set to v. Shorthand for
-// o.set && o.v == v.
-func (o optionalC[E]) Is(v E) bool {
-	return o.set && o.v == v
-}
-
-func (o optionalC[E]) Or(v E) E {
-	return (optional[E](o)).Or(v)
-}
-
 type projAction int
 
 const (
@@ -297,19 +273,6 @@ func parseProjAttrKey(s string) (projKey, error) {
 	default:
 		return "", fmt.Errorf("invalid attribute %q; must be one of %s", s, strings.Join(projAttrKeyNames(), ", "))
 	}
-}
-
-func parseOnOff(s string) (bool, error) {
-	up := strings.ToUpper(s)
-	if up == "ON" || up == "1" || up == "ENABLE" || up == "TRUE" || up == "T" || up == "YES" || up == "Y" {
-		return true, nil
-	}
-
-	if up == "OFF" || up == "0" || up == "DISABLE" || up == "FALSE" || up == "F" || up == "NO" || up == "N" {
-		return false, nil
-	}
-
-	return false, fmt.Errorf("invalid value %q; must be ON or OFF (case-insensitive)", s)
 }
 
 type projOptions struct {

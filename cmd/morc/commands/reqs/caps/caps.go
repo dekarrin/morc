@@ -251,6 +251,71 @@ type capsOptions struct {
 	spec   optional[string]
 }
 
+func invokeCapsEdit(reqName, varName string, opts capsOptions) error {
+	// load the project file
+	p, err := morc.LoadProjectFromDisk(opts.projFile, false)
+	if err != nil {
+		return err
+	}
+
+	// case doesn't matter for request template names
+	reqName = strings.ToLower(reqName)
+	req, ok := p.Templates[reqName]
+	if !ok {
+		return fmt.Errorf("no request template %s", reqName)
+	}
+
+	// case doesn't matter for var names
+	varUpper := strings.ToUpper(varName)
+	if len(req.Captures) == 0 {
+		return fmt.Errorf("no capture to variable $%s exists in request %s", varUpper, reqName)
+	}
+	cap, ok := req.Captures[varUpper]
+	if !ok {
+		return fmt.Errorf("no capture to variable $%s exists in request %s", varUpper, reqName)
+	}
+
+	// okay did the user actually ask to change somefin
+	if !opts.capVar.set && !opts.spec.set {
+		return fmt.Errorf("no changes requested")
+	}
+
+	// if we have a name change, apply that first
+	if opts.capVar.set {
+		newNameUpper := strings.ToUpper(opts.capVar.v)
+
+		// if new name same as old, no reason to do additional work
+		if newNameUpper != varUpper {
+			// check if the new name is already in use
+			if _, ok := req.Captures[newNameUpper]; ok {
+				return fmt.Errorf("capture to variable $%s already exists in request %s", opts.capVar.v, reqName)
+			}
+
+			// remove the old name
+			delete(req.Captures, varUpper)
+
+			// add the new one; we will update the name when we save it back to
+			// the project
+			cap.Name = opts.capVar.v
+		}
+	}
+
+	// if we have a spec change, apply that next
+	if opts.spec.set {
+		cap, err = morc.ParseVarScraperSpec(cap.Name, opts.spec.v)
+		if err != nil {
+			return fmt.Errorf("spec: %w", err)
+		}
+	}
+
+	// update the request
+	req.Captures[strings.ToUpper(cap.Name)] = cap
+	p.Templates[reqName] = req
+
+	// save the project file
+	return p.PersistToDisk(false)
+}
+
 func invokeCapsGet(io cmdio.IO, reqName, capName string, getItem capKey, opts capsOptions) error {
 	// load the project file
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)

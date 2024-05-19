@@ -108,6 +108,7 @@ var FlowCmd = &cobra.Command{
 					return fmt.Errorf("--move/-m: step moving cannot be performed while getting flow step/attribute")
 				}
 			}
+
 		}
 		//
 		// * if user puts no args, action is LIST. no args beside -F are allowed.

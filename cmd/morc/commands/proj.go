@@ -459,44 +459,7 @@ func invokeProjEdit(io cmdio.IO, opts projOptions) error {
 		return err
 	}
 
-	// create our output
-	if len(modifiedVals) > 0 {
-		io.PrintLoudf("Set ")
-
-		// get ordering we want
-		modKeys := sortedProjAttrMapKeys(modifiedVals)
-
-		// turn to slice of output values and let IO handle commas
-		setMessages := []string{}
-		for _, k := range modKeys {
-			v := modifiedVals[projKey(k)]
-
-			if fmt.Sprintf("%v", v) == "" {
-				v = `""`
-			}
-
-			setMessages = append(setMessages, fmt.Sprintf("%s to %s", k.Human(), v))
-		}
-
-		io.PrintLoudf("%s\n", io.OxfordCommaJoin(setMessages))
-	}
-
-	if len(noChangeVals) > 0 {
-		// get ordering we want
-		noChangeKeys := sortedProjAttrMapKeys(noChangeVals)
-
-		// we don't need to do fancy string building because we will simply output
-		// each one on its own line
-		for _, k := range noChangeKeys {
-			v := noChangeVals[projKey(k)]
-
-			if fmt.Sprintf("%v", v) == "" {
-				v = `""`
-			}
-
-			io.PrintLoudErrf("No change to %s; already set to %s\n", k.Human(), v)
-		}
-	}
+	cmdio.OutputLoudEditAttrsResult(io, modifiedVals, noChangeVals, projAttrKeys)
 
 	return nil
 }

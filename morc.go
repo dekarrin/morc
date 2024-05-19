@@ -279,18 +279,23 @@ func (v VarScraper) EqualSpec(other VarScraper) bool {
 		if !other.IsJSONSpec() {
 			return false
 		}
+
+		for i := range v.Steps {
+			if v.Steps[i] != other.Steps[i] {
+				return false
+			}
+		}
 	} else if v.IsOffsetSpec() {
 		if !other.IsOffsetSpec() {
 			return false
 		}
-	} else {
-		return false
-	}
 
-	for i := range v.Steps {
-		if v.Steps[i] != other.Steps[i] {
+		if v.OffsetStart != other.OffsetStart || v.OffsetEnd != other.OffsetEnd {
 			return false
 		}
+	} else {
+		// not comprable
+		return false
 	}
 
 	return true

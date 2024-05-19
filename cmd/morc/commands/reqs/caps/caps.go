@@ -170,6 +170,11 @@ var RootCmd = &cobra.Command{
 	},
 }
 
+type optional[E any] struct {
+	set bool
+	v   E
+}
+
 type capsAction int
 
 const (
@@ -251,7 +256,7 @@ type capsOptions struct {
 	spec   optional[string]
 }
 
-func invokeCapsEdit(reqName, varName string, opts capsOptions) error {
+func invokeCapsEdit(io cmdio.IO, reqName, varName string, opts capsOptions) error {
 	// load the project file
 	p, err := morc.LoadProjectFromDisk(opts.projFile, false)
 	if err != nil {
@@ -309,9 +314,16 @@ func invokeCapsEdit(reqName, varName string, opts capsOptions) error {
 
 	// if we have a spec change, apply that next
 	if opts.spec.set {
-		cap, err = morc.ParseVarScraperSpec(cap.Name, opts.spec.v)
+		newCap, err := morc.ParseVarScraperSpec(cap.Name, opts.spec.v)
 		if err != nil {
 			return fmt.Errorf("spec: %w", err)
+		}
+
+		if !cap.EqualSpec(newCap) {
+			cap = newCap
+			modifiedVals[capKeySpec] = opts.spec.v
+		} else {
+			noChangeVals[capKeySpec] = cap.Spec()
 		}
 	}
 
@@ -320,7 +332,14 @@ func invokeCapsEdit(reqName, varName string, opts capsOptions) error {
 	p.Templates[reqName] = req
 
 	// save the project file
-	return p.PersistToDisk(false)
+	err = p.PersistToDisk(false)
+	if err != nil {
+		return err
+	}
+
+	cmdio.OutputLoudEditAttrsResult(io, modifiedVals, noChangeVals, capAttrKeys)
+
+	return nil
 }
 
 func invokeCapsGet(io cmdio.IO, reqName, capName string, getItem capKey, opts capsOptions) error {

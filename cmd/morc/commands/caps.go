@@ -1,4 +1,4 @@
-package caps
+package commands
 
 import (
 	"fmt"
@@ -168,11 +168,6 @@ var CapsCmd = &cobra.Command{
 			return fmt.Errorf("unknown action %d", opts.action)
 		}
 	},
-}
-
-type optional[E any] struct {
-	set bool
-	v   E
 }
 
 type capsAction int

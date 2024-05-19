@@ -16,22 +16,25 @@ var (
 )
 
 func init() {
-	CapsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
-	CapsCmd.PersistentFlags().BoolVarP(&flagCapsNew, "new", "", false, "Create a new variable capture on the request. If given, the specification of the new capture must also be given as a third argument.")
-	CapsCmd.PersistentFlags().BoolVarP(&flagCapsDelete, "delete", "d", false, "Delete the given variable capture from the request. Can only be used if giving REQ and CAP and no other arguments.")
+	capsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+	capsCmd.PersistentFlags().BoolVarP(&flagCapsNew, "new", "", false, "Create a new variable capture on the request. If given, the specification of the new capture must also be given as a third argument.")
+	capsCmd.PersistentFlags().BoolVarP(&flagCapsDelete, "delete", "d", false, "Delete the given variable capture from the request. Can only be used if giving REQ and CAP and no other arguments.")
 
 	// cannot delete while doing new
-	CapsCmd.MarkFlagsMutuallyExclusive("new", "delete")
+	capsCmd.MarkFlagsMutuallyExclusive("new", "delete")
+
+	rootCmd.AddCommand(capsCmd)
 }
 
-var CapsCmd = &cobra.Command{
+var capsCmd = &cobra.Command{
 	Use: "caps REQ [-F project_file]\n" +
 		"caps REQ CAP [-d] [-F project_file]\n" +
 		"caps REQ CAP SPECIFICATION --new\n" +
 		"caps REQ CAP ATTR [VALUE [ATTR2 VALUE2]...]",
-	Short: "Get or modify variable captures on a request template.",
-	Long:  "Perform operations on variable captures defined on a request template. With only the name of the request template given, prints out a listing of all the captures defined on the given request. For all other operations, CAP must be specified; this is the name of the variable that the capture is saved to, and serves as the primary identifier for variable captures. If CAP is given with no other arguments, information on that capture is printed. If --new is given with CAP, a new capture will be created on the request that saves to the var called CAP and that captures data from responses with the given specification. If -d is given, var capture CAP is deleted from the request template. If a capture attribute name is given after CAP, only that particular attribute is printed out. If one or more pairs of capture attributes and new values are given, those attributes on CAP will be set to their corresponding values.\n\nCapture specifications can be given in one of two formats. They can be in format ':START,END' for a byte offset (ex: \":4,20\") or a jq-ish path with only keys and variable indexes (ex: \"records[1].auth.token\")",
-	Args:  cobra.MinimumNArgs(1),
+	GroupID: projMetaCommands.ID,
+	Short:   "Get or modify variable captures on a request template.",
+	Long:    "Perform operations on variable captures defined on a request template. With only the name of the request template given, prints out a listing of all the captures defined on the given request. For all other operations, CAP must be specified; this is the name of the variable that the capture is saved to, and serves as the primary identifier for variable captures. If CAP is given with no other arguments, information on that capture is printed. If --new is given with CAP, a new capture will be created on the request that saves to the var called CAP and that captures data from responses with the given specification. If -d is given, var capture CAP is deleted from the request template. If a capture attribute name is given after CAP, only that particular attribute is printed out. If one or more pairs of capture attributes and new values are given, those attributes on CAP will be set to their corresponding values.\n\nCapture specifications can be given in one of two formats. They can be in format ':START,END' for a byte offset (ex: \":4,20\") or a jq-ish path with only keys and variable indexes (ex: \"records[1].auth.token\")",
+	Args:    cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := capsOptions{
 			projFile: commonflags.ProjectFile,

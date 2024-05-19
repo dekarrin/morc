@@ -16,15 +16,15 @@ var (
 )
 
 func init() {
-	RootCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
-	RootCmd.PersistentFlags().BoolVarP(&flagCapsNew, "new", "", false, "Create a new variable capture on the request. If given, the specification of the new capture must also be given as a third argument.")
-	RootCmd.PersistentFlags().BoolVarP(&flagCapsDelete, "delete", "d", false, "Create a new variable capture on the request. If given, the specification of the new capture must also be given as a third argument.")
+	CapsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+	CapsCmd.PersistentFlags().BoolVarP(&flagCapsNew, "new", "", false, "Create a new variable capture on the request. If given, the specification of the new capture must also be given as a third argument.")
+	CapsCmd.PersistentFlags().BoolVarP(&flagCapsDelete, "delete", "d", false, "Delete the given variable capture from the request. Can only be used if giving REQ and CAP and no other arguments.")
 
 	// cannot delete while doing new
-	RootCmd.MarkFlagsMutuallyExclusive("new", "delete")
+	CapsCmd.MarkFlagsMutuallyExclusive("new", "delete")
 }
 
-var RootCmd = &cobra.Command{
+var CapsCmd = &cobra.Command{
 	Use: "caps REQ [-F project_file]\n" +
 		"caps REQ CAP [-d] [-F project_file]\n" +
 		"caps REQ CAP SPECIFICATION --new\n" +
@@ -209,17 +209,6 @@ func (ck capKey) Name() string {
 	return string(ck)
 }
 
-// extracts map keys in order of capAttrKeys
-func sortedCapAttrMapKeys[E any](m map[capKey]E) []capKey {
-	keys := []capKey{}
-	for _, k := range capAttrKeys {
-		if _, ok := m[k]; ok {
-			keys = append(keys, k)
-		}
-	}
-	return keys
-}
-
 var (
 	// ordering of capKeys in output is set here
 
@@ -254,6 +243,44 @@ type capsOptions struct {
 
 	capVar optional[string]
 	spec   optional[string]
+}
+
+func invokeCapsDelete(io cmdio.IO, reqName, varName string, opts capsOptions) error {
+	// load the project file
+	p, err := morc.LoadProjectFromDisk(opts.projFile, false)
+	if err != nil {
+		return err
+	}
+
+	// case doesn't matter for request template names
+	reqName = strings.ToLower(reqName)
+	req, ok := p.Templates[reqName]
+	if !ok {
+		return fmt.Errorf("no request template %s", reqName)
+	}
+
+	// var name normalized to upper case
+	varUpper := strings.ToUpper(varName)
+	if len(req.Captures) > 0 {
+		if _, ok := req.Captures[varUpper]; !ok {
+			// TODO: standardize "not-found" error messages
+			return fmt.Errorf("no capture defined for %s in %s", reqName, varUpper)
+		}
+	}
+
+	// remove the capture
+	delete(req.Captures, varUpper)
+	p.Templates[reqName] = req
+
+	// save the project file
+	err = p.PersistToDisk(false)
+	if err != nil {
+		return err
+	}
+
+	io.PrintLoudf("Deleted capture to %s from %s", varUpper, reqName)
+
+	return nil
 }
 
 func invokeCapsEdit(io cmdio.IO, reqName, varName string, opts capsOptions) error {
@@ -403,7 +430,7 @@ func invokeCapsNew(io cmdio.IO, reqName, varName, varCap string, opts capsOption
 	}
 
 	// parse the capture spec
-	scraper, err := morc.ParseVarScraperSpec(varName, varCap)
+	cap, err := morc.ParseVarScraperSpec(varName, varCap)
 	if err != nil {
 		return err
 	}
@@ -413,10 +440,24 @@ func invokeCapsNew(io cmdio.IO, reqName, varName, varCap string, opts capsOption
 		req.Captures = make(map[string]morc.VarScraper)
 		p.Templates[reqName] = req
 	}
-	req.Captures[varUpper] = scraper
+	req.Captures[varUpper] = cap
 
 	// save the project file
-	return p.PersistToDisk(false)
+	err = p.PersistToDisk(false)
+	if err != nil {
+		return err
+	}
+
+	scrapeSource := "response"
+	if cap.IsJSONSpec() {
+		scrapeSource = "JSON response body"
+	} else if cap.IsOffsetSpec() {
+		scrapeSource = "byte offset in response"
+	}
+
+	io.PrintLoudf("Added new capture from %s to %s on %s", scrapeSource, varUpper, reqName)
+
+	return nil
 }
 
 func invokeCapsList(io cmdio.IO, reqName string, opts capsOptions) error {

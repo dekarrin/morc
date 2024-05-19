@@ -280,6 +280,9 @@ func invokeCapsEdit(reqName, varName string, opts capsOptions) error {
 		return fmt.Errorf("no changes requested")
 	}
 
+	modifiedVals := map[capKey]interface{}{}
+	noChangeVals := map[capKey]interface{}{}
+
 	// if we have a name change, apply that first
 	if opts.capVar.set {
 		newNameUpper := strings.ToUpper(opts.capVar.v)
@@ -297,6 +300,10 @@ func invokeCapsEdit(reqName, varName string, opts capsOptions) error {
 			// add the new one; we will update the name when we save it back to
 			// the project
 			cap.Name = opts.capVar.v
+
+			modifiedVals[capKeyVar] = opts.capVar.v
+		} else {
+			noChangeVals[capKeyVar] = varUpper
 		}
 	}
 

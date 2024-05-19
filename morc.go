@@ -266,6 +266,36 @@ func (v VarScraper) String() string {
 	return s
 }
 
+func (v VarScraper) IsOffsetSpec() bool {
+	return len(v.Steps) == 0
+}
+
+func (v VarScraper) IsJSONSpec() bool {
+	return len(v.Steps) > 0
+}
+
+func (v VarScraper) EqualSpec(other VarScraper) bool {
+	if v.IsJSONSpec() {
+		if !other.IsJSONSpec() {
+			return false
+		}
+	} else if v.IsOffsetSpec() {
+		if !other.IsOffsetSpec() {
+			return false
+		}
+	} else {
+		return false
+	}
+
+	for i := range v.Steps {
+		if v.Steps[i] != other.Steps[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (v VarScraper) Spec() string {
 	s := ""
 	if len(v.Steps) > 0 {

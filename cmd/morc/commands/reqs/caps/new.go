@@ -2,9 +2,7 @@ package caps
 
 import (
 	"fmt"
-	"strings"
 
-	"github.com/dekarrin/morc"
 	"github.com/dekarrin/morc/cmd/morc/commonflags"
 	"github.com/spf13/cobra"
 )
@@ -45,55 +43,10 @@ var newCmd = &cobra.Command{
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
 
-		return invokeReqCapsNew(reqName, varName, varCap, opts)
+		return nil
 	},
 }
 
 type newOptions struct {
 	projFile string
-}
-
-func invokeReqCapsNew(name, varName, varCap string, opts newOptions) error {
-	// load the project file
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
-	if err != nil {
-		return err
-	}
-
-	// case doesn't matter for request template names
-	name = strings.ToLower(name)
-	req, ok := p.Templates[name]
-	if !ok {
-		return fmt.Errorf("no request template %s", name)
-	}
-
-	// parse the var scraper
-	varName, err = morc.ParseVarName(varName)
-	if err != nil {
-		return err
-	}
-
-	// var name normalized to upper case
-	varUpper := strings.ToUpper(varName)
-	if len(req.Captures) > 0 {
-		if _, ok := req.Captures[varUpper]; ok {
-			return fmt.Errorf("variable $%s already has a capture", varUpper)
-		}
-	}
-
-	// parse the capture spec
-	scraper, err := morc.ParseVarScraperSpec(varName, varCap)
-	if err != nil {
-		return err
-	}
-
-	// otherwise, we have a valid capture, so add it to the request.
-	if req.Captures == nil {
-		req.Captures = make(map[string]morc.VarScraper)
-		p.Templates[name] = req
-	}
-	req.Captures[varUpper] = scraper
-
-	// save the project file
-	return p.PersistToDisk(false)
 }

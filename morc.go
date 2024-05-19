@@ -262,6 +262,12 @@ type VarScraper struct {
 
 func (v VarScraper) String() string {
 	s := fmt.Sprintf("%s from ", v.Name)
+	s += v.Spec()
+	return s
+}
+
+func (v VarScraper) Spec() string {
+	s := ""
 	if len(v.Steps) > 0 {
 		for _, step := range v.Steps {
 			s += step.String()

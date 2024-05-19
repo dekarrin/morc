@@ -251,6 +251,83 @@ type capsOptions struct {
 	spec   optional[string]
 }
 
+func invokeCapsGet(io cmdio.IO, reqName, capName string, getItem capKey, opts capsOptions) error {
+	// load the project file
+	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+	if err != nil {
+		return err
+	}
+
+	// case doesn't matter for request template names
+	reqName = strings.ToLower(reqName)
+	req, ok := p.Templates[reqName]
+	if !ok {
+		return fmt.Errorf("no request template %s", reqName)
+	}
+
+	capName = strings.ToUpper(capName)
+	cap, ok := req.Captures[capName]
+	if !ok {
+		return fmt.Errorf("no capture to %s exists on request template %s", capName, reqName)
+	}
+
+	switch getItem {
+	case capKeyVar:
+		io.Printf("%s\n", cap.Name)
+	case capKeySpec:
+		io.Printf("%s\n", cap.Spec())
+	default:
+		return fmt.Errorf("unknown item %q", getItem)
+	}
+
+	return nil
+}
+
+func invokeCapsNew(io cmdio.IO, reqName, varName, varCap string, opts capsOptions) error {
+	// load the project file
+	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+	if err != nil {
+		return err
+	}
+
+	// case doesn't matter for request template names
+	reqName = strings.ToLower(reqName)
+	req, ok := p.Templates[reqName]
+	if !ok {
+		return fmt.Errorf("no request template %s", reqName)
+	}
+
+	// parse the var scraper
+	varName, err = morc.ParseVarName(varName)
+	if err != nil {
+		return err
+	}
+
+	// var name normalized to upper case
+	varUpper := strings.ToUpper(varName)
+	if len(req.Captures) > 0 {
+		if _, ok := req.Captures[varUpper]; ok {
+			return fmt.Errorf("variable $%s already has a capture", varUpper)
+		}
+	}
+
+	// parse the capture spec
+	scraper, err := morc.ParseVarScraperSpec(varName, varCap)
+	if err != nil {
+		return err
+	}
+
+	// otherwise, we have a valid capture, so add it to the request.
+	if req.Captures == nil {
+		req.Captures = make(map[string]morc.VarScraper)
+		p.Templates[reqName] = req
+	}
+	req.Captures[varUpper] = scraper
+
+	// save the project file
+	return p.PersistToDisk(false)
+}
+
 func invokeCapsList(io cmdio.IO, reqName string, opts capsOptions) error {
 	// load the project file
 	p, err := morc.LoadProjectFromDisk(opts.projFile, true)

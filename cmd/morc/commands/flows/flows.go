@@ -24,8 +24,8 @@ func init() {
 	FlowCmd.PersistentFlags().BoolVarP(&flagFlowDelete, "delete", "d", false, "Delete the flow with the given name. Can only be used when flow name is also given.")
 	FlowCmd.PersistentFlags().BoolVarP(&flagFlowNew, "new", "", false, "Create a new flow with the given name and request steps. If given, arguments to the command are interpreted as the new flow name and the request steps, in order.")
 	FlowCmd.PersistentFlags().IntSliceVarP(&flagFlowStepRemovals, "remove", "r", nil, "Remove the step at index `IDX` from the flow. Can be given multiple times; if so, will be applied from highest to lowest index.")
-	FlowCmd.PersistentFlags().StringSliceVarP(&flagFlowStepAdds, "add", "a", nil, "Add a new step calling request REQ at index IDX, or at the end of current steps if index is omitted. Argument must be a string in form `[IDX]:REQ`. Can be given multiple times; if so, will be applied from lowest to highest index after any removals are applied.")
-	FlowCmd.PersistentFlags().StringSliceVarP(&flagFlowStepMoves, "move", "m", nil, "Move the step at index FROM to index TO. Argument must be a string in form `FROM:TO`. Can be given multiple times; if so, will be applied in order given after any removals and adds are applied.")
+	FlowCmd.PersistentFlags().StringArrayVarP(&flagFlowStepAdds, "add", "a", nil, "Add a new step calling request REQ at index IDX, or at the end of current steps if index is omitted. Argument must be a string in form `[IDX]:REQ`. Can be given multiple times; if so, will be applied from lowest to highest index after any removals are applied.")
+	FlowCmd.PersistentFlags().StringArrayVarP(&flagFlowStepMoves, "move", "m", nil, "Move the step at index FROM to index TO. Argument must be a string in form `FROM:TO`. Can be given multiple times; if so, will be applied in order given after any removals and adds are applied.")
 
 	FlowCmd.MarkFlagsMutuallyExclusive("delete", "new", "remove")
 	FlowCmd.MarkFlagsMutuallyExclusive("delete", "new", "add")
@@ -59,12 +59,56 @@ var FlowCmd = &cobra.Command{
 		// flows FLOW -d - DELETE
 
 		// (GET?) NAME, STEPS, N.
-		// (EDIT?) NAME=NEW/+N NEW/+-r N/+-a N:NEW/+-m N->M
+		// (EDIT?) NAME=NEW/+N NEW/+-r N/+-a N:NEW/+-m N:M
 
 		// mutation steps are applicable in EDIT-style, SHOW-style, INCOMPAT with -d,
 
-		// * if user gives new, must have at least 3 args and no -d and no step mutations
-		// * if user gives -d, must have 1 arg and no step mutations and no --new.
+		// sanity flag checks
+		if flagFlowNew {
+			if len(args) < 2 {
+				return fmt.Errorf("--new requires a name and at least two requests")
+			}
+		}
+		if flagFlowDelete {
+			if len(args) < 1 {
+				return fmt.Errorf("--delete/-d requires a flow name")
+			}
+			if len(args) > 1 {
+				return fmt.Errorf("--delete/-d must be used only with a flow name")
+			}
+		}
+
+		if len(args) == 0 {
+			opts.action = flowActionList
+
+			if len(flagFlowStepRemovals) > 0 {
+				return fmt.Errorf("--remove/-r: step removal requires name of flow to remove from")
+			}
+			if len(flagFlowStepAdds) > 0 {
+				return fmt.Errorf("--add/-a: step addition requires name of flow to add to")
+			}
+			if len(flagFlowStepMoves) > 0 {
+				return fmt.Errorf("--move/-m: step moving requires name of flow to move within")
+			}
+		} else if len(args) == 1 {
+			if flagFlowDelete {
+				opts.action = flowActionDelete
+			} else {
+				opts.action = flowActionShow
+			}
+		} else {
+			if len(args) == 2 {
+				if len(flagFlowStepRemovals) > 0 {
+					return fmt.Errorf("--remove/-r: step removal cannot be performed while getting flow step/attribute")
+				}
+				if len(flagFlowStepAdds) > 0 {
+					return fmt.Errorf("--add/-a: step addition cannot be performed while getting flow step/attribute")
+				}
+				if len(flagFlowStepMoves) > 0 {
+					return fmt.Errorf("--move/-m: step moving cannot be performed while getting flow step/attribute")
+				}
+			}
+		}
 		//
 		// * if user puts no args, action is LIST. no args beside -F are allowed.
 		// * if user puts 1 arg, it is flow name. -d and -F is allowed. step mutations are allowed, but not with -d.

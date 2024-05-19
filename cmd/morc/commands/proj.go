@@ -259,17 +259,6 @@ func (pk projKey) Name() string {
 	return string(pk)
 }
 
-// extracts map keys in order of projAttrKeys
-func sortedProjAttrMapKeys[E any](m map[projKey]E) []projKey {
-	keys := []projKey{}
-	for _, k := range projAttrKeys {
-		if _, ok := m[k]; ok {
-			keys = append(keys, k)
-		}
-	}
-	return keys
-}
-
 var (
 	// ordering of projAttrKeys in output is set here
 

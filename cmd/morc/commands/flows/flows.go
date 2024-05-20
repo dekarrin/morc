@@ -45,7 +45,7 @@ var FlowCmd = &cobra.Command{
 	Long:    "Performs operations on the flows defined in the project. By itself, lists out the names of all flows in the project. If given a flow name FLOW with no other arguments, shows the steps in the flow. A new flow can be created by including the --new flag when providing the name of the flow and 2 or more names of requests to be included, in order. A flow can be deleted by passing the -d flag when providing the name of the flow. If a numerical flow step index IDX is provided after the flow name, the name of the req at that step is output. If a non-numerical flow attribute ATTR is provided after the flow name, that attribute is output. If a value is provided after ATTR or IDX, the attribute or step at the given index is updated to the new value. Format for the new value for an ATTR is dependent on the ATTR, and format for the new value for an IDX is the name of the request to call at that step index.\n\nFlow step mutations other than a step replacing an existing one are handled by giving the name of the FLOW and one or more step mutation options. --remove/-r IDX can be used to remove the step at the given index. --add/-a [IDX]:REQ will add a new step at the given index, or at the end if IDX is omitted; double the colon to insert a template whose name begins with a colon at the end of the flow.. --move/-m IDX->IDX will move the step at the first index to the second index; if the new index is higher than the old, all indexes in between move down to accommodate, and if the new index is lower, all other indexes are pushed up to accommodate. Multiple moves, adds, and removes can be given in a single command; all removes are applied from highest to lowest index, then any adds from lowest to highest, then any moves.",
 	Args:    cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		opts := flowOptions{
+		opts := flowsOptions{
 			projFile:         commonflags.ProjectFile,
 			stepReplacements: map[int]string{},
 		}
@@ -54,18 +54,7 @@ var FlowCmd = &cobra.Command{
 			return fmt.Errorf("project file is set to empty string")
 		}
 
-		// semantic CLI actions (a little weird because flow contains a list of steps):
-		// flows - LIST
-		// flows FLOW - SHOW
-		// flows FLOW STEP1REQ STEP2REQ [STEPNREQ]... --new  - NEW
-		// flows FLOW -d - DELETE
-
-		// (GET?) NAME, STEPS, N.
-		// (EDIT?) NAME=NEW/+N NEW/+-r N/+-a N:NEW/+-m N:M
-
-		// mutation steps are applicable in EDIT-style, SHOW-style, INCOMPAT with -d,
-
-		// sanity flag checks
+		// flag sanity checks
 		if flagFlowNew {
 			if len(args) < 3 {
 				return fmt.Errorf("--new requires a name and at least two requests")
@@ -124,50 +113,37 @@ var FlowCmd = &cobra.Command{
 
 				// already checked required arg count for --new above; no need to do so again
 				steps = args[1:]
+
+				for _, reqName := range steps {
+					if reqName == "" {
+						return fmt.Errorf("request name cannot be empty")
+					}
+				}
 			} else {
 				// full arg parsing mode
-				var curKey cmdio.AttrKey
-				var curKeyIsIndex bool
+				var curKey flowKey
 				var err error
 
 				for i, arg := range args[1:] {
 					if i%2 == 0 {
 						// if even, should be an attribute or a step index.
 
-						curKeyIsIndex = false
-
-						// as a rule, no non-index attribute begins with a
-						// digit, so attempt to parse as an index first.
-						if len(arg) > 0 && arg[0] >= '0' && arg[0] <= '9' {
-							idx, err := strconv.Atoi(arg)
-							if err != nil {
-								return fmt.Errorf("attr/idx #%d: not a valid step index: %w", (i/2)+1, err)
-							}
-
-							curKey = flowStepIndex(idx)
-							curKeyIsIndex = true
-						}
-
-						// if index is not set, it must be an attribute. parse.
-						if !curKeyIsIndex {
-							curKey, err = parseFlowAttrKey(arg)
-							if err != nil {
-								return fmt.Errorf("attr/idx #%d: %w", (i/2)+1, err)
-							}
+						curKey, err = parseFlowAttrKey(arg)
+						if err != nil {
+							return fmt.Errorf("attr/idx #%d: %w", (i/2)+1, err)
 						}
 
 						// do "already set" check
 						setTwice := false
-						switch curKey {
-						case flowKeyName:
+
+						switch curKey.name {
+						case "":
+							idx := curKey.stepIndex
+							_, setTwice = opts.stepReplacements[idx]
+						case flowKeyName.name:
 							setTwice = opts.newName.set
 						default:
-							// check in the step replacements
-							idx, ok := curKey.(flowStepIndex)
-							if !ok {
-								return fmt.Errorf("attr/idx #%d: unknown attribute %q", (i/2)+1, curKey)
-							}
-							_, setTwice = opts.stepReplacements[int(idx)]
+							return fmt.Errorf("attr/idx #%d: unknown attribute %q", (i/2)+1, curKey)
 						}
 
 						if setTwice {
@@ -176,15 +152,14 @@ var FlowCmd = &cobra.Command{
 					} else {
 						// if odd, it is a value
 
-						switch curKey {
-						case flowKeyName:
+						switch curKey.name {
+						case "":
+							idx := curKey.stepIndex
+							opts.stepReplacements[idx] = arg
+						case flowKeyName.name:
 							opts.newName = optional[string]{set: true, v: arg}
 						default:
-							idx, ok := curKey.(flowStepIndex)
-							if !ok {
-								panic("failed to cast flowStepIndex")
-							}
-							opts.stepReplacements[int(idx)] = arg
+							panic(fmt.Sprintf("unhandled flow key %q", curKey))
 						}
 					}
 				}
@@ -212,13 +187,247 @@ var FlowCmd = &cobra.Command{
 		switch opts.action {
 		case flowsList:
 			return invokeFlowsList(io, opts)
+		case flowsShow:
+			return invokeFlowsShow(io, flowName, opts)
+		case flowsDelete:
+			return invokeFlowsDelete(io, flowName, opts)
+		case flowsEdit:
+			return invokeFlowsEdit(io, flowName, opts)
+		case flowsGet:
+			return invokeFlowsGet(io, flowName, getItem, opts)
+		case flowsNew:
+			return invokeFlowsNew(io, flowName, steps, opts)
+
 		default:
 			panic(fmt.Sprintf("unhandled flow action %q", opts.action))
 		}
 	},
 }
 
-func invokeFlowsList(io cmdio.IO, opts flowOptions) error {
+type optional[E any] struct {
+	set bool
+	v   E
+}
+
+func invokeFlowsEdit(io cmdio.IO, flowName string, opts flowsOptions) error {
+	// load the project file
+	p, err := morc.LoadProjectFromDisk(opts.projFile, false)
+	if err != nil {
+		return err
+	}
+
+	// case doesn't matter for flow names
+	flowName = strings.ToLower(flowName)
+	flow, ok := p.Flows[flowName]
+	if !ok {
+		return fmt.Errorf("no flow named %s exists", flowName)
+	}
+
+	modifiedVals := map[cmdio.AttrKey]interface{}{}
+	noChangeVals := map[cmdio.AttrKey]interface{}{}
+
+	if opts.newName.set {
+		newNameLower := strings.ToLower(opts.newName.v)
+		if newNameLower != flowName {
+			if newNameLower == "" {
+				return fmt.Errorf("new name cannot be empty")
+			}
+			if _, exists := p.Flows[newNameLower]; exists {
+				return fmt.Errorf("flow named %s already exists", opts.newName.v)
+			}
+
+			flow.Name = newNameLower
+			delete(p.Flows, flowName)
+			modifiedVals[flowKeyName] = newNameLower
+		} else {
+			noChangeVals[flowKeyName] = flowName
+		}
+	}
+
+	for _, delIdx := range opts.deletes {
+		if delIdx < 1 || delIdx > len(flow.Steps) {
+			return fmt.Errorf("cannot delete step #%d; it does not exist", delIdx)
+		}
+		actualIdx := delIdx - 1
+
+		newSteps := make([]morc.FlowStep, len(flow.Steps)-1)
+		copy(newSteps, flow.Steps[:actualIdx])
+		copy(newSteps[actualIdx:], flow.Steps[actualIdx+1:])
+		flow.Steps = newSteps
+	}
+
+	for _, add := range opts.adds {
+		if add.index < -1 {
+			return fmt.Errorf("cannot add step at #%d; it does not exist", add.index)
+		}
+
+		if add.index > len(flow.Steps) {
+			add.index = -1
+		}
+
+		// make shore the template exists
+		add.template = strings.ToLower(add.template)
+		if _, exists := p.Templates[add.template]; !exists {
+			return fmt.Errorf("no request template %q in project", add.template)
+		}
+
+		if add.index == -1 {
+			flow.Steps = append(flow.Steps, morc.FlowStep{
+				Template: add.template,
+			})
+		} else {
+			actualIdx := add.index - 1
+
+			newSteps := make([]morc.FlowStep, len(flow.Steps)+1)
+
+			if actualIdx > 0 {
+				copy(newSteps, flow.Steps[:actualIdx])
+			}
+			newSteps[actualIdx] = morc.FlowStep{
+				Template: add.template,
+			}
+			copy(newSteps[actualIdx+1:], flow.Steps[actualIdx:])
+
+			flow.Steps = newSteps
+		}
+	}
+
+	p.Flows[flow.Name] = flow
+
+	return p.PersistToDisk(false)
+}
+
+func invokeFlowsGet(io cmdio.IO, flowName string, getItem cmdio.AttrKey, opts flowsOptions) error {
+	// load the project file
+	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+	if err != nil {
+		return err
+	}
+
+	// case doesn't matter for flow names
+
+	flowName = strings.ToUpper(flowName)
+	flow, ok := p.Flows[flowName]
+	if !ok {
+		return fmt.Errorf("no flow named %s exists", flowName)
+	}
+
+	switch getItem {
+	case flowKeyName:
+		io.Printf("%s\n", flow.Name)
+	default:
+		// it's a step index (panic if not)
+		stepIdx, ok := getItem.(flowStepIndex)
+		if !ok {
+			panic("failed to cast flowStepIndex")
+		}
+		idx := int(stepIdx)
+
+		if idx < 1 {
+			return fmt.Errorf("%s index must be greater than 0")
+		}
+
+		if idx >= len(flow.Steps) {
+			return fmt.Errorf("%d doesn't exist; highest step index in %s is %d", idx, flow.Name, len(flow.Steps)-1)
+		}
+
+		io.Printf("%s\n", flow.Steps[idx])
+	}
+
+	return nil
+}
+
+func invokeFlowsNew(io cmdio.IO, name string, templates []string, opts flowsOptions) error {
+	// load the project file
+	p, err := morc.LoadProjectFromDisk(opts.projFile, false)
+	if err != nil {
+		return err
+	}
+
+	// case doesn't matter for flow names
+	name = strings.ToLower(name)
+
+	// check if the project already has a flow with the same name
+	if _, exists := p.Flows[name]; exists {
+		return fmt.Errorf("flow %s already exists in project", name)
+	}
+
+	// check that each of the templates exist and create the flow steps
+	var steps []morc.FlowStep
+	for _, reqName := range templates {
+		reqLower := strings.ToLower(reqName)
+		if _, exists := p.Templates[reqLower]; !exists {
+			return fmt.Errorf("no request template %q in project", reqName)
+		}
+		steps = append(steps, morc.FlowStep{
+			Template: reqLower,
+		})
+	}
+
+	// create the new flow
+	flow := morc.Flow{
+		Name:  name,
+		Steps: steps,
+	}
+
+	p.Flows[name] = flow
+
+	// save the project file
+	err = p.PersistToDisk(false)
+	if err != nil {
+		return err
+	}
+
+	io.PrintLoudf("Created new flow %s with %s\n", name, io.CountOf(len(templates), "step"))
+
+	return nil
+}
+
+func invokeFlowsShow(io cmdio.IO, name string, opts flowsOptions) error {
+	// load the project file
+	p, err := morc.LoadProjectFromDisk(opts.projFile, false)
+	if err != nil {
+		return err
+	}
+
+	// case doesn't matter for flow names
+	name = strings.ToLower(name)
+
+	flow, ok := p.Flows[name]
+	if !ok {
+		return fmt.Errorf("no flow named %s exists", name)
+	}
+
+	if len(flow.Steps) == 0 {
+		io.Println("(no steps in flow)")
+	}
+
+	for i, step := range flow.Steps {
+		req, exists := p.Templates[step.Template]
+
+		if exists {
+			notSendableBang := ""
+			meth := req.Method
+			reqURL := req.URL
+			if meth == "" {
+				notSendableBang = "!"
+				meth = "???"
+			}
+			if reqURL == "" {
+				notSendableBang = "!"
+				reqURL = "http://???"
+			}
+
+			io.Printf("%d:%s %s (%s %s)\n", i+1, notSendableBang, step.Template, meth, reqURL)
+		} else {
+			io.Printf("%d:! %s (!non-existent req)\n", i+1, step.Template)
+		}
+	}
+
+	return nil
+}
+
+func invokeFlowsList(io cmdio.IO, opts flowsOptions) error {
 	p, err := morc.LoadProjectFromDisk(opts.projFile, false)
 	if err != nil {
 		return err
@@ -265,25 +474,39 @@ const (
 	flowsEdit
 )
 
-// probs overengineered given there is ONE flow attribute other than steps.
-type flowKey string
+// probs overengineered given there is ONE flow attribute constant other than
+// steps. If name is "" it is assumed that it is an index-style attribute.
+type flowKey struct {
+	name      string
+	stepIndex int
+}
 
-const (
-	flowKeyName flowKey = "NAME"
+func (fk flowKey) isStepIndex() bool {
+	return fk.name == ""
+}
+
+var (
+	flowKeyName flowKey = flowKey{name: "NAME"}
 )
 
 // Human prints the human-readable description of the key.
 func (fk flowKey) Human() string {
-	switch fk {
-	case flowKeyName:
+	switch fk.name {
+	case "":
+		return fmt.Sprintf("step %d", fk.stepIndex)
+	case flowKeyName.name:
 		return "flow name"
 	default:
-		return fmt.Sprintf("unknown flow key %q", fk)
+		return fmt.Sprintf("unknown flow key %q", fk.name)
 	}
 }
 
 func (fk flowKey) Name() string {
-	return string(fk)
+	if fk.name != "" {
+		return string(fk.name)
+	} else {
+		return fmt.Sprintf("%d", fk.stepIndex)
+	}
 }
 
 var (
@@ -314,15 +537,24 @@ func flowAttrKeyNames() []string {
 }
 
 func parseFlowAttrKey(s string) (flowKey, error) {
+	if len(s) > 0 && s[0] >= '0' && s[0] <= '9' {
+		idx, err := strconv.Atoi(s)
+		if err != nil {
+			return flowKey{}, fmt.Errorf("must be a step index or one of %s", s, strings.Join(flowAttrKeyNames(), ", "))
+		}
+
+		return flowKey{stepIndex: idx}, nil
+	}
+
 	switch strings.ToUpper(s) {
 	case flowKeyName.Name():
 		return flowKeyName, nil
 	default:
-		return "", fmt.Errorf("invalid attribute %q; must be one of %s", s, strings.Join(flowAttrKeyNames(), ", "))
+		return flowKey{}, fmt.Errorf("must be a step index or one of %s", s, strings.Join(flowAttrKeyNames(), ", "))
 	}
 }
 
-type flowOptions struct {
+type flowsOptions struct {
 	projFile string
 	action   flowAction
 

@@ -15,9 +15,14 @@ import (
 // used for providing standardized output and sorting using
 // [OutputLoudEditAttrsResult] and [SortedAttrMapKeys].
 type AttrKey interface {
-	comparable
 	Human() string
 	Name() string
+}
+
+// CAttrKey is an AttrKey that also implements comparable.
+type CAttrKey interface {
+	comparable
+	AttrKey
 }
 
 var (
@@ -109,7 +114,7 @@ func (io IO) PrintLoudErrf(format string, args ...interface{}) {
 }
 
 // extracts map keys in order of some strict ordering slice
-func SortedAttrMapKeys[K AttrKey, V any](m map[K]V, order []K) []K {
+func SortedAttrMapKeys[K CAttrKey, V any](m map[K]V, order []K) []K {
 	keys := []K{}
 	for _, k := range order {
 		if _, ok := m[k]; ok {
@@ -128,7 +133,7 @@ func SortedAttrMapKeys[K AttrKey, V any](m map[K]V, order []K) []K {
 //
 // Edits that resulted in a mutation will be printed to the output stream and
 // edits that did not result in a mutation will be printed to the error stream.
-func OutputLoudEditAttrsResult[K AttrKey](io IO, modifiedVals map[K]interface{}, noChangeVals map[K]interface{}, ordering []K) {
+func OutputLoudEditAttrsResult[K CAttrKey](io IO, modifiedVals map[K]interface{}, noChangeVals map[K]interface{}, ordering []K) {
 	// if IO is quite, no need to go to the trouble of printing and sorting
 	if io.Quiet {
 		return

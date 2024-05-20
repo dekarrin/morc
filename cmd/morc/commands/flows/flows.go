@@ -3,6 +3,7 @@ package flows
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/dekarrin/morc"
@@ -42,10 +43,11 @@ var FlowCmd = &cobra.Command{
 	GroupID: "project",
 	Short:   "Get or modify request flows",
 	Long:    "Performs operations on the flows defined in the project. By itself, lists out the names of all flows in the project. If given a flow name FLOW with no other arguments, shows the steps in the flow. A new flow can be created by including the --new flag when providing the name of the flow and 2 or more names of requests to be included, in order. A flow can be deleted by passing the -d flag when providing the name of the flow. If a numerical flow step index IDX is provided after the flow name, the name of the req at that step is output. If a non-numerical flow attribute ATTR is provided after the flow name, that attribute is output. If a value is provided after ATTR or IDX, the attribute or step at the given index is updated to the new value. Format for the new value for an ATTR is dependent on the ATTR, and format for the new value for an IDX is the name of the request to call at that step index.\n\nFlow step mutations other than a step replacing an existing one are handled by giving the name of the FLOW and one or more step mutation options. --remove/-r IDX can be used to remove the step at the given index. --add/-a [IDX]:REQ will add a new step at the given index, or at the end if IDX is omitted; double the colon to insert a template whose name begins with a colon at the end of the flow.. --move/-m IDX->IDX will move the step at the first index to the second index; if the new index is higher than the old, all indexes in between move down to accommodate, and if the new index is lower, all other indexes are pushed up to accommodate. Multiple moves, adds, and removes can be given in a single command; all removes are applied from highest to lowest index, then any adds from lowest to highest, then any moves.",
-	Args:    cobra.NoArgs,
+	Args:    cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := flowOptions{
-			projFile: commonflags.ProjectFile,
+			projFile:         commonflags.ProjectFile,
+			stepReplacements: map[int]string{},
 		}
 
 		if opts.projFile == "" {
@@ -65,7 +67,7 @@ var FlowCmd = &cobra.Command{
 
 		// sanity flag checks
 		if flagFlowNew {
-			if len(args) < 2 {
+			if len(args) < 3 {
 				return fmt.Errorf("--new requires a name and at least two requests")
 			}
 		}
@@ -78,8 +80,12 @@ var FlowCmd = &cobra.Command{
 			}
 		}
 
+		var flowName string
+		var steps []string
+		var getItem cmdio.AttrKey
+
 		if len(args) == 0 {
-			opts.action = flowActionList
+			opts.action = flowsList
 
 			if len(flagFlowStepRemovals) > 0 {
 				return fmt.Errorf("--remove/-r: step removal requires name of flow to remove from")
@@ -91,12 +97,16 @@ var FlowCmd = &cobra.Command{
 				return fmt.Errorf("--move/-m: step moving requires name of flow to move within")
 			}
 		} else if len(args) == 1 {
+			flowName = args[0]
+
 			if flagFlowDelete {
-				opts.action = flowActionDelete
+				opts.action = flowsDelete
 			} else {
-				opts.action = flowActionShow
+				opts.action = flowsShow
 			}
 		} else {
+			flowName = args[0]
+
 			if len(args) == 2 {
 				if len(flagFlowStepRemovals) > 0 {
 					return fmt.Errorf("--remove/-r: step removal cannot be performed while getting flow step/attribute")
@@ -109,27 +119,102 @@ var FlowCmd = &cobra.Command{
 				}
 			}
 
+			if flagFlowNew {
+				opts.action = flowsNew
+
+				// already checked required arg count for --new above; no need to do so again
+				steps = args[1:]
+			} else {
+				// full arg parsing mode
+				var curKey cmdio.AttrKey
+				var curKeyIsIndex bool
+				var err error
+
+				for i, arg := range args[1:] {
+					if i%2 == 0 {
+						// if even, should be an attribute or a step index.
+
+						curKeyIsIndex = false
+
+						// as a rule, no non-index attribute begins with a
+						// digit, so attempt to parse as an index first.
+						if len(arg) > 0 && arg[0] >= '0' && arg[0] <= '9' {
+							idx, err := strconv.Atoi(arg)
+							if err != nil {
+								return fmt.Errorf("attr/idx #%d: not a valid step index: %w", (i/2)+1, err)
+							}
+
+							curKey = flowStepIndex(idx)
+							curKeyIsIndex = true
+						}
+
+						// if index is not set, it must be an attribute. parse.
+						if !curKeyIsIndex {
+							curKey, err = parseFlowAttrKey(arg)
+							if err != nil {
+								return fmt.Errorf("attr/idx #%d: %w", (i/2)+1, err)
+							}
+						}
+
+						// do "already set" check
+						setTwice := false
+						switch curKey {
+						case flowKeyName:
+							setTwice = opts.newName.set
+						default:
+							// check in the step replacements
+							idx, ok := curKey.(flowStepIndex)
+							if !ok {
+								return fmt.Errorf("attr/idx #%d: unknown attribute %q", (i/2)+1, curKey)
+							}
+							_, setTwice = opts.stepReplacements[int(idx)]
+						}
+
+						if setTwice {
+							return fmt.Errorf("%s is set more than once", curKey.Human())
+						}
+					} else {
+						// if odd, it is a value
+
+						switch curKey {
+						case flowKeyName:
+							opts.newName = optional[string]{set: true, v: arg}
+						default:
+							idx, ok := curKey.(flowStepIndex)
+							if !ok {
+								panic("failed to cast flowStepIndex")
+							}
+							opts.stepReplacements[int(idx)] = arg
+						}
+					}
+				}
+
+				// now that we are done, do an arg-count check and use it to set
+				// action.
+				// doing AFTER parsing so that we can give a betta error message if
+				// missing last value
+				if len(args[1:]) == 1 {
+					// that's fine, we just want to get the one item
+					opts.action = flowsGet
+					getItem = curKey
+				} else if len(args)%2 != 0 {
+					return fmt.Errorf("%s is missing a value", curKey)
+				} else {
+					opts.action = flowsEdit
+				}
+			}
 		}
-		//
-		// * if user puts no args, action is LIST. no args beside -F are allowed.
-		// * if user puts 1 arg, it is flow name. -d and -F is allowed. step mutations are allowed, but not with -d.
-		//    * if -d is present, action is DELETE
-		//    * if step mutations are present, action is EDIT
-		//    * else, action is SHOW
-		// * if user puts 2 args, first is flow name.
-		//    * if 2nd arg is numeric, it is an index.
-		//    * else, it is an attribute name.
-		//    * action is GET ITEM (roll parsing into below)
-		// * if user puts 2 or more args, first is flow name.
-		//    * if --new is set, action is NEW. 2nd, 3rd, and following args are request names
-		//    * else, parse args as edit attrs.
-		//    * if arg count is 1, action is GET ITEM. Otherwise, action is EDIT.
-		//    * if final arg count is odd and > 1, ERROR
 
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
-		return invokeFlowsList(io, opts)
+
+		switch opts.action {
+		case flowsList:
+			return invokeFlowsList(io, opts)
+		default:
+			panic(fmt.Sprintf("unhandled flow action %q", opts.action))
+		}
 	},
 }
 
@@ -172,12 +257,12 @@ func invokeFlowsList(io cmdio.IO, opts flowOptions) error {
 type flowAction int
 
 const (
-	flowActionList flowAction = iota
-	flowActionShow
-	flowActionNew
-	flowActionDelete
-	flowActionGet
-	flowActionEdit
+	flowsList flowAction = iota
+	flowsShow
+	flowsNew
+	flowsDelete
+	flowsGet
+	flowsEdit
 )
 
 // probs overengineered given there is ONE flow attribute other than steps.
@@ -209,6 +294,17 @@ var (
 	}
 )
 
+// custom type for holding referred-to index as an attribute of a flow
+type flowStepIndex int
+
+func (si flowStepIndex) Name() string {
+	return fmt.Sprintf("%d", si)
+}
+
+func (si flowStepIndex) Human() string {
+	return fmt.Sprintf("step %d", si)
+}
+
 func flowAttrKeyNames() []string {
 	names := make([]string, len(flowAttrKeys))
 	for i, k := range flowAttrKeys {
@@ -229,4 +325,7 @@ func parseFlowAttrKey(s string) (flowKey, error) {
 type flowOptions struct {
 	projFile string
 	action   flowAction
+
+	newName          optional[string]
+	stepReplacements map[int]string
 }

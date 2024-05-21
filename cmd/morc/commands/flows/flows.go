@@ -351,107 +351,58 @@ func invokeFlowsEdit(io cmdio.IO, flowName string, opts flowsOptions) error {
 	}
 
 	for _, delIdx := range opts.stepRemovals {
-		if delIdx < 1 || delIdx > len(flow.Steps) {
-			return fmt.Errorf("cannot delete step #%d; it does not exist", delIdx)
+		actualIdx := delIdx
+		if delIdx != -1 {
+			actualIdx--
 		}
-		actualIdx := delIdx - 1
 
-		newSteps := make([]morc.FlowStep, len(flow.Steps)-1)
-		copy(newSteps, flow.Steps[:actualIdx])
-		copy(newSteps[actualIdx:], flow.Steps[actualIdx+1:])
-		flow.Steps = newSteps
+		if err := flow.RemoveStep(actualIdx); err != nil {
+			return fmt.Errorf("cannot remove step #%d: %w", delIdx, err)
+		}
 	}
 
 	for _, add := range opts.stepAdds {
-		if add.index < -1 {
-			return fmt.Errorf("cannot add step at #%d; it does not exist", add.index)
+		actualIdx := add.index
+		if add.index != -1 {
+			actualIdx--
 		}
 
-		if add.index > len(flow.Steps) {
-			add.index = -1
-		}
-
-		// make shore the template exists
+		// make shore the new template exists
 		add.template = strings.ToLower(add.template)
 		if _, exists := p.Templates[add.template]; !exists {
 			return fmt.Errorf("no request template %q in project", add.template)
 		}
 
-		if add.index == -1 {
-			flow.Steps = append(flow.Steps, morc.FlowStep{
-				Template: add.template,
-			})
-		} else {
-			actualIdx := add.index - 1
+		newStep := morc.FlowStep{
+			Template: add.template,
+		}
 
-			newSteps := make([]morc.FlowStep, len(flow.Steps)+1)
-
-			if actualIdx > 0 {
-				copy(newSteps, flow.Steps[:actualIdx])
-			}
-			newSteps[actualIdx] = morc.FlowStep{
-				Template: add.template,
-			}
-			if actualIdx < len(newSteps) {
-				copy(newSteps[actualIdx+1:], flow.Steps[actualIdx:])
-			}
-
-			flow.Steps = newSteps
+		if err := flow.InsertStep(actualIdx, newStep); err != nil {
+			return fmt.Errorf("cannot add step at #%d: %w", add.index, err)
 		}
 	}
 
 	for _, move := range opts.stepMoves {
-		// arg check; is this possible?
-		if move.from < 1 || move.from > len(flow.Steps) {
-			return fmt.Errorf("cannot move step #%d; it does not exist", move.from)
+		actualFrom := move.from
+		actualTo := move.to
+
+		if actualFrom != -1 {
+			actualFrom--
 		}
-		if move.to < -1 {
-			return fmt.Errorf("cannot move step #%[1]d to #%[2]d; #%[2]d does not exist", move.from, move.to)
-		}
-		if move.to > len(flow.Steps) {
-			move.to = -1
+		if actualTo != -1 {
+			actualTo--
 		}
 
-		if move.from != move.to {
-			fromPos := move.from - 1
-
-			moved := flow.Steps[fromPos]
-
-			// first, erase the old to move everyfin from old pos + 1 down by
-			// one.
-			stepsWithoutMoved := make([]morc.FlowStep, len(flow.Steps)-1)
-			copy(stepsWithoutMoved, flow.Steps[:fromPos])
-			copy(stepsWithoutMoved[fromPos:], flow.Steps[fromPos+1:])
-
-			var newSteps []morc.FlowStep
-			if move.to == -1 || move.to-1 == len(stepsWithoutMoved) {
-				// append operation
-				stepsWithoutMoved = append(stepsWithoutMoved, moved)
-				newSteps = stepsWithoutMoved
-			} else {
-				toPos := move.to - 1
-				newSteps = make([]morc.FlowStep, len(stepsWithoutMoved)+1)
-
-				if toPos > 0 {
-					copy(newSteps, stepsWithoutMoved[:toPos])
-				}
-				newSteps[toPos] = moved
-
-				// if swap is at end, there's nothing to move up (toPos+1 will
-				// be invalid)
-
-				if toPos < len(newSteps) {
-					copy(newSteps[toPos+1:], stepsWithoutMoved[toPos:])
-				}
-			}
-
-			flow.Steps = newSteps
+		if err := flow.MoveStep(actualFrom, actualTo); err != nil {
+			return fmt.Errorf("cannot move step #%d to #%d: %w", move.from, move.to)
 		} else {
 			// noChange add.
 		}
 	}
 
 	p.Flows[flow.Name] = flow
+
+	// TODO: output the changes
 
 	return p.PersistToDisk(false)
 }
@@ -482,8 +433,11 @@ func invokeFlowsGet(io cmdio.IO, flowName string, getItem cmdio.AttrKey, opts fl
 		}
 		idx := int(stepIdx)
 
-		if idx < 1 {
-			return fmt.Errorf("%s index must be greater than 0")
+		if idx == -1 {
+			idx = len(flow.Steps) - 1
+			if idx < 0 {
+				idx = 0
+			}
 		}
 
 		if idx >= len(flow.Steps) {

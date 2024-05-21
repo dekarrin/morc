@@ -26,7 +26,7 @@ func init() {
 	FlowCmd.PersistentFlags().BoolVarP(&flagFlowNew, "new", "", false, "Create a new flow with the given name and request steps. If given, arguments to the command are interpreted as the new flow name and the request steps, in order.")
 	FlowCmd.PersistentFlags().IntSliceVarP(&flagFlowStepRemovals, "remove", "r", nil, "Remove the step at index `IDX` from the flow. Can be given multiple times; if so, will be applied from highest to lowest index.")
 	FlowCmd.PersistentFlags().StringArrayVarP(&flagFlowStepAdds, "add", "a", nil, "Add a new step calling request REQ at index IDX, or at the end of current steps if index is omitted. Argument must be a string in form `[IDX]:REQ`. Can be given multiple times; if so, will be applied from lowest to highest index after any removals are applied.")
-	FlowCmd.PersistentFlags().StringArrayVarP(&flagFlowStepMoves, "move", "m", nil, "Move the step at index FROM to index TO. Argument must be a string in form `FROM:TO`. Can be given multiple times; if so, will be applied in order given after any removals and adds are applied.")
+	FlowCmd.PersistentFlags().StringArrayVarP(&flagFlowStepMoves, "move", "m", nil, "Move the step at index FROM to index TO. Argument must be a string in form `FROM:[TO]`. Can be given multiple times; if so, will be applied in order given after any removals and adds are applied. If TO is not given, the step is moved to the end of the flow.")
 
 	FlowCmd.MarkFlagsMutuallyExclusive("delete", "new", "remove")
 	FlowCmd.MarkFlagsMutuallyExclusive("delete", "new", "add")
@@ -45,6 +45,20 @@ var FlowCmd = &cobra.Command{
 	Long:    "Performs operations on the flows defined in the project. By itself, lists out the names of all flows in the project. If given a flow name FLOW with no other arguments, shows the steps in the flow. A new flow can be created by including the --new flag when providing the name of the flow and 2 or more names of requests to be included, in order. A flow can be deleted by passing the -d flag when providing the name of the flow. If a numerical flow step index IDX is provided after the flow name, the name of the req at that step is output. If a non-numerical flow attribute ATTR is provided after the flow name, that attribute is output. If a value is provided after ATTR or IDX, the attribute or step at the given index is updated to the new value. Format for the new value for an ATTR is dependent on the ATTR, and format for the new value for an IDX is the name of the request to call at that step index.\n\nFlow step mutations other than a step replacing an existing one are handled by giving the name of the FLOW and one or more step mutation options. --remove/-r IDX can be used to remove the step at the given index. --add/-a [IDX]:REQ will add a new step at the given index, or at the end if IDX is omitted; double the colon to insert a template whose name begins with a colon at the end of the flow.. --move/-m IDX->IDX will move the step at the first index to the second index; if the new index is higher than the old, all indexes in between move down to accommodate, and if the new index is lower, all other indexes are pushed up to accommodate. Multiple moves, adds, and removes can be given in a single command; all removes are applied from highest to lowest index, then any adds from lowest to highest, then any moves.",
 	Args:    cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		disallowStepMutations := func(reason string) error {
+			if len(flagFlowStepRemovals) > 0 {
+				return fmt.Errorf("--remove/-r: step removal %s", reason)
+			}
+			if len(flagFlowStepAdds) > 0 {
+				return fmt.Errorf("--add/-a: step addition %s", reason)
+			}
+			if len(flagFlowStepMoves) > 0 {
+				return fmt.Errorf("--move/-m: step moving %s", reason)
+			}
+
+			return nil
+		}
+
 		opts := flowsOptions{
 			projFile:         commonflags.ProjectFile,
 			stepReplacements: map[int]string{},
@@ -76,20 +90,17 @@ var FlowCmd = &cobra.Command{
 		if len(args) == 0 {
 			opts.action = flowsList
 
-			if len(flagFlowStepRemovals) > 0 {
-				return fmt.Errorf("--remove/-r: step removal requires name of flow to remove from")
-			}
-			if len(flagFlowStepAdds) > 0 {
-				return fmt.Errorf("--add/-a: step addition requires name of flow to add to")
-			}
-			if len(flagFlowStepMoves) > 0 {
-				return fmt.Errorf("--move/-m: step moving requires name of flow to move within")
+			if err := disallowStepMutations("requires name of flow to modify"); err != nil {
+				return err
 			}
 		} else if len(args) == 1 {
 			flowName = args[0]
 
 			if flagFlowDelete {
 				opts.action = flowsDelete
+			} else if len(flagFlowStepAdds) > 0 || len(flagFlowStepRemovals) > 0 || len(flagFlowStepMoves) > 0 {
+				// we are actually in edit mode due to edit flags specified.
+				opts.action = flowsEdit
 			} else {
 				opts.action = flowsShow
 			}
@@ -97,14 +108,8 @@ var FlowCmd = &cobra.Command{
 			flowName = args[0]
 
 			if len(args) == 2 {
-				if len(flagFlowStepRemovals) > 0 {
-					return fmt.Errorf("--remove/-r: step removal cannot be performed while getting flow step/attribute")
-				}
-				if len(flagFlowStepAdds) > 0 {
-					return fmt.Errorf("--add/-a: step addition cannot be performed while getting flow step/attribute")
-				}
-				if len(flagFlowStepMoves) > 0 {
-					return fmt.Errorf("--move/-m: step moving cannot be performed while getting flow step/attribute")
+				if err := disallowStepMutations("cannot be performed while getting flow step/attribute"); err != nil {
+					return err
 				}
 			}
 
@@ -180,6 +185,107 @@ var FlowCmd = &cobra.Command{
 			}
 		}
 
+		// okay, now bring in step modifications. we should have done enough
+		// checks by now to now that these will only be set when valid so for
+		// the -m, -r, and -a flag parsing below, we just panic if a sanity
+		// check fails
+
+		if len(flagFlowStepRemovals) > 0 {
+			if opts.action != flowsEdit {
+				panic(fmt.Sprintf("should never happen: step removals parsing reached for action %d", opts.action))
+			}
+			opts.stepRemovals = flagFlowStepRemovals
+			sort.Sort(sort.Reverse(sort.IntSlice(opts.stepRemovals)))
+		}
+
+		addsByIndex := map[int][]flowStepAdd{}
+		sortedAddIndexes := []int{}
+
+		if len(flagFlowStepAdds) > 0 {
+			if opts.action != flowsEdit {
+				panic(fmt.Sprintf("should never happen: step adds parsing reached for action %d", opts.action))
+			}
+			for addIdx, step := range flagFlowStepAdds {
+				var add flowStepAdd
+				parts := strings.SplitN(step, ":", 2)
+				if len(parts) == 1 || len(parts) == 2 && parts[0] == "" {
+					add.index = -1
+				} else {
+					var err error
+					add.index, err = strconv.Atoi(parts[0])
+					if err != nil {
+						return fmt.Errorf("add #%d: invalid index %s", addIdx+1, parts[0])
+					}
+				}
+
+				add.template = strings.ToLower(parts[len(parts)-1])
+
+				if addsByIndex[add.index] == nil {
+					addsByIndex[add.index] = []flowStepAdd{}
+					sortedAddIndexes = append(sortedAddIndexes, add.index)
+				}
+
+				addsByIndex[add.index] = append(addsByIndex[add.index], add)
+			}
+
+			sort.Ints(sortedAddIndexes)
+
+			for _, idx := range sortedAddIndexes {
+				// save for last, it is to the end
+				if idx == -1 {
+					continue
+				}
+				opts.stepAdds = append(opts.stepAdds, addsByIndex[idx]...)
+			}
+
+			// now add index -1's
+			if addsByIndex[-1] != nil {
+				opts.stepAdds = append(opts.stepAdds, addsByIndex[-1]...)
+			}
+		}
+
+		if len(flagFlowStepMoves) > 0 {
+			if opts.action != flowsEdit {
+				panic(fmt.Sprintf("should never happen: step moves parsing reached for action %d", opts.action))
+			}
+
+			for moveIdx, move := range flagFlowStepMoves {
+				parts := strings.Split(move, ":")
+				if len(parts) != 2 {
+					// only allowed if TO is omitted, but maybe they forgot the trailing colon. be nice and add it for
+					// them and try again
+					if len(parts) == 1 {
+						parts = strings.Split(move+":", ":")
+					} else {
+						return fmt.Errorf("move #%d: invalid format %q", moveIdx+1, move)
+					}
+				}
+
+				from, err := strconv.Atoi(parts[0])
+				if err != nil {
+					return fmt.Errorf("move #%d: FROM is not a valid step index: %s", moveIdx+1, parts[0])
+				}
+
+				var to int
+				if parts[1] == "" {
+					to = -1
+					// move to end of slice
+				} else {
+					to, err = strconv.Atoi(parts[1])
+					if err != nil {
+						return fmt.Errorf("move #%d: TO is not a valid step index: %s", moveIdx+1, parts[1])
+					}
+
+					if to < 0 {
+						to = -1
+					}
+				}
+
+				opts.stepMoves = append(opts.stepMoves, flowStepMove{from: from, to: to})
+			}
+
+		}
+
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
@@ -244,7 +350,7 @@ func invokeFlowsEdit(io cmdio.IO, flowName string, opts flowsOptions) error {
 		}
 	}
 
-	for _, delIdx := range opts.deletes {
+	for _, delIdx := range opts.stepRemovals {
 		if delIdx < 1 || delIdx > len(flow.Steps) {
 			return fmt.Errorf("cannot delete step #%d; it does not exist", delIdx)
 		}
@@ -256,7 +362,7 @@ func invokeFlowsEdit(io cmdio.IO, flowName string, opts flowsOptions) error {
 		flow.Steps = newSteps
 	}
 
-	for _, add := range opts.adds {
+	for _, add := range opts.stepAdds {
 		if add.index < -1 {
 			return fmt.Errorf("cannot add step at #%d; it does not exist", add.index)
 		}
@@ -286,9 +392,62 @@ func invokeFlowsEdit(io cmdio.IO, flowName string, opts flowsOptions) error {
 			newSteps[actualIdx] = morc.FlowStep{
 				Template: add.template,
 			}
-			copy(newSteps[actualIdx+1:], flow.Steps[actualIdx:])
+			if actualIdx < len(newSteps) {
+				copy(newSteps[actualIdx+1:], flow.Steps[actualIdx:])
+			}
 
 			flow.Steps = newSteps
+		}
+	}
+
+	for _, move := range opts.stepMoves {
+		// arg check; is this possible?
+		if move.from < 1 || move.from > len(flow.Steps) {
+			return fmt.Errorf("cannot move step #%d; it does not exist", move.from)
+		}
+		if move.to < -1 {
+			return fmt.Errorf("cannot move step #%[1]d to #%[2]d; #%[2]d does not exist", move.from, move.to)
+		}
+		if move.to > len(flow.Steps) {
+			move.to = -1
+		}
+
+		if move.from != move.to {
+			fromPos := move.from - 1
+
+			moved := flow.Steps[fromPos]
+
+			// first, erase the old to move everyfin from old pos + 1 down by
+			// one.
+			stepsWithoutMoved := make([]morc.FlowStep, len(flow.Steps)-1)
+			copy(stepsWithoutMoved, flow.Steps[:fromPos])
+			copy(stepsWithoutMoved[fromPos:], flow.Steps[fromPos+1:])
+
+			var newSteps []morc.FlowStep
+			if move.to == -1 || move.to-1 == len(stepsWithoutMoved) {
+				// append operation
+				stepsWithoutMoved = append(stepsWithoutMoved, moved)
+				newSteps = stepsWithoutMoved
+			} else {
+				toPos := move.to - 1
+				newSteps = make([]morc.FlowStep, len(stepsWithoutMoved)+1)
+
+				if toPos > 0 {
+					copy(newSteps, stepsWithoutMoved[:toPos])
+				}
+				newSteps[toPos] = moved
+
+				// if swap is at end, there's nothing to move up (toPos+1 will
+				// be invalid)
+
+				if toPos < len(newSteps) {
+					copy(newSteps[toPos+1:], stepsWithoutMoved[toPos:])
+				}
+			}
+
+			flow.Steps = newSteps
+		} else {
+			// noChange add.
 		}
 	}
 
@@ -554,10 +713,23 @@ func parseFlowAttrKey(s string) (flowKey, error) {
 	}
 }
 
+type flowStepAdd struct {
+	index    int
+	template string
+}
+
+type flowStepMove struct {
+	from int
+	to   int
+}
+
 type flowsOptions struct {
 	projFile string
 	action   flowAction
 
 	newName          optional[string]
 	stepReplacements map[int]string
+	stepAdds         []flowStepAdd
+	stepRemovals     []int
+	stepMoves        []flowStepMove
 }

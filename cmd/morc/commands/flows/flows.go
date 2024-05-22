@@ -329,8 +329,8 @@ func invokeFlowsEdit(io cmdio.IO, flowName string, opts flowsOptions) error {
 		return fmt.Errorf("no flow named %s exists", flowName)
 	}
 
-	modifiedVals := map[cmdio.AttrKey]interface{}{}
-	noChangeVals := map[cmdio.AttrKey]interface{}{}
+	modifiedVals := map[flowKey]interface{}{}
+	noChangeVals := map[flowKey]interface{}{}
 
 	if opts.newName.set {
 		newNameLower := strings.ToLower(opts.newName.v)
@@ -356,9 +356,19 @@ func invokeFlowsEdit(io cmdio.IO, flowName string, opts flowsOptions) error {
 			actualIdx--
 		}
 
+		var removedTemplateName string
+		if actualIdx >= 0 && actualIdx < len(flow.Steps) {
+			removedTemplateName = flow.Steps[actualIdx].Template
+		}
+
 		if err := flow.RemoveStep(actualIdx); err != nil {
 			return fmt.Errorf("cannot remove step #%d: %w", delIdx, err)
 		}
+
+		if removedTemplateName == "" {
+			removedTemplateName = `""`
+		}
+		modifiedVals[flowKey{stepIndex: delIdx}] = fmt.Sprintf("<REMOVED: %s>", removedTemplateName) 
 	}
 
 	for _, add := range opts.stepAdds {
@@ -380,6 +390,12 @@ func invokeFlowsEdit(io cmdio.IO, flowName string, opts flowsOptions) error {
 		if err := flow.InsertStep(actualIdx, newStep); err != nil {
 			return fmt.Errorf("cannot add step at #%d: %w", add.index, err)
 		}
+
+		tmplName := add.template
+		if tmplName == "" {
+			tmplName = `""`
+		}
+		modifiedVals[flowKey{stepIndex: add.index}] = fmt.Sprintf("<INSERTED: %s>", tmplName),
 	}
 
 	for _, move := range opts.stepMoves {

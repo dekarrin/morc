@@ -1,4 +1,4 @@
-package flows
+package commands
 
 import (
 	"fmt"
@@ -22,19 +22,21 @@ var (
 )
 
 func init() {
-	FlowCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
-	FlowCmd.PersistentFlags().BoolVarP(&flagFlowDelete, "delete", "d", false, "Delete the flow with the given name. Can only be used when flow name is also given.")
-	FlowCmd.PersistentFlags().BoolVarP(&flagFlowNew, "new", "", false, "Create a new flow with the given name and request steps. If given, arguments to the command are interpreted as the new flow name and the request steps, in order.")
-	FlowCmd.PersistentFlags().IntSliceVarP(&flagFlowStepRemovals, "remove", "r", nil, "Remove the step at index `IDX` from the flow. Can be given multiple times; if so, will be applied from highest to lowest index. Will be applied after all step replacements are applied.")
-	FlowCmd.PersistentFlags().StringArrayVarP(&flagFlowStepAdds, "add", "a", nil, "Add a new step calling request REQ at index IDX, or at the end of current steps if index is omitted. Argument must be a string in form `[IDX]:REQ`. Can be given multiple times; if so, will be applied from lowest to highest index after all replacements and removals are applied.")
-	FlowCmd.PersistentFlags().StringArrayVarP(&flagFlowStepMoves, "move", "m", nil, "Move the step at index FROM to index TO. Argument must be a string in form `FROM:[TO]`. Can be given multiple times; if so, will be applied in order given after all replacements, removals, and adds are applied. If TO is not given, the step is moved to the end of the flow.")
+	flowCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+	flowCmd.PersistentFlags().BoolVarP(&flagFlowDelete, "delete", "d", false, "Delete the flow with the given name. Can only be used when flow name is also given.")
+	flowCmd.PersistentFlags().BoolVarP(&flagFlowNew, "new", "", false, "Create a new flow with the given name and request steps. If given, arguments to the command are interpreted as the new flow name and the request steps, in order.")
+	flowCmd.PersistentFlags().IntSliceVarP(&flagFlowStepRemovals, "remove", "r", nil, "Remove the step at index `IDX` from the flow. Can be given multiple times; if so, will be applied from highest to lowest index. Will be applied after all step replacements are applied.")
+	flowCmd.PersistentFlags().StringArrayVarP(&flagFlowStepAdds, "add", "a", nil, "Add a new step calling request REQ at index IDX, or at the end of current steps if index is omitted. Argument must be a string in form `[IDX]:REQ`. Can be given multiple times; if so, will be applied from lowest to highest index after all replacements and removals are applied.")
+	flowCmd.PersistentFlags().StringArrayVarP(&flagFlowStepMoves, "move", "m", nil, "Move the step at index FROM to index TO. Argument must be a string in form `FROM:[TO]`. Can be given multiple times; if so, will be applied in order given after all replacements, removals, and adds are applied. If TO is not given, the step is moved to the end of the flow.")
 
-	FlowCmd.MarkFlagsMutuallyExclusive("delete", "new", "remove")
-	FlowCmd.MarkFlagsMutuallyExclusive("delete", "new", "add")
-	FlowCmd.MarkFlagsMutuallyExclusive("delete", "new", "move")
+	flowCmd.MarkFlagsMutuallyExclusive("delete", "new", "remove")
+	flowCmd.MarkFlagsMutuallyExclusive("delete", "new", "add")
+	flowCmd.MarkFlagsMutuallyExclusive("delete", "new", "move")
+
+	rootCmd.AddCommand(flowCmd)
 }
 
-var FlowCmd = &cobra.Command{
+var flowCmd = &cobra.Command{
 	Use: "flows [-F FILE]\n" +
 		"flows FLOW --new REQ1 REQ2 [REQN]... [-F FILE]\n" +
 		"flows FLOW [-F FILE]\n" +
@@ -315,11 +317,6 @@ var FlowCmd = &cobra.Command{
 			panic(fmt.Sprintf("unhandled flow action %q", opts.action))
 		}
 	},
-}
-
-type optional[E any] struct {
-	set bool
-	v   E
 }
 
 func invokeFlowsDelete(io cmdio.IO, name string, opts flowsOptions) error {

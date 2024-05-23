@@ -4,13 +4,11 @@ import "fmt"
 
 // Remove removes the item at the given index. If the index does not exist, an
 // error is returned. -1 denotes the element at the end of the list.
-func sliceRemove[E any](sl []E, index int) ([]E, error) {
-	if index == -1 {
-		index = len(sl) - 1
-	}
-
-	if index < -1 || index >= len(sl) {
-		return sl, fmt.Errorf("index does not exist")
+func Remove[E any](sl []E, index int) ([]E, error) {
+	var err error
+	index, err = RealIndex(sl, index, false)
+	if err != nil {
+		return sl, fmt.Errorf("index %w", err)
 	}
 
 	if len(sl) == 1 {
@@ -29,19 +27,22 @@ func sliceRemove[E any](sl []E, index int) ([]E, error) {
 // Insert inserts the given item at the given index. If the index is larger than
 // possible or -1, the item is inserted at the end of the list via append. All
 // items at list.Items[index] are moved up by one to make room for the new item.
-func sliceInsert[E any](sl []E, index int, item E) ([]E, error) {
-	if index == -1 {
-		index = len(sl)
+func Insert[E any](sl []E, index int, item E) ([]E, error) {
+
+	// for insertion we actually get real index as though the slice were one
+	// item larger, so make the updated slice first so we can check against it.
+	updated := make([]E, len(sl)+1)
+	var err error
+	index, err = RealIndex(updated, index, true)
+	if err != nil {
+		return sl, fmt.Errorf("index %w", err)
 	}
 
-	if index < -1 {
-		return sl, fmt.Errorf("index does not exist")
-	}
+	// if we are inserting at the end, just append
 	if index >= len(sl) {
 		sl = append(sl, item)
 		return sl, nil
 	}
-	updated := make([]E, len(sl)+1)
 
 	copy(updated, sl[:index])
 	updated[index] = item
@@ -58,25 +59,24 @@ func sliceInsert[E any](sl []E, index int, item E) ([]E, error) {
 // error is returned. If to is negative or greater than allowed index, the item
 // is moved to the end of the list.
 func Move[E any](sl []E, from, to int) ([]E, error) {
-	if from < 0 || from >= len(sl) {
-		return sl, fmt.Errorf("from-index does not exist")
+	var err error
+	from, err = RealIndex(sl, from, false)
+	if err != nil {
+		return sl, fmt.Errorf("from-index %w", err)
 	}
-	if to < -1 {
-		return sl, fmt.Errorf("to-index does not exist")
-	}
-	if to == -1 || to >= len(sl) {
-		to = len(sl) - 1
+	to, err = RealIndex(sl, to, true)
+	if err != nil {
+		return sl, fmt.Errorf("to-index %w", err)
 	}
 
 	moved := sl[from]
 
-	var err error
-	sl, err = sliceRemove(sl, from)
+	sl, err = Remove(sl, from)
 	if err != nil {
 		return sl, err
 	}
 
-	return sliceInsert(sl, to, moved)
+	return Insert(sl, to, moved)
 }
 
 // RealIndex returns the given index if it is valid. If the index is -1, it is
@@ -86,8 +86,28 @@ func Move[E any](sl []E, from, to int) ([]E, error) {
 // error is returned. If a valid index is not possible, an error is returned. If
 // the returned error is nil, the returned index is guaranteed to be able to be
 // used in sl without panicking in its current state. Not thread-safe.
+//
+// Even if an error is returned, the index at its last value is also returned,
+// which informs what the actual index was at the time the error was discoverd.
 func RealIndex[E any](sl []E, idx int, clampMax bool) (int, error) {
-	if idx == -1 {
-
+	if len(sl) == 0 {
+		return idx, fmt.Errorf("does not exist")
 	}
+
+	if idx == -1 {
+		idx = len(sl) - 1
+	}
+
+	if idx < 0 {
+		return idx, fmt.Errorf("does not exist")
+	}
+
+	if idx >= len(sl) {
+		if clampMax {
+			return len(sl) - 1, nil
+		}
+		return idx, fmt.Errorf("does not exist")
+	}
+
+	return idx, nil
 }

@@ -143,14 +143,16 @@ var FlowCmd = &cobra.Command{
 						// do "already set" check
 						setTwice := false
 
-						switch curKey.name {
-						case "":
+						if curKey.isStepIndex() {
 							idx := curKey.stepIndex
 							_, setTwice = seenReplacements[idx]
-						case flowKeyName.name:
-							setTwice = opts.newName.set
-						default:
-							return fmt.Errorf("attr/idx #%d: unknown attribute %q", (i/2)+1, curKey)
+						} else {
+							switch curKey.name {
+							case flowKeyName.name:
+								setTwice = opts.newName.set
+							default:
+								return fmt.Errorf("attr/idx #%d: unknown attribute %q", (i/2)+1, curKey)
+							}
 						}
 
 						if setTwice {
@@ -159,15 +161,17 @@ var FlowCmd = &cobra.Command{
 					} else {
 						// if odd, it is a value
 
-						switch curKey.name {
-						case "":
+						if curKey.isStepIndex() {
 							idx := curKey.stepIndex
 							seenReplacements[idx] = struct{}{}
 							opts.stepReplacements = append(opts.stepReplacements, flowStepUpsert{index: idx, template: arg})
-						case flowKeyName.name:
-							opts.newName = optional[string]{set: true, v: arg}
-						default:
-							panic(fmt.Sprintf("unhandled flow key %q", curKey))
+						} else {
+							switch curKey.name {
+							case flowKeyName.name:
+								opts.newName = optional[string]{set: true, v: arg}
+							default:
+								panic(fmt.Sprintf("unhandled flow key %q", curKey))
+							}
 						}
 					}
 				}
@@ -181,7 +185,7 @@ var FlowCmd = &cobra.Command{
 					opts.action = flowsGet
 					getItem = curKey
 				} else if len(args)%2 != 0 {
-					return fmt.Errorf("%s is missing a value", curKey)
+					return fmt.Errorf("%s is missing a value", curKey.Name())
 				} else {
 					opts.action = flowsEdit
 				}
@@ -318,6 +322,33 @@ type optional[E any] struct {
 	v   E
 }
 
+func invokeFlowsDelete(io cmdio.IO, name string, opts flowsOptions) error {
+	// load the project file
+	p, err := morc.LoadProjectFromDisk(opts.projFile, false)
+	if err != nil {
+		return err
+	}
+
+	// case doesn't matter for flow names
+	name = strings.ToLower(name)
+
+	if _, ok := p.Flows[name]; !ok {
+		return fmt.Errorf("no flow named %s", name)
+	}
+
+	delete(p.Flows, name)
+
+	// save the project file
+	err = p.PersistToDisk(false)
+	if err != nil {
+		return err
+	}
+
+	io.PrintLoudf("Deleted flow %s\n", name)
+
+	return nil
+}
+
 func invokeFlowsEdit(io cmdio.IO, flowName string, opts flowsOptions) error {
 	// load the project file
 	p, err := morc.LoadProjectFromDisk(opts.projFile, false)
@@ -441,7 +472,7 @@ func invokeFlowsEdit(io cmdio.IO, flowName string, opts flowsOptions) error {
 		}
 		actualTo, err := flowStepIndexFromOrdinal(flow, move.to, true)
 		if err != nil {
-			return fmt.Errorf("cannot move step #%d to #%d: destination %w", actualFrom, actualTo, err)
+			return fmt.Errorf("cannot move step #%d to #%d: destination %w", actualFrom+1, actualTo, err)
 		}
 
 		modKey := flowKey{stepIndex: actualFrom + 1, uniqueInt: stepOpCount}
@@ -449,13 +480,13 @@ func invokeFlowsEdit(io cmdio.IO, flowName string, opts flowsOptions) error {
 
 		if actualFrom != actualTo {
 			if err := flow.MoveStep(actualFrom, actualTo); err != nil {
-				return fmt.Errorf("cannot move step #%d to #%d: %w", actualFrom, actualTo)
+				return fmt.Errorf("cannot move step #%d to #%d: %w", actualFrom+1, actualTo+1, err)
 			}
 
 			// always assume that the move is valid
 			modifiedVals[modKey] = fmt.Sprintf("<MOVED TO #%d>", move.to)
 		} else {
-			noChangeVals[modKey] = fmt.Sprintf("<NO-OP MOVE>")
+			noChangeVals[modKey] = "<NO-OP MOVE>"
 		}
 		attrOrdering = append(attrOrdering, modKey)
 	}
@@ -667,9 +698,11 @@ var (
 
 // Human prints the human-readable description of the key.
 func (fk flowKey) Human() string {
-	switch fk.name {
-	case "":
+	if fk.isStepIndex() {
 		return fmt.Sprintf("step %d", fk.stepIndex)
+	}
+
+	switch fk.name {
 	case flowKeyName.name:
 		return "flow name"
 	default:
@@ -678,10 +711,10 @@ func (fk flowKey) Human() string {
 }
 
 func (fk flowKey) Name() string {
-	if fk.name != "" {
-		return string(fk.name)
-	} else {
+	if fk.isStepIndex() {
 		return fmt.Sprintf("%d", fk.stepIndex)
+	} else {
+		return string(fk.name)
 	}
 }
 
@@ -705,7 +738,7 @@ func parseFlowAttrKey(s string) (flowKey, error) {
 	if len(s) > 0 && s[0] >= '0' && s[0] <= '9' {
 		idx, err := strconv.Atoi(s)
 		if err != nil {
-			return flowKey{}, fmt.Errorf("must be a step index or one of %s", s, strings.Join(flowAttrKeyNames(), ", "))
+			return flowKey{}, fmt.Errorf("must be a step index or one of %s", strings.Join(flowAttrKeyNames(), ", "))
 		}
 
 		return flowKey{stepIndex: idx}, nil
@@ -715,7 +748,7 @@ func parseFlowAttrKey(s string) (flowKey, error) {
 	case flowKeyName.Name():
 		return flowKeyName, nil
 	default:
-		return flowKey{}, fmt.Errorf("must be a step index or one of %s", s, strings.Join(flowAttrKeyNames(), ", "))
+		return flowKey{}, fmt.Errorf("must be a step index or one of %s", strings.Join(flowAttrKeyNames(), ", "))
 	}
 }
 

@@ -17,13 +17,29 @@ func Test_Flows_New(t *testing.T) {
 		name               string
 		p                  morc.Project
 		args               []string // DO NOT INCLUDE -F; it is automatically set to a project file
-		expectErr          string   // set if command.Execute expected to fail, with a string that would be in the error message
-		expectStderrOutput string   // set with expected output to stderr
-		expectOutput       string   // set with expected output to stdout
+		expectP            morc.Project
+		expectErr          string // set if command.Execute expected to fail, with a string that would be in the error message
+		expectStderrOutput string // set with expected output to stderr
+		expectOutput       string // set with expected output to stdout
 	}{
 		{
 			name: "happy path - 2 requests",
 			p: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"req1": {Name: "req1", Method: "GET", URL: "https://example.com"},
+					"req2": {Name: "req2", Method: "POST", URL: "https://example.com"},
+				},
+			},
+			expectP: morc.Project{
+				Flows: map[string]morc.Flow{
+					"test": {
+						Name: "test",
+						Steps: []morc.FlowStep{
+							{Template: "req1"},
+							{Template: "req2"},
+						},
+					},
+				},
 				Templates: map[string]morc.RequestTemplate{
 					"req1": {Name: "req1", Method: "GET", URL: "https://example.com"},
 					"req2": {Name: "req2", Method: "POST", URL: "https://example.com"},
@@ -43,6 +59,23 @@ func Test_Flows_New(t *testing.T) {
 			},
 			args:         []string{"flows", "test", "req1", "req2", "req3", "--new"},
 			expectOutput: "Created new flow test with 3 steps\n",
+			expectP: morc.Project{
+				Flows: map[string]morc.Flow{
+					"test": {
+						Name: "test",
+						Steps: []morc.FlowStep{
+							{Template: "req1"},
+							{Template: "req2"},
+							{Template: "req3"},
+						},
+					},
+				},
+				Templates: map[string]morc.RequestTemplate{
+					"req1": {Name: "req1", Method: "GET", URL: "https://example.com"},
+					"req2": {Name: "req2", Method: "POST", URL: "https://example.com"},
+					"req3": {Name: "req3", Method: "PATCH", URL: "https://example.com"},
+				},
+			},
 		},
 		{
 			name: "need more than 1 request",
@@ -62,9 +95,9 @@ func Test_Flows_New(t *testing.T) {
 			assert := assert.New(t)
 
 			// create project and dump config to a temp dir
-			projTestDir := createTestProjectFiles(t, tc.p)
+			projFilePath := createTestProjectFiles(t, tc.p)
 			// set up the root command and run
-			output, outputErr, err := runTestCommand(flowsCmd, projTestDir, tc.args)
+			output, outputErr, err := runTestCommand(flowsCmd, projFilePath, tc.args)
 
 			// assert and check stdout and stderr
 			if err != nil {
@@ -74,14 +107,26 @@ func Test_Flows_New(t *testing.T) {
 				}
 				if !strings.Contains(err.Error(), tc.expectErr) {
 					t.Fatalf("expected returned error to contain %q, got %q", tc.expectErr, err)
-					return
 				}
+				return
+			}
+
+			// reload the project and make sure it matches the expected project
+			updatedProj, err := morc.LoadProjectFromDisk(projFilePath, true)
+			if err != nil {
+				t.Fatalf("error loading project post execution: %v", err)
+				return
 			}
 
 			// okay, check stdout and stderr
 
 			assert.Equal(tc.expectOutput, output)
 			assert.Equal(tc.expectStderrOutput, outputErr)
+
+			// ignore the project file path
+			tc.expectP.Config.ProjFile = ""
+			updatedProj.Config.ProjFile = ""
+			assert.Equal(tc.expectP, updatedProj)
 		})
 	}
 
@@ -396,6 +441,14 @@ func createTestProjectFiles(t *testing.T, p morc.Project) string {
 	dir := t.TempDir()
 	projFilePath := filepath.Join(dir, "project.json")
 	f, err := os.Create(projFilePath)
+	if err != nil {
+		t.Fatal(err)
+		return ""
+	}
+
+	// set the proj file path in project at this point or there will be issues
+	// on persistence
+	p.Config.ProjFile, err = filepath.Abs(projFilePath)
 	if err != nil {
 		t.Fatal(err)
 		return ""

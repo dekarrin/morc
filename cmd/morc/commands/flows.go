@@ -570,6 +570,10 @@ func invokeFlowsNew(io cmdio.IO, name string, templates []string, opts flowsOpti
 		Steps: steps,
 	}
 
+	if p.Flows == nil {
+		p.Flows = map[string]morc.Flow{}
+	}
+
 	p.Flows[name] = flow
 
 	// save the project file

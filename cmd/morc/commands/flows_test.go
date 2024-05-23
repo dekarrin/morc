@@ -12,6 +12,81 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func Test_Flows_New(t *testing.T) {
+	testCases := []struct {
+		name               string
+		p                  morc.Project
+		args               []string // DO NOT INCLUDE -F; it is automatically set to a project file
+		expectErr          string   // set if command.Execute expected to fail, with a string that would be in the error message
+		expectStderrOutput string   // set with expected output to stderr
+		expectOutput       string   // set with expected output to stdout
+	}{
+		{
+			name: "happy path - 2 requests",
+			p: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"req1": {Name: "req1", Method: "GET", URL: "https://example.com"},
+					"req2": {Name: "req2", Method: "POST", URL: "https://example.com"},
+				},
+			},
+			args:         []string{"flows", "--new", "test", "req1", "req2"},
+			expectOutput: "Created new flow test with 2 steps\n",
+		},
+		{
+			name: "happy path - 3 requests",
+			p: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"req1": {Name: "req1", Method: "GET", URL: "https://example.com"},
+					"req2": {Name: "req2", Method: "POST", URL: "https://example.com"},
+					"req3": {Name: "req3", Method: "PATCH", URL: "https://example.com"},
+				},
+			},
+			args:         []string{"flows", "test", "req1", "req2", "req3", "--new"},
+			expectOutput: "Created new flow test with 3 steps\n",
+		},
+		{
+			name: "need more than 1 request",
+			p: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"req1": {Name: "req1", Method: "GET", URL: "https://example.com"},
+					"req2": {Name: "req2", Method: "POST", URL: "https://example.com"},
+				},
+			},
+			args:      []string{"flows", "--new", "test", "req1"},
+			expectErr: "--new requires a name and at least two requests",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			// create project and dump config to a temp dir
+			projTestDir := createTestProjectFiles(t, tc.p)
+			// set up the root command and run
+			output, outputErr, err := runTestCommand(flowsCmd, projTestDir, tc.args)
+
+			// assert and check stdout and stderr
+			if err != nil {
+				if tc.expectErr == "" {
+					t.Fatalf("unexpected returned error: %v", err)
+					return
+				}
+				if !strings.Contains(err.Error(), tc.expectErr) {
+					t.Fatalf("expected returned error to contain %q, got %q", tc.expectErr, err)
+					return
+				}
+			}
+
+			// okay, check stdout and stderr
+
+			assert.Equal(tc.expectOutput, output)
+			assert.Equal(tc.expectStderrOutput, outputErr)
+		})
+	}
+
+}
+
 func Test_Flows_Show(t *testing.T) {
 	testCases := []struct {
 		name               string

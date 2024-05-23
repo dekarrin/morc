@@ -330,7 +330,7 @@ func invokeFlowsDelete(io cmdio.IO, name string, opts flowsOptions) error {
 	name = strings.ToLower(name)
 
 	if _, ok := p.Flows[name]; !ok {
-		return fmt.Errorf("no flow named %s", name)
+		return morc.NewFlowNotFoundError(name)
 	}
 
 	delete(p.Flows, name)
@@ -357,7 +357,7 @@ func invokeFlowsEdit(io cmdio.IO, flowName string, opts flowsOptions) error {
 	flowName = strings.ToLower(flowName)
 	flow, ok := p.Flows[flowName]
 	if !ok {
-		return fmt.Errorf("no flow named %s exists", flowName)
+		return morc.NewFlowNotFoundError(flowName)
 	}
 
 	modifiedVals := map[flowKey]interface{}{}
@@ -511,7 +511,7 @@ func invokeFlowsGet(io cmdio.IO, flowName string, getItem flowKey, opts flowsOpt
 	flowName = strings.ToUpper(flowName)
 	flow, ok := p.Flows[flowName]
 	if !ok {
-		return fmt.Errorf("no flow named %s exists", flowName)
+		return morc.NewFlowNotFoundError(flowName)
 	}
 
 	switch getItem {
@@ -549,7 +549,7 @@ func invokeFlowsNew(io cmdio.IO, name string, templates []string, opts flowsOpti
 
 	// check if the project already has a flow with the same name
 	if _, exists := p.Flows[name]; exists {
-		return fmt.Errorf("flow %s already exists in project", name)
+		return morc.NewFlowExistsError(name)
 	}
 
 	// check that each of the templates exist and create the flow steps
@@ -595,7 +595,7 @@ func invokeFlowsShow(io cmdio.IO, name string, opts flowsOptions) error {
 
 	flow, ok := p.Flows[name]
 	if !ok {
-		return fmt.Errorf("no flow named %s exists", name)
+		return morc.NewFlowNotFoundError(name)
 	}
 
 	if len(flow.Steps) == 0 {

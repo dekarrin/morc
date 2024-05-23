@@ -508,7 +508,7 @@ func invokeFlowsGet(io cmdio.IO, flowName string, getItem flowKey, opts flowsOpt
 
 	// case doesn't matter for flow names
 
-	flowName = strings.ToUpper(flowName)
+	flowName = strings.ToLower(flowName)
 	flow, ok := p.Flows[flowName]
 	if !ok {
 		return morc.NewFlowNotFoundError(flowName)
@@ -519,19 +519,16 @@ func invokeFlowsGet(io cmdio.IO, flowName string, getItem flowKey, opts flowsOpt
 		io.Printf("%s\n", flow.Name)
 	default:
 		idx := getItem.stepIndex
-
-		if idx == -1 {
-			idx = len(flow.Steps) - 1
-			if idx < 0 {
-				idx = 0
-			}
+		idx, err = flowStepIndexFromOrdinal(flow, idx, false)
+		if err != nil {
+			return fmt.Errorf("cannot get step #%d: %w", getItem.stepIndex, err)
 		}
 
 		if idx >= len(flow.Steps) {
 			return fmt.Errorf("%d doesn't exist; highest step index in %s is %d", idx, flow.Name, len(flow.Steps)-1)
 		}
 
-		io.Printf("%s\n", flow.Steps[idx])
+		io.Printf("%s\n", flow.Steps[idx].Template)
 	}
 
 	return nil
@@ -781,8 +778,13 @@ func flowStepIndexFromOrdinal(flow morc.Flow, idx int, autoClampMax bool) (int, 
 
 	// TODO: horribly messy to refer to steps by number but actually store them by index. this tool is for engineers; we know it's 0-based.
 
+	if idx == 0 {
+		// never valid; no 0th value for ordinals
+		return 0, fmt.Errorf("does not exist")
+	}
+
 	if idx != -1 {
-		return sliceops.RealIndex(flow.Steps, idx, autoClampMax)
+		return sliceops.RealIndex(flow.Steps, idx-1, autoClampMax)
 	}
 	return sliceops.RealIndex(flow.Steps, idx, autoClampMax)
 }

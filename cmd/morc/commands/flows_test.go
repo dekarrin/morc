@@ -25,29 +25,105 @@ func Test_Flows_Show(t *testing.T) {
 			name:      "flow not present",
 			p:         morc.Project{},
 			args:      []string{"flows", "test"},
-			expectErr: "no flow named test exists",
+			expectErr: "no flow named test exists in project",
 		},
 		{
 			name:      "flow is explicitly blank",
 			p:         morc.Project{},
 			args:      []string{"flows", ""},
-			expectErr: "no flow named \"\" exists",
+			expectErr: "no flow named \"\" exists in project",
 		},
-		// {
-		// 	name: "flow is present",
-		// 	p: morc.Project{
-		// 		Flows: map[string]morc.Flow{
-		// 			"test": {
-		// 				Name: "Test",
-		// 				Steps: []morc.FlowStep{
-		// 					{Template: "req1"},
-		// 				},
-		// 			},
-		// 		},
-		// 	},
-		// 	args:            []string{"flows", "test"},
-		// 	expectErrOutput: "no flow named test",
-		// },
+		{
+			name: "flow is present - no steps",
+			p: morc.Project{
+				Flows: map[string]morc.Flow{
+					"test": {
+						Name: "test",
+					},
+				},
+			},
+			args:         []string{"flows", "test"},
+			expectOutput: "(no steps in flow)\n",
+		},
+		{
+			name: "flow is present - one step is missing",
+			p: morc.Project{
+				Flows: map[string]morc.Flow{
+					"test": {
+						Name: "test",
+						Steps: []morc.FlowStep{
+							{Template: "req1"},
+							{Template: "req2"},
+						},
+					},
+				},
+				Templates: map[string]morc.RequestTemplate{
+					"req1": {
+						Name:   "req1",
+						Method: "GET",
+						URL:    "https://example.com",
+					},
+				},
+			},
+			args:         []string{"flows", "test"},
+			expectOutput: "1: req1 (GET https://example.com)\n2:! req2 (!non-existent req)\n",
+		},
+		{
+			name: "flow is present - one step is unsendable",
+			p: morc.Project{
+				Flows: map[string]morc.Flow{
+					"test": {
+						Name: "test",
+						Steps: []morc.FlowStep{
+							{Template: "req1"},
+							{Template: "req2"},
+						},
+					},
+				},
+				Templates: map[string]morc.RequestTemplate{
+					"req1": {
+						Name:   "req1",
+						Method: "",
+						URL:    "https://example.com",
+					},
+					"req2": {
+						Name:   "req2",
+						Method: "POST",
+						URL:    "https://example.com",
+					},
+				},
+			},
+			args:         []string{"flows", "test"},
+			expectOutput: "1:! req1 (??? https://example.com)\n2: req2 (POST https://example.com)\n",
+		},
+		{
+			name: "flow is present - all steps are valid",
+			p: morc.Project{
+				Flows: map[string]morc.Flow{
+					"test": {
+						Name: "test",
+						Steps: []morc.FlowStep{
+							{Template: "req1"},
+							{Template: "req2"},
+						},
+					},
+				},
+				Templates: map[string]morc.RequestTemplate{
+					"req1": {
+						Name:   "req1",
+						Method: "GET",
+						URL:    "https://example.com",
+					},
+					"req2": {
+						Name:   "req2",
+						Method: "POST",
+						URL:    "https://example.com",
+					},
+				},
+			},
+			args:         []string{"flows", "test"},
+			expectOutput: "1: req1 (GET https://example.com)\n2: req2 (POST https://example.com)\n",
+		},
 	}
 
 	for _, tc := range testCases {

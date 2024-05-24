@@ -18,8 +18,14 @@ const (
 	testRequestBaseName = "req"
 )
 
-func testRequestName(n int) string {
+func testReq(n int) string {
 	return fmt.Sprintf(testRequestBaseName+"%d", n)
+}
+
+func testProject_nRequests(n int) morc.Project {
+	return morc.Project{
+		Templates: testRequestsN(n),
+	}
 }
 
 func testProject_singleFlowWithNSteps(n int) morc.Project {
@@ -62,7 +68,7 @@ func testRequestsN(n int) map[string]morc.RequestTemplate {
 		}
 
 		tmpl := morc.RequestTemplate{
-			Name:   testRequestName(i + 1),
+			Name:   testReq(i + 1),
 			Method: methods[i%len(methods)],
 			URL:    "https://example.com",
 		}
@@ -85,7 +91,7 @@ func testFlows_singleFlowWithNameAndSequence(name string, reqNums ...int) map[st
 
 	for i, req := range reqNums {
 		fl.Steps[i] = morc.FlowStep{
-			Template: testRequestName(req),
+			Template: testReq(req),
 		}
 	}
 
@@ -281,13 +287,13 @@ func Test_Flows_Get(t *testing.T) {
 			name:               "get first request",
 			args:               []string{"flows", testFlowName, "1"},
 			p:                  testProject_singleFlowWithNSteps(2),
-			expectStdoutOutput: testRequestName(1) + "\n",
+			expectStdoutOutput: testReq(1) + "\n",
 		},
 		{
 			name:               "get second request",
 			args:               []string{"flows", testFlowName, "2"},
 			p:                  testProject_singleFlowWithNSteps(2),
-			expectStdoutOutput: testRequestName(2) + "\n",
+			expectStdoutOutput: testReq(2) + "\n",
 		},
 		{
 			name:               "get name",
@@ -353,77 +359,31 @@ func Test_Flows_Get(t *testing.T) {
 func Test_Flows_New(t *testing.T) {
 	testCases := []struct {
 		name               string
-		p                  morc.Project
 		args               []string // DO NOT INCLUDE -F; it is automatically set to a project file
+		p                  morc.Project
 		expectP            morc.Project
 		expectErr          string // set if command.Execute expected to fail, with a string that would be in the error message
 		expectStderrOutput string // set with expected output to stderr
-		expectOutput       string // set with expected output to stdout
+		expectStdoutOutput string // set with expected output to stdout
 	}{
 		{
-			name: "happy path - 2 requests",
-			p: morc.Project{
-				Templates: map[string]morc.RequestTemplate{
-					"req1": {Name: "req1", Method: "GET", URL: "https://example.com"},
-					"req2": {Name: "req2", Method: "POST", URL: "https://example.com"},
-				},
-			},
-			expectP: morc.Project{
-				Flows: map[string]morc.Flow{
-					"test": {
-						Name: "test",
-						Steps: []morc.FlowStep{
-							{Template: "req1"},
-							{Template: "req2"},
-						},
-					},
-				},
-				Templates: map[string]morc.RequestTemplate{
-					"req1": {Name: "req1", Method: "GET", URL: "https://example.com"},
-					"req2": {Name: "req2", Method: "POST", URL: "https://example.com"},
-				},
-			},
-			args:         []string{"flows", "--new", "test", "req1", "req2"},
-			expectOutput: "Created new flow test with 2 steps\n",
+			name:               "happy path - 2 requests",
+			args:               []string{"flows", "--new", "test", "req1", "req2"},
+			p:                  testProject_nRequests(2),
+			expectP:            testProject_singleFlowWithSequence(1, 2),
+			expectStdoutOutput: "Created new flow test with 2 steps\n",
 		},
 		{
-			name: "happy path - 3 requests",
-			p: morc.Project{
-				Templates: map[string]morc.RequestTemplate{
-					"req1": {Name: "req1", Method: "GET", URL: "https://example.com"},
-					"req2": {Name: "req2", Method: "POST", URL: "https://example.com"},
-					"req3": {Name: "req3", Method: "PATCH", URL: "https://example.com"},
-				},
-			},
-			args:         []string{"flows", "test", "req1", "req2", "req3", "--new"},
-			expectOutput: "Created new flow test with 3 steps\n",
-			expectP: morc.Project{
-				Flows: map[string]morc.Flow{
-					"test": {
-						Name: "test",
-						Steps: []morc.FlowStep{
-							{Template: "req1"},
-							{Template: "req2"},
-							{Template: "req3"},
-						},
-					},
-				},
-				Templates: map[string]morc.RequestTemplate{
-					"req1": {Name: "req1", Method: "GET", URL: "https://example.com"},
-					"req2": {Name: "req2", Method: "POST", URL: "https://example.com"},
-					"req3": {Name: "req3", Method: "PATCH", URL: "https://example.com"},
-				},
-			},
+			name:               "happy path - 3 requests",
+			args:               []string{"flows", "test", "req1", "req2", "req3", "--new"},
+			p:                  testProject_nRequests(3),
+			expectP:            testProject_singleFlowWithNSteps(3),
+			expectStdoutOutput: "Created new flow test with 3 steps\n",
 		},
 		{
-			name: "need more than 1 request",
-			p: morc.Project{
-				Templates: map[string]morc.RequestTemplate{
-					"req1": {Name: "req1", Method: "GET", URL: "https://example.com"},
-					"req2": {Name: "req2", Method: "POST", URL: "https://example.com"},
-				},
-			},
+			name:      "need more than 1 request",
 			args:      []string{"flows", "--new", "test", "req1"},
+			p:         testProject_nRequests(2),
 			expectErr: "--new requires a name and at least two requests",
 		},
 	}
@@ -460,7 +420,7 @@ func Test_Flows_New(t *testing.T) {
 
 			// okay, check stdout and stderr
 
-			assert.Equal(tc.expectOutput, output)
+			assert.Equal(tc.expectStdoutOutput, output)
 			assert.Equal(tc.expectStderrOutput, outputErr)
 
 			// ignore the project file path
@@ -475,114 +435,64 @@ func Test_Flows_New(t *testing.T) {
 func Test_Flows_Show(t *testing.T) {
 	testCases := []struct {
 		name               string
-		p                  morc.Project
 		args               []string // DO NOT INCLUDE -F; it is automatically set to a project file
-		expectErr          string   // set if command.Execute expected to fail, with a string that would be in the error message
-		expectStderrOutput string   // set with expected output to stderr
-		expectOutput       string   // set with expected output to stdout
+		p                  morc.Project
+		expectErr          string // set if command.Execute expected to fail, with a string that would be in the error message
+		expectStderrOutput string // set with expected output to stderr
+		expectStdoutOutput string // set with expected output to stdout
 	}{
 		{
 			name:      "flow not present",
-			p:         morc.Project{},
 			args:      []string{"flows", "test"},
+			p:         morc.Project{},
 			expectErr: "no flow named test exists in project",
 		},
 		{
 			name:      "flow is explicitly blank",
-			p:         morc.Project{},
 			args:      []string{"flows", ""},
+			p:         morc.Project{},
 			expectErr: "no flow named \"\" exists in project",
 		},
 		{
-			name: "flow is present - no steps",
-			p: morc.Project{
-				Flows: map[string]morc.Flow{
-					"test": {
-						Name: "test",
-					},
-				},
-			},
-			args:         []string{"flows", "test"},
-			expectOutput: "(no steps in flow)\n",
+			name:               "flow is present - no steps",
+			args:               []string{"flows", "test"},
+			p:                  testProject_singleFlowWithNSteps(0),
+			expectStdoutOutput: "(no steps in flow)\n",
 		},
 		{
 			name: "flow is present - one step is missing",
+			args: []string{"flows", "test"},
 			p: morc.Project{
-				Flows: map[string]morc.Flow{
-					"test": {
-						Name: "test",
-						Steps: []morc.FlowStep{
-							{Template: "req1"},
-							{Template: "req2"},
-						},
-					},
-				},
-				Templates: map[string]morc.RequestTemplate{
-					"req1": {
-						Name:   "req1",
-						Method: "GET",
-						URL:    "https://example.com",
-					},
-				},
+				Flows:     testFlows_singleFlowWithNSteps(2),
+				Templates: testRequestsN(1),
 			},
-			args:         []string{"flows", "test"},
-			expectOutput: "1: req1 (GET https://example.com)\n2:! req2 (!non-existent req)\n",
+			expectStdoutOutput: "1: req1 (GET https://example.com)\n2:! req2 (!non-existent req)\n",
 		},
 		{
 			name: "flow is present - one step is unsendable",
+			args: []string{"flows", "test"},
 			p: morc.Project{
-				Flows: map[string]morc.Flow{
-					"test": {
-						Name: "test",
-						Steps: []morc.FlowStep{
-							{Template: "req1"},
-							{Template: "req2"},
-						},
-					},
-				},
+				Flows: testFlows_singleFlowWithNSteps(2),
 				Templates: map[string]morc.RequestTemplate{
-					"req1": {
-						Name:   "req1",
+					testReq(1): {
+						Name:   testReq(1),
 						Method: "",
 						URL:    "https://example.com",
 					},
-					"req2": {
-						Name:   "req2",
+					testReq(2): {
+						Name:   testReq(2),
 						Method: "POST",
 						URL:    "https://example.com",
 					},
 				},
 			},
-			args:         []string{"flows", "test"},
-			expectOutput: "1:! req1 (??? https://example.com)\n2: req2 (POST https://example.com)\n",
+			expectStdoutOutput: "1:! req1 (??? https://example.com)\n2: req2 (POST https://example.com)\n",
 		},
 		{
-			name: "flow is present - all steps are valid",
-			p: morc.Project{
-				Flows: map[string]morc.Flow{
-					"test": {
-						Name: "test",
-						Steps: []morc.FlowStep{
-							{Template: "req1"},
-							{Template: "req2"},
-						},
-					},
-				},
-				Templates: map[string]morc.RequestTemplate{
-					"req1": {
-						Name:   "req1",
-						Method: "GET",
-						URL:    "https://example.com",
-					},
-					"req2": {
-						Name:   "req2",
-						Method: "POST",
-						URL:    "https://example.com",
-					},
-				},
-			},
-			args:         []string{"flows", "test"},
-			expectOutput: "1: req1 (GET https://example.com)\n2: req2 (POST https://example.com)\n",
+			name:               "flow is present - all steps are valid",
+			args:               []string{"flows", "test"},
+			p:                  testProject_singleFlowWithNSteps(2),
+			expectStdoutOutput: "1: req1 (GET https://example.com)\n2: req2 (POST https://example.com)\n",
 		},
 	}
 
@@ -611,7 +521,7 @@ func Test_Flows_Show(t *testing.T) {
 
 			// okay, check stdout and stderr
 
-			assert.Equal(tc.expectOutput, output)
+			assert.Equal(tc.expectStdoutOutput, output)
 			assert.Equal(tc.expectStderrOutput, outputErr)
 		})
 	}
@@ -621,117 +531,54 @@ func Test_Flows_Show(t *testing.T) {
 func Test_Flows_List(t *testing.T) {
 	testCases := []struct {
 		name               string
-		p                  morc.Project
 		args               []string // DO NOT INCLUDE -F; it is automatically set to a project file
-		expectErr          string   // set if command.Execute expected to fail, with a string that would be in the error message
-		expectStderrOutput string   // set with expected output to stderr
-		expectOutput       string   // set with expected output to stdout
+		p                  morc.Project
+		expectErr          string // set if command.Execute expected to fail, with a string that would be in the error message
+		expectStderrOutput string // set with expected output to stderr
+		expectStdoutOutput string // set with expected output to stdout
 	}{
 		{
-			name:         "no flows present - empty project",
-			p:            morc.Project{},
-			args:         []string{"flows"},
-			expectOutput: "(none)\n",
+			name:               "no flows present - empty project",
+			args:               []string{"flows"},
+			p:                  morc.Project{},
+			expectStdoutOutput: "(none)\n",
 		},
 		{
-			name: "no flows present - empty Flows",
-			p: morc.Project{
-				Flows: map[string]morc.Flow{},
-			},
-			args:         []string{"flows"},
-			expectOutput: "(none)\n",
+			name:               "no flows present - empty Flows",
+			args:               []string{"flows"},
+			p:                  morc.Project{Flows: map[string]morc.Flow{}},
+			expectStdoutOutput: "(none)\n",
 		},
 		{
-			name: "one flow present - no steps",
-			p: morc.Project{
-				Flows: map[string]morc.Flow{
-					"test": {
-						Name: "test",
-					},
-				},
-			},
-			args:         []string{"flows"},
-			expectOutput: "test:! 0 requests\n",
+			name:               "one flow present - no steps",
+			args:               []string{"flows"},
+			p:                  testProject_singleFlowWithNSteps(0),
+			expectStdoutOutput: "test:! 0 requests\n",
 		},
 		{
-			name: "one flow present - valid",
-			p: morc.Project{
-				Flows: map[string]morc.Flow{
-					"test": {
-						Name: "test",
-						Steps: []morc.FlowStep{
-							{
-								Template: "req1",
-							},
-						},
-					},
-				},
-				Templates: map[string]morc.RequestTemplate{
-					"req1": {
-						Name:   "req1",
-						Method: "GET",
-						URL:    "https://example.com",
-					},
-				},
-			},
-			args:         []string{"flows"},
-			expectOutput: "test: 1 request\n",
+			name:               "one flow present - 1 step, valid",
+			args:               []string{"flows"},
+			p:                  testProject_singleFlowWithNSteps(1),
+			expectStdoutOutput: "test: 1 request\n",
 		},
 		{
-			name: "3 flows present - valid",
-			p: morc.Project{
-				Flows: map[string]morc.Flow{
-					"test": {
-						Name: "test",
-						Steps: []morc.FlowStep{
-							{Template: "req1"},
-							{Template: "req2"},
-							{Template: "req3"},
-						},
-					},
-				},
-				Templates: map[string]morc.RequestTemplate{
-					"req1": {
-						Name:   "req1",
-						Method: "GET",
-						URL:    "https://example.com",
-					},
-					"req2": {
-						Name:   "req2",
-						Method: "GET",
-						URL:    "https://example.com",
-					},
-					"req3": {
-						Name:   "req3",
-						Method: "GET",
-						URL:    "https://example.com",
-					},
-				},
-			},
-			args:         []string{"flows"},
-			expectOutput: "test: 3 requests\n",
+			name:               "1 flow present - 3 steps, valid",
+			args:               []string{"flows"},
+			p:                  testProject_singleFlowWithNSteps(3),
+			expectStdoutOutput: "test: 3 requests\n",
 		},
 		{
 			name: "one flow present - req not sendable",
+			args: []string{"flows"},
 			p: morc.Project{
-				Flows: map[string]morc.Flow{
-					"test": {
-						Name: "test",
-						Steps: []morc.FlowStep{
-							{
-								Template: "req1",
-							},
-						},
-					},
-				},
+				Flows: testFlows_singleFlowWithNSteps(1),
 				Templates: map[string]morc.RequestTemplate{
-					"req1": {
-						Name: "req1",
+					testReq(1): {
+						Name: testReq(1),
 					},
 				},
 			},
-			args:         []string{"flows"},
-			expectOutput: "test:! 1 request\n",
+			expectStdoutOutput: "test:! 1 request\n",
 		},
 	}
 
@@ -760,7 +607,7 @@ func Test_Flows_List(t *testing.T) {
 
 			// okay, check stdout and stderr
 
-			assert.Equal(tc.expectOutput, output)
+			assert.Equal(tc.expectStdoutOutput, output)
 			assert.Equal(tc.expectStderrOutput, outputErr)
 		})
 	}

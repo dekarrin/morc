@@ -30,89 +30,56 @@ func Test_Flows_Edit(t *testing.T) {
 	}{
 		{
 			name:               "set name",
-			args:               []string{"flows", testFlowName, "name", "nepeta"},
+			args:               []string{"flows", "test", "name", "nepeta"},
 			p:                  testProject_singleFlowWithNSteps(2),
 			expectP:            testProject_singleFlowWithNameAndNSteps("nepeta", 2),
 			expectStdoutOutput: "Set flow name to nepeta\n",
 		},
 		{
 			name:               "replace 2nd step",
-			args:               []string{"flows", testFlowName, "2", "req1"},
+			args:               []string{"flows", "test", "2", "req1"},
 			p:                  testProject_singleFlowWithSequence(1, 2, 3),
 			expectP:            testProject_singleFlowWithSequence(1, 1, 3),
 			expectStdoutOutput: "Set step #2 to req1\n",
 		},
 		{
 			name:               "replace no-op",
-			args:               []string{"flows", testFlowName, "2", "req2"},
+			args:               []string{"flows", "test", "2", "req2"},
 			p:                  testProject_singleFlowWithNSteps(3),
 			expectP:            testProject_singleFlowWithNSteps(3),
 			expectStderrOutput: "No change to step #2; already set to req2\n",
 		},
 		{
 			name:               "add at start",
-			args:               []string{"flows", testFlowName, "-a", "1:req2"},
+			args:               []string{"flows", "test", "-a", "1:req2"},
 			p:                  testProject_singleFlowWithNSteps(3),
 			expectP:            testProject_3Requests_singleFlowWithSequence(2, 1, 2, 3),
 			expectStdoutOutput: "Set step #1 to req2 (added)\n",
 		},
-		// {
-		// 	name: "add at end (implied position)",
-		// 	p: morc.Project{
-		// 		Flows: map[string]morc.Flow{
-		// 			"test": {
-		// 				Name: "test",
-		// 				Steps: []morc.FlowStep{
-		// 					{Template: "req1"},
-		// 					{Template: "req2"},
-		// 					{Template: "req3"},
-		// 				},
-		// 			},
-		// 		},
-		// 		Templates: map[string]morc.RequestTemplate{
-		// 			"req1": {Name: "req1", Method: "GET", URL: "https://example.com"},
-		// 			"req2": {Name: "req2", Method: "POST", URL: "https://example.com"},
-		// 			"req3": {Name: "req2", Method: "POST", URL: "https://example.com"},
-		// 		},
-		// 	},
-		// 	args: []string{"flows", "test", "-a", "req2"},
-		// 	expectP: morc.Project{
-		// 		Flows: map[string]morc.Flow{
-		// 			"test": {
-		// 				Name: "test",
-		// 				Steps: []morc.FlowStep{
-		// 					{Template: "req1"},
-		// 					{Template: "req2"},
-		// 					{Template: "req3"},
-		// 					{Template: "req2"},
-		// 				},
-		// 			},
-		// 		},
-		// 		Templates: map[string]morc.RequestTemplate{
-		// 			"req1": {Name: "req1", Method: "GET", URL: "https://example.com"},
-		// 			"req2": {Name: "req2", Method: "POST", URL: "https://example.com"},
-		// 			"req3": {Name: "req3", Method: "POST", URL: "https://example.com"},
-		// 		},
-		// 	},
-		// 	expectOutput: "Set step #4 to req2 (added)\n",
-		// },
+		{
+			name:               "add at end (implied position)",
+			args:               []string{"flows", "test", "-a", "req2"},
+			p:                  testProject_singleFlowWithNSteps(3),
+			expectP:            testProject_3Requests_singleFlowWithSequence(1, 2, 3, 2),
+			expectStdoutOutput: "Set step #4 to req2 (added)\n",
+		},
 		{
 			name:               "move first to third",
-			args:               []string{"flows", testFlowName, "-m", "1:3"},
+			args:               []string{"flows", "test", "-m", "1:3"},
 			p:                  testProject_singleFlowWithNSteps(3),
 			expectP:            testProject_singleFlowWithSequence(2, 3, 1),
 			expectStdoutOutput: "Set step #1 to position #3\n",
 		},
 		{
 			name:               "move second to end",
-			args:               []string{"flows", testFlowName, "-m", "2:"},
+			args:               []string{"flows", "test", "-m", "2:"},
 			p:                  testProject_singleFlowWithNSteps(3),
 			expectP:            testProject_singleFlowWithSequence(1, 3, 2),
 			expectStdoutOutput: "Set step #2 to position #3\n",
 		},
 		{
 			name:               "move third to first",
-			args:               []string{"flows", testFlowName, "-m", "3:1"},
+			args:               []string{"flows", "test", "-m", "3:1"},
 			p:                  testProject_singleFlowWithNSteps(3),
 			expectP:            testProject_singleFlowWithSequence(3, 1, 2),
 			expectStdoutOutput: "Set step #3 to position #1\n",

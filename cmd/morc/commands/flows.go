@@ -433,6 +433,10 @@ func invokeFlowsEdit(io cmdio.IO, flowName string, opts flowsOptions) error {
 	}
 
 	for _, add := range opts.stepAdds {
+		// apply step index conversion as if flows were one bigger to allow for
+		// one-past end.
+		proposedFlow := 
+
 		actualIdx, err := flowStepIndexFromOrdinal(flow, add.index, true)
 		if err != nil {
 			return fmt.Errorf("cannot add step at #%d: %w", actualIdx, err)

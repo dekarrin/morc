@@ -186,7 +186,7 @@ var flowsCmd = &cobra.Command{
 					// that's fine, we just want to get the one item
 					opts.action = flowsGet
 					getItem = curKey
-				} else if len(args)%2 != 0 {
+				} else if len(args[1:])%2 != 0 {
 					return fmt.Errorf("%s is missing a value", curKey.Name())
 				} else {
 					opts.action = flowsEdit
@@ -428,7 +428,7 @@ func invokeFlowsEdit(io cmdio.IO, flowName string, opts flowsOptions) error {
 		}
 		modKey := flowKey{stepIndex: actualIdx + 1, uniqueInt: stepOpCount}
 		stepOpCount++
-		modifiedVals[modKey] = fmt.Sprintf("<REMOVED: %s>", removedTemplateName)
+		modifiedVals[modKey] = fmt.Sprintf("no longer exist; was %s (removed)", removedTemplateName)
 		attrOrdering = append(attrOrdering, modKey)
 	}
 
@@ -458,7 +458,7 @@ func invokeFlowsEdit(io cmdio.IO, flowName string, opts flowsOptions) error {
 		}
 		modKey := flowKey{stepIndex: actualIdx + 1, uniqueInt: stepOpCount}
 		stepOpCount++
-		modifiedVals[modKey] = fmt.Sprintf("<INSERTED: %s>", tmplName)
+		modifiedVals[modKey] = fmt.Sprintf("%s (added)", tmplName)
 		attrOrdering = append(attrOrdering, modKey)
 	}
 
@@ -481,9 +481,9 @@ func invokeFlowsEdit(io cmdio.IO, flowName string, opts flowsOptions) error {
 			}
 
 			// always assume that the move is valid
-			modifiedVals[modKey] = fmt.Sprintf("<MOVED TO #%d>", move.to)
+			modifiedVals[modKey] = fmt.Sprintf("position #%d", actualTo+1)
 		} else {
-			noChangeVals[modKey] = "<NO-OP MOVE>"
+			noChangeVals[modKey] = fmt.Sprintf("position #%d", actualFrom+1)
 		}
 		attrOrdering = append(attrOrdering, modKey)
 	}
@@ -697,7 +697,7 @@ var (
 // Human prints the human-readable description of the key.
 func (fk flowKey) Human() string {
 	if fk.isStepIndex() {
-		return fmt.Sprintf("step %d", fk.stepIndex)
+		return fmt.Sprintf("step #%d", fk.stepIndex)
 	}
 
 	switch fk.name {

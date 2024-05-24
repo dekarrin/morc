@@ -142,7 +142,7 @@ var capsCmd = &cobra.Command{
 					// that's fine, we just want to get the one item
 					opts.action = capsGet
 					getItem = curKey
-				} else if len(args)%2 != 0 {
+				} else if len(args[2:])%2 != 0 {
 					return fmt.Errorf("%s is missing a value", curKey)
 				} else {
 					opts.action = capsEdit

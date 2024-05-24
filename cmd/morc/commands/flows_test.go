@@ -18,105 +18,6 @@ const (
 	testRequestBaseName = "req"
 )
 
-func testReq(n int) string {
-	return fmt.Sprintf(testRequestBaseName+"%d", n)
-}
-
-func testProject_nRequests(n int) morc.Project {
-	return morc.Project{
-		Templates: testRequestsN(n),
-	}
-}
-
-func testProject_singleFlowWithNSteps(n int) morc.Project {
-	return morc.Project{
-		Flows:     testFlows_singleFlowWithNSteps(n),
-		Templates: testRequestsN(n),
-	}
-}
-
-func testProject_singleFlowWithNameAndNSteps(name string, n int) morc.Project {
-	return morc.Project{
-		Flows:     testFlows_singleFlowWithNameAndNSteps(name, n),
-		Templates: testRequestsN(n),
-	}
-}
-
-func testProject_3Requests_singleFlowWithSequence(reqNums ...int) morc.Project {
-	return morc.Project{
-		Flows:     testFlows_singleFlowWithSequence(reqNums...),
-		Templates: testRequestsN(3),
-	}
-}
-
-func testProject_singleFlowWithSequence(reqNums ...int) morc.Project {
-	return morc.Project{
-		Flows:     testFlows_singleFlowWithSequence(reqNums...),
-		Templates: testRequestsN(len(reqNums)),
-	}
-}
-
-func testRequestsN(n int) map[string]morc.RequestTemplate {
-	methods := []string{"GET", "POST", "PATCH", "DELETE", "PUT"}
-	urlAppend := 0
-
-	reqs := make(map[string]morc.RequestTemplate)
-
-	for i := 0; i < n; i++ {
-		if i > 0 && i%len(methods) == 0 {
-			urlAppend++
-		}
-
-		tmpl := morc.RequestTemplate{
-			Name:   testReq(i + 1),
-			Method: methods[i%len(methods)],
-			URL:    "https://example.com",
-		}
-
-		if urlAppend > 0 {
-			tmpl.URL += fmt.Sprintf("/%d", urlAppend)
-		}
-
-		reqs[tmpl.Name] = tmpl
-	}
-
-	return reqs
-}
-
-func testFlows_singleFlowWithNameAndSequence(name string, reqNums ...int) map[string]morc.Flow {
-	fl := morc.Flow{
-		Name:  name,
-		Steps: make([]morc.FlowStep, len(reqNums)),
-	}
-
-	for i, req := range reqNums {
-		fl.Steps[i] = morc.FlowStep{
-			Template: testReq(req),
-		}
-	}
-
-	return map[string]morc.Flow{
-		strings.ToLower(name): fl,
-	}
-}
-
-func testFlows_singleFlowWithNameAndNSteps(name string, n int) map[string]morc.Flow {
-	sequence := make([]int, n)
-	for i := 0; i < n; i++ {
-		sequence[i] = i + 1
-	}
-
-	return testFlows_singleFlowWithNameAndSequence(name, sequence...)
-}
-
-func testFlows_singleFlowWithNSteps(n int) map[string]morc.Flow {
-	return testFlows_singleFlowWithNameAndNSteps(testFlowName, n)
-}
-
-func testFlows_singleFlowWithSequence(reqNums ...int) map[string]morc.Flow {
-	return testFlows_singleFlowWithNameAndSequence(testFlowName, reqNums...)
-}
-
 func Test_Flows_Edit(t *testing.T) {
 	testCases := []struct {
 		name               string
@@ -659,4 +560,103 @@ func createTestProjectFiles(t *testing.T, p morc.Project) string {
 	defer f.Close()
 
 	return projFilePath
+}
+
+func testReq(n int) string {
+	return fmt.Sprintf(testRequestBaseName+"%d", n)
+}
+
+func testProject_nRequests(n int) morc.Project {
+	return morc.Project{
+		Templates: testRequestsN(n),
+	}
+}
+
+func testProject_singleFlowWithNSteps(n int) morc.Project {
+	return morc.Project{
+		Flows:     testFlows_singleFlowWithNSteps(n),
+		Templates: testRequestsN(n),
+	}
+}
+
+func testProject_singleFlowWithNameAndNSteps(name string, n int) morc.Project {
+	return morc.Project{
+		Flows:     testFlows_singleFlowWithNameAndNSteps(name, n),
+		Templates: testRequestsN(n),
+	}
+}
+
+func testProject_3Requests_singleFlowWithSequence(reqNums ...int) morc.Project {
+	return morc.Project{
+		Flows:     testFlows_singleFlowWithSequence(reqNums...),
+		Templates: testRequestsN(3),
+	}
+}
+
+func testProject_singleFlowWithSequence(reqNums ...int) morc.Project {
+	return morc.Project{
+		Flows:     testFlows_singleFlowWithSequence(reqNums...),
+		Templates: testRequestsN(len(reqNums)),
+	}
+}
+
+func testRequestsN(n int) map[string]morc.RequestTemplate {
+	methods := []string{"GET", "POST", "PATCH", "DELETE", "PUT"}
+	urlAppend := 0
+
+	reqs := make(map[string]morc.RequestTemplate)
+
+	for i := 0; i < n; i++ {
+		if i > 0 && i%len(methods) == 0 {
+			urlAppend++
+		}
+
+		tmpl := morc.RequestTemplate{
+			Name:   testReq(i + 1),
+			Method: methods[i%len(methods)],
+			URL:    "https://example.com",
+		}
+
+		if urlAppend > 0 {
+			tmpl.URL += fmt.Sprintf("/%d", urlAppend)
+		}
+
+		reqs[tmpl.Name] = tmpl
+	}
+
+	return reqs
+}
+
+func testFlows_singleFlowWithNameAndSequence(name string, reqNums ...int) map[string]morc.Flow {
+	fl := morc.Flow{
+		Name:  name,
+		Steps: make([]morc.FlowStep, len(reqNums)),
+	}
+
+	for i, req := range reqNums {
+		fl.Steps[i] = morc.FlowStep{
+			Template: testReq(req),
+		}
+	}
+
+	return map[string]morc.Flow{
+		strings.ToLower(name): fl,
+	}
+}
+
+func testFlows_singleFlowWithNameAndNSteps(name string, n int) map[string]morc.Flow {
+	sequence := make([]int, n)
+	for i := 0; i < n; i++ {
+		sequence[i] = i + 1
+	}
+
+	return testFlows_singleFlowWithNameAndSequence(name, sequence...)
+}
+
+func testFlows_singleFlowWithNSteps(n int) map[string]morc.Flow {
+	return testFlows_singleFlowWithNameAndNSteps(testFlowName, n)
+}
+
+func testFlows_singleFlowWithSequence(reqNums ...int) map[string]morc.Flow {
+	return testFlows_singleFlowWithNameAndSequence(testFlowName, reqNums...)
 }

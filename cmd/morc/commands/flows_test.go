@@ -19,6 +19,88 @@ const (
 	testRequestBaseName = "req"
 )
 
+func Test_Flows_Delete(t *testing.T) {
+	testCases := []struct {
+		name               string
+		args               []string // DO NOT INCLUDE -F; it is automatically set to a project file
+		p                  morc.Project
+		expectP            morc.Project
+		expectErr          string // set if command.Execute expected to fail, with a string that would be in the error message
+		expectStderrOutput string // set with expected output to stderr
+		expectStdoutOutput string // set with expected output to stdout
+	}{
+		{
+			name:      "no flows present - empty project",
+			args:      []string{"flows", "test", "-d"},
+			p:         morc.Project{},
+			expectErr: "no flow named test exists",
+		},
+		{
+			name:      "no flows present - empty Flows",
+			args:      []string{"flows", "test", "-d"},
+			p:         morc.Project{Flows: map[string]morc.Flow{}},
+			expectErr: "no flow named test exists",
+		},
+		{
+			name:      "delete needs 2 args",
+			args:      []string{"flows", "-d"},
+			p:         testProject_singleFlowWithNSteps(3),
+			expectErr: "-d requires a flow name",
+		},
+		{
+			name: "normal delete",
+			args: []string{"flows", "test", "-d"},
+			p:    testProject_singleFlowWithNSteps(3),
+			expectP: morc.Project{
+				Flows:     map[string]morc.Flow{},
+				Templates: testRequestsN(3),
+			},
+			expectStdoutOutput: "Deleted flow test\n",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+			resetFlowsFlags()
+
+			// create project and dump config to a temp dir
+			projFilePath := createTestProjectFiles(t, tc.p)
+			// set up the root command and run
+			output, outputErr, err := runTestCommand(flowsCmd, projFilePath, tc.args)
+
+			// assert and check stdout and stderr
+			if err != nil {
+				if tc.expectErr == "" {
+					t.Fatalf("unexpected returned error: %v", err)
+					return
+				}
+				if !strings.Contains(err.Error(), tc.expectErr) {
+					t.Fatalf("expected returned error to contain %q, got %q", tc.expectErr, err)
+				}
+				return
+			}
+
+			// reload the project and make sure it matches the expected project
+			updatedProj, err := morc.LoadProjectFromDisk(projFilePath, true)
+			if err != nil {
+				t.Fatalf("error loading project post execution: %v", err)
+				return
+			}
+
+			// okay, check stdout and stderr
+
+			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
+			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
+
+			// ignore the project file path
+			tc.expectP.Config.ProjFile = ""
+			updatedProj.Config.ProjFile = ""
+			assert.Equal(tc.expectP, updatedProj, "resulting project does not match expected")
+		})
+	}
+}
+
 func Test_Flows_Edit(t *testing.T) {
 	testCases := []struct {
 		name               string

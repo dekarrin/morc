@@ -10,6 +10,7 @@ import (
 
 	"github.com/dekarrin/morc"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -207,6 +208,7 @@ func Test_Flows_Get(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
+			resetFlowsFlags()
 
 			// create project and dump config to a temp dir
 			projFilePath := createTestProjectFiles(t, tc.p)
@@ -280,7 +282,6 @@ func Test_Flows_New(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
-
 			resetFlowsFlags()
 
 			// create project and dump config to a temp dir
@@ -388,7 +389,6 @@ func Test_Flows_Show(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
-
 			resetFlowsFlags()
 
 			// create project and dump config to a temp dir
@@ -474,7 +474,6 @@ func Test_Flows_List(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
-
 			resetFlowsFlags()
 
 			// create project and dump config to a temp dir
@@ -508,6 +507,10 @@ func resetFlowsFlags() {
 	flagFlowStepRemovals = nil
 	flagFlowStepAdds = nil
 	flagFlowStepMoves = nil
+
+	flowsCmd.Flags().VisitAll(func(fl *pflag.Flag) {
+		fl.Changed = false
+	})
 }
 
 // DO NOT INCLUDE -F IN args!!! It is added automatically from projFilePath

@@ -64,6 +64,27 @@ func Test_Flows_Edit(t *testing.T) {
 			expectStdoutOutput: "Set step #4 to req2 (added)\n",
 		},
 		{
+			name:               "add at end (explicit position)",
+			args:               []string{"flows", "test", "-a", "4:req2"},
+			p:                  testProject_singleFlowWithNSteps(3),
+			expectP:            testProject_3Requests_singleFlowWithSequence(1, 2, 3, 2),
+			expectStdoutOutput: "Set step #4 to req2 (added)\n",
+		},
+		{
+			name:               "remove from start",
+			args:               []string{"flows", "test", "-r", "1"},
+			p:                  testProject_singleFlowWithNSteps(3),
+			expectP:            testProject_3Requests_singleFlowWithSequence(2, 3),
+			expectStdoutOutput: "Set step #1 to no longer exist; was req1 (removed)\n",
+		},
+		{
+			name:               "remove from end",
+			args:               []string{"flows", "test", "-r", "3"},
+			p:                  testProject_singleFlowWithNSteps(3),
+			expectP:            testProject_3Requests_singleFlowWithSequence(1, 2),
+			expectStdoutOutput: "Set step #3 to no longer exist; was req3 (removed)\n",
+		},
+		{
 			name:               "move first to third",
 			args:               []string{"flows", "test", "-m", "1:3"},
 			p:                  testProject_singleFlowWithNSteps(3),

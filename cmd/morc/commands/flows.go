@@ -392,7 +392,7 @@ func invokeFlowsEdit(io cmdio.IO, flowName string, opts flowsOptions) error {
 		newVal := strings.ToLower(upsert.template)
 
 		var err error
-		idx, err = flowStepIndexFromOrdinal(flow, idx, false)
+		idx, err = flowStepIndexFromOrdinal(flow.Steps, idx, false)
 		if err != nil {
 			return fmt.Errorf("cannot set value of step #%d: %w", idx+1, err)
 		}
@@ -412,7 +412,7 @@ func invokeFlowsEdit(io cmdio.IO, flowName string, opts flowsOptions) error {
 	}
 
 	for _, delIdx := range opts.stepRemovals {
-		actualIdx, err := flowStepIndexFromOrdinal(flow, delIdx, false)
+		actualIdx, err := flowStepIndexFromOrdinal(flow.Steps, delIdx, false)
 		if err != nil {
 			return fmt.Errorf("cannot remove step #%d: %w", actualIdx, err)
 		}
@@ -434,10 +434,10 @@ func invokeFlowsEdit(io cmdio.IO, flowName string, opts flowsOptions) error {
 
 	for _, add := range opts.stepAdds {
 		// apply step index conversion as if flows were one bigger to allow for
-		// one-past end.
-		proposedFlow := 
+		// one-past end
 
-		actualIdx, err := flowStepIndexFromOrdinal(flow, add.index, true)
+		updatedSteps := make([]morc.FlowStep, len(flow.Steps)+1)
+		actualIdx, err := flowStepIndexFromOrdinal(updatedSteps, add.index, true)
 		if err != nil {
 			return fmt.Errorf("cannot add step at #%d: %w", actualIdx, err)
 		}
@@ -467,11 +467,11 @@ func invokeFlowsEdit(io cmdio.IO, flowName string, opts flowsOptions) error {
 	}
 
 	for _, move := range opts.stepMoves {
-		actualFrom, err := flowStepIndexFromOrdinal(flow, move.from, false)
+		actualFrom, err := flowStepIndexFromOrdinal(flow.Steps, move.from, false)
 		if err != nil {
 			return fmt.Errorf("cannot move step #%d: step %w", actualFrom, err)
 		}
-		actualTo, err := flowStepIndexFromOrdinal(flow, move.to, true)
+		actualTo, err := flowStepIndexFromOrdinal(flow.Steps, move.to, true)
 		if err != nil {
 			return fmt.Errorf("cannot move step #%d to #%d: destination %w", actualFrom+1, actualTo, err)
 		}
@@ -523,7 +523,7 @@ func invokeFlowsGet(io cmdio.IO, flowName string, getItem flowKey, opts flowsOpt
 		io.Printf("%s\n", flow.Name)
 	default:
 		idx := getItem.stepIndex
-		idx, err = flowStepIndexFromOrdinal(flow, idx, false)
+		idx, err = flowStepIndexFromOrdinal(flow.Steps, idx, false)
 		if err != nil {
 			return fmt.Errorf("cannot get step #%d: %w", getItem.stepIndex, err)
 		}
@@ -775,7 +775,7 @@ type flowsOptions struct {
 	stepMoves        []flowStepMove
 }
 
-func flowStepIndexFromOrdinal(flow morc.Flow, idx int, autoClampMax bool) (int, error) {
+func flowStepIndexFromOrdinal(steps []morc.FlowStep, idx int, autoClampMax bool) (int, error) {
 	// basically, we will decrement (unless the sigil value -1) and then feed to
 	// sliceops func that will translate -1's. If the index cannot be translated
 	// to a valid index, we will return an error.
@@ -788,7 +788,7 @@ func flowStepIndexFromOrdinal(flow morc.Flow, idx int, autoClampMax bool) (int, 
 	}
 
 	if idx != -1 {
-		return sliceops.RealIndex(flow.Steps, idx-1, autoClampMax)
+		return sliceops.RealIndex(steps, idx-1, autoClampMax)
 	}
-	return sliceops.RealIndex(flow.Steps, idx, autoClampMax)
+	return sliceops.RealIndex(steps, idx, autoClampMax)
 }

@@ -34,6 +34,13 @@ func init() {
 	projCmd.PersistentFlags().StringVarP(&flagProjRecordCookies, "cookies", "c", "", "Set whether cookie recording is enabled. `ON|OFF` must be one of 'ON' or 'OFF'. Setting this is equivalent to calling 'morc cookies --on' or 'morc cookies --off'")
 	projCmd.PersistentFlags().StringVarP(&flagProjRecordHistory, "history", "R", "", "Set whether history recording is enabled. `ON|OFF` must be one of 'ON' or 'OFF'. Setting this is equivalent to calling 'morc history --on' or 'morc history --off'")
 
+	projCmd.MarkFlagsMutuallyExclusive("new", "get")
+	projCmd.MarkFlagsMutuallyExclusive("cookies", "get")
+	projCmd.MarkFlagsMutuallyExclusive("cookie-lifetime", "get")
+	projCmd.MarkFlagsMutuallyExclusive("history", "get")
+	projCmd.MarkFlagsMutuallyExclusive("history-file", "get")
+	projCmd.MarkFlagsMutuallyExclusive("cookies-file", "get")
+
 	rootCmd.AddCommand(projCmd)
 }
 
@@ -81,6 +88,22 @@ var (
 	}()
 )
 
+func parseProjActionFromFlagsAndArgs(args []string) (projAction, error) {
+	// Enforcements assumed:
+	// * mutual-exclusion enforced by cobra: --new and --get will not both be
+	// present.
+	// * mutual-exclusion enforced by cobra: Iff --get present, set-flags will
+	// not be present.
+
+	if flagProjGet {
+
+	}
+	// assume no set-flag is present and that no --new is present. GET action.
+	// * if --new is present: NEW action.
+	// * if any set-flag is present (and above do not apply), we are in EDIT.
+	// * else, we are in new.
+}
+
 var projCmd = &cobra.Command{
 	Use: "proj [-F FILE]\n" +
 		"proj [-F FILE] --new [-nHSCcR]\n" +
@@ -89,7 +112,7 @@ var projCmd = &cobra.Command{
 	GroupID: "project",
 	Short:   "Show or manipulate project attributes and config",
 	Long:    projCmdHelp,
-	Args:    cobra.ArbitraryArgs,
+	Args:    cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := projOptions{
 			projFile: commonflags.ProjectFile,

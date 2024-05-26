@@ -11,30 +11,79 @@ import (
 )
 
 var (
-	flagCapsNew    bool
-	flagCapsDelete bool
+	flagCapsNew    string
+	flagCapsDelete string
+	flagCapsGet    string
+	flagCapsSpec   string
+	flagCapsVar    string
 )
 
 func init() {
 	capsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
-	capsCmd.PersistentFlags().BoolVarP(&flagCapsNew, "new", "", false, "Create a new variable capture on the request. If given, the specification of the new capture must also be given as a third argument.")
-	capsCmd.PersistentFlags().BoolVarP(&flagCapsDelete, "delete", "d", false, "Delete the given variable capture from the request. Can only be used if giving REQ and CAP and no other arguments.")
+	capsCmd.PersistentFlags().StringVarP(&flagCapsNew, "new", "N", "", "Create a new capture on REQ that saves captured data to `VAR`. If given, the specification of the new capture must also be given with --spec/-s.")
+	capsCmd.PersistentFlags().StringVarP(&flagCapsDelete, "delete", "D", "", "Delete the given variable capture `VAR` from the request.")
+	capsCmd.PersistentFlags().StringVarP(&flagCapsGet, "get", "G", "", "Get the value of the given attribute of the capture. Can only be used if giving REQ and CAP and no other arguments.")
+	capsCmd.PersistentFlags().StringVarP(&flagCapsSpec, "spec", "s", "", "Specify where in responses that data should be captured from. `SPEC` is a specially-formatted string of form :FROM,TO to specify a byte-offset or a jq-ish syntax string to specify a path to a value within a JSON response body.")
+	capsCmd.PersistentFlags().StringVarP(&flagCapsVar, "var", "V", "", "Set the variable that the capture saves to.")
 
 	// cannot delete while doing new
-	capsCmd.MarkFlagsMutuallyExclusive("new", "delete")
+	capsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get")
+	capsCmd.MarkFlagsMutuallyExclusive("delete", "spec")
+	capsCmd.MarkFlagsMutuallyExclusive("delete", "var")
+	capsCmd.MarkFlagsMutuallyExclusive("get", "spec")
+	capsCmd.MarkFlagsMutuallyExclusive("get", "var")
+	capsCmd.MarkFlagsMutuallyExclusive("new", "var")
 
 	rootCmd.AddCommand(capsCmd)
 }
 
+// if --delete is present:
+//  * CHECK: exactly 1 arg. (or ERR)
+//  * ACTION: DELETE
+//
+// if --new is present:
+//  * CHECK: exactly 1 args. (or ERR)
+//  * CHECK: -s must be present (or ERR)
+//  * CHECK: -V must not be present (or ERR)
+//  * ACTION: NEW
+//
+// If --get is present:
+//  * CHECK: exactly 2 args. (or ERR)
+//  * ACTION: GET
+//
+// If any set flag is present:
+//  * CHECK: exactly 2 args. (or ERR)
+//  * ACTION: EDIT
+//
+// ELSE:
+//
+// If exactly 1 arg:
+//  * ACTION: LIST
+//
+// If exactly 2 args:
+// * ACTION: SHOW
+//
+
 var capsCmd = &cobra.Command{
-	Use: "caps REQ [-F project_file]\n" +
-		"caps REQ CAP [-d] [-F project_file]\n" +
-		"caps REQ CAP SPECIFICATION --new\n" +
-		"caps REQ CAP ATTR [VALUE [ATTR2 VALUE2]...]",
+	Use: "caps [-F FILE] REQ\n" +
+		"caps [-F FILE] REQ --delete VAR\n" +
+		"caps [-F FILE] REQ --new VAR -s SPEC\n" +
+		"caps [-F FILE] REQ VAR\n" +
+		"caps [-F FILE] REQ VAR --get ATTR\n" +
+		"caps [-F FILE] REQ VAR [-sV]",
 	GroupID: projMetaCommands.ID,
 	Short:   "Get or modify variable captures on a request template.",
-	Long:    "Perform operations on variable captures defined on a request template. With only the name of the request template given, prints out a listing of all the captures defined on the given request. For all other operations, CAP must be specified; this is the name of the variable that the capture is saved to, and serves as the primary identifier for variable captures. If CAP is given with no other arguments, information on that capture is printed. If --new is given with CAP, a new capture will be created on the request that saves to the var called CAP and that captures data from responses with the given specification. If -d is given, var capture CAP is deleted from the request template. If a capture attribute name is given after CAP, only that particular attribute is printed out. If one or more pairs of capture attributes and new values are given, those attributes on CAP will be set to their corresponding values.\n\nCapture specifications can be given in one of two formats. They can be in format ':START,END' for a byte offset (ex: \":4,20\") or a jq-ish path with only keys and variable indexes (ex: \"records[1].auth.token\")",
-	Args:    cobra.MinimumNArgs(1),
+	Long: "Perform operations on variable captures defined on a request template. With only the name REQ of the request " +
+		"template given, prints out a listing of all the captures defined on the request.\n\n" +
+		"To create a new capture, provide --new with the name of the variable to capture to as its argument. Additionally, the " +
+		"-s/--spec flag must be given to provide the location within responses that the variable's value is to be taken from.\n\n" +
+		"A capture can be viewed by providing VAR, the name of the variable that the capture saves to. To view only a single attribute " +
+		"of a capture, give VAR as an argument and provide --get along with the name of the attribute to view. The available names are: " + strings.Join(capAttrKeyNames(), ",") + "\n\n" +
+		"To modify a capture, use one of the -s or -V flags when giving the VAR of the capture; -s will alter the spec, and -V " +
+		"will change the captured-to variable.\n\n" +
+		"A capture is removed from a request by providing --delete and the VAR of the capture to be deleted.\n\n" +
+		"Capture specifications can be given in one of two formats. They can be in format ':START,END' for a byte offset (ex: \":4,20\") or a jq-ish path with only keys and array indexes (ex: \"records[1].auth.token\")",
+	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := capsOptions{
 			projFile: commonflags.ProjectFile,

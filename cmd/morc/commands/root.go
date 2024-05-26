@@ -28,7 +28,7 @@ func init() {
 	rootCmd.AddGroup(projMetaCommands)
 	rootCmd.AddGroup(sendingCommands)
 	rootCmd.AddGroup(quickreqCommands)
-	rootCmd.AddCommand(reqs.RootCmd)
+	rootCmd.AddCommand(reqs.ReqsCmd)
 }
 
 var rootCmd = &cobra.Command{

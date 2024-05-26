@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	RootCmd.AddCommand(deleteCmd)
+	ReqsCmd.AddCommand(deleteCmd)
 }
 
 var deleteCmd = &cobra.Command{

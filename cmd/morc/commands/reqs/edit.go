@@ -34,7 +34,7 @@ func init() {
 
 	editCmd.MarkFlagsMutuallyExclusive("data", "delete-data")
 
-	RootCmd.AddCommand(editCmd)
+	ReqsCmd.AddCommand(editCmd)
 }
 
 var editCmd = &cobra.Command{

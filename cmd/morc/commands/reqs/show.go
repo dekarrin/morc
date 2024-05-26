@@ -29,7 +29,7 @@ func init() {
 	showCmd.PersistentFlags().BoolVarP(&flagAuthFlowOnly, "auth", "", false, "Show only the auth flow of the request")
 	showCmd.MarkFlagsMutuallyExclusive("body", "method", "url", "headers", "captures", "auth")
 
-	RootCmd.AddCommand(showCmd)
+	ReqsCmd.AddCommand(showCmd)
 }
 
 var showCmd = &cobra.Command{

@@ -26,7 +26,7 @@ func init() {
 	newCmd.PersistentFlags().StringVarP(&flagMethod, "method", "X", "GET", "Specify the method to use for the request")
 	newCmd.PersistentFlags().StringVarP(&flagURL, "url", "u", "http://example.com", "Specify the URL for the request")
 
-	RootCmd.AddCommand(newCmd)
+	ReqsCmd.AddCommand(newCmd)
 }
 
 var newCmd = &cobra.Command{

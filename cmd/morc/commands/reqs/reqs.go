@@ -33,9 +33,9 @@ func init() {
 //
 // PROJ:
 // PROJ --new/-N (no name required), followed by specific args.      NEW
-// PROJ --delete/-D                                                  DELETE
 // PROJ --get ATTR                                                   GET
 // PROJ (implied show)                                               SHOW
+// PROJ (!--new,!--get) followed by flag arg sets                    EDIT
 //
 // CAPS:
 // CAPS REQ                                                          LIST

@@ -14,7 +14,7 @@ import (
 
 var (
 	flagProjNew            bool
-	flagProjGet            bool
+	flagProjGet            string
 	flagProjName           string
 	flagProjHistoryFile    string
 	flagProjSessionFile    string
@@ -26,7 +26,7 @@ var (
 func init() {
 	projCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
 	projCmd.PersistentFlags().BoolVarP(&flagProjNew, "new", "N", false, "Create a new project instead of reading/editing one. Combine with other arguments to specify values for the new project.")
-	projCmd.PersistentFlags().BoolVarP(&flagProjGet, "get", "G", false, "Get the value of a specific attribute of the project. `ATTR` is the name of an attribute to retrieve and must be one of the following: "+strings.Join(projAttrKeyNames(), ", "))
+	projCmd.PersistentFlags().StringVarP(&flagProjGet, "get", "G", "", "Get the value of a specific attribute of the project. `ATTR` is the name of an attribute to retrieve and must be one of the following: "+strings.Join(projAttrKeyNames(), ", "))
 	projCmd.PersistentFlags().StringVarP(&flagProjName, "name", "n", "", "Set the name of the project to `NAME`")
 	projCmd.PersistentFlags().StringVarP(&flagProjHistoryFile, "history-file", "H", "", "Set the history file to `FILE`. If the special string '"+morc.ProjDirVar+"' is in the path, it is replaced with the directory containing the project file whenever morc is executed, allowing the history file path to still function even if the containing directory is moved.")
 	projCmd.PersistentFlags().StringVarP(&flagProjSessionFile, "cookies-file", "C", "", "Set the session (cookies) storage file to `FILE`. If the special string '"+morc.ProjDirVar+"' is in the path, it is replaced with the directory containing the project file whenever morc is executed, allowing the session file path to still function even if the containing directory is moved.")
@@ -88,22 +88,6 @@ var (
 	}()
 )
 
-func parseProjActionFromFlagsAndArgs(args []string) (projAction, error) {
-	// Enforcements assumed:
-	// * mutual-exclusion enforced by cobra: --new and --get will not both be
-	// present.
-	// * mutual-exclusion enforced by cobra: Iff --get present, set-flags will
-	// not be present.
-
-	if flagProjGet {
-
-	}
-	// assume no set-flag is present and that no --new is present. GET action.
-	// * if --new is present: NEW action.
-	// * if any set-flag is present (and above do not apply), we are in EDIT.
-	// * else, we are in new.
-}
-
 var projCmd = &cobra.Command{
 	Use: "proj [-F FILE]\n" +
 		"proj [-F FILE] --new [-nHSCcR]\n" +
@@ -114,109 +98,9 @@ var projCmd = &cobra.Command{
 	Long:    projCmdHelp,
 	Args:    cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		opts := projOptions{
-			projFile: commonflags.ProjectFile,
-		}
-
-		if opts.projFile == "" {
-			return fmt.Errorf("project file cannot be set to empty string")
-		}
-
-		// find out our action and do action-specific flag checks
-		var getItem projKey
-
-		if len(args) == 0 {
-			// either the user wants all the info or new is set and we are making
-			// a new project with all defaults.
-
-			if flagProjNew {
-				opts.action = projNew
-			} else {
-				opts.action = projInfo
-			}
-		} else {
-			// begin parsing each of the args
-
-			var curKey projKey
-			var err error
-
-			for i, arg := range args {
-				if i%2 == 0 {
-					// if even, should be an attribute.
-					curKey, err = parseProjAttrKey(arg)
-					if err != nil {
-						return fmt.Errorf("attribute #%d: %w", (i/2)+1, err)
-					}
-
-					// do an "already set" check
-					setTwice := false
-					switch curKey {
-					case projKeyName:
-						setTwice = opts.name.set
-					case projKeyHistFile:
-						setTwice = opts.histFile.set
-					case projKeySeshFile:
-						setTwice = opts.seshFile.set
-					case projKeyCookieLifetime:
-						setTwice = opts.cookieLifetime.set
-					case projKeyCookies:
-						setTwice = opts.recordCookies.set
-					case projKeyHistory:
-						setTwice = opts.recordHistory.set
-					}
-
-					if setTwice {
-						return fmt.Errorf("%s is set more than once", curKey)
-					}
-				} else {
-					// if odd, it is a value
-					switch curKey {
-					case projKeyName:
-						opts.name = optionalC[string]{set: true, v: arg}
-					case projKeyHistFile:
-						opts.histFile = optionalC[string]{set: true, v: arg}
-					case projKeySeshFile:
-						opts.seshFile = optionalC[string]{set: true, v: arg}
-					case projKeyCookieLifetime:
-						cl, err := time.ParseDuration(arg)
-						if err != nil {
-							return fmt.Errorf("value for %s: %w", curKey, err)
-						}
-						opts.cookieLifetime = optionalC[time.Duration]{set: true, v: cl}
-					case projKeyCookies:
-						isOn, err := parseOnOff(arg)
-						if err != nil {
-							return fmt.Errorf("value for %s: %w", curKey, err)
-						}
-						opts.recordCookies = optionalC[bool]{set: true, v: isOn}
-					case projKeyHistory:
-						isOn, err := parseOnOff(arg)
-						if err != nil {
-							return fmt.Errorf("value for %s: %w", curKey, err)
-						}
-						opts.recordHistory = optionalC[bool]{set: true, v: isOn}
-					}
-				}
-			}
-
-			// now that we are done, do an arg-count check and use it to set
-			// action.
-			// doing AFTER parsing so that we can give a betta error message if
-			// missing last value
-			if len(args) == 1 {
-				// that's fine, we just want to get the one item
-				opts.action = projGet
-				getItem = curKey
-			} else if len(args)%2 != 0 {
-				return fmt.Errorf("%s is missing a value", curKey)
-			} else {
-				if flagProjNew {
-					opts.action = projNew
-				} else {
-					opts.action = projEdit
-				}
-			}
-
+		var opts projArgs
+		if err := parseProjArgs(cmd, args, &opts); err != nil {
+			return err
 		}
 
 		// done checking args, don't show usage on error
@@ -225,17 +109,117 @@ var projCmd = &cobra.Command{
 
 		switch opts.action {
 		case projInfo:
-			return invokeProjShow(io, opts)
+			return invokeProjShow(io, opts.projFile)
 		case projGet:
-			return invokeProjGet(io, getItem, opts)
+			return invokeProjGet(io, opts.projFile, opts.getItem)
 		case projNew:
-			return invokeProjNew(io, opts.name.v, opts)
+			return invokeProjNew(io, opts.projFile, opts.sets)
 		case projEdit:
-			return invokeProjEdit(io, opts)
+			return invokeProjEdit(io, opts.projFile, opts.sets)
 		default:
 			panic(fmt.Sprintf("unhandled proj action %q", opts.action))
 		}
 	},
+}
+
+func parseProjArgs(cmd *cobra.Command, posArgs []string, args *projArgs) error {
+	args.projFile = commonflags.ProjectFile
+	if args.projFile == "" {
+		return fmt.Errorf("project file cannot be set to empty string")
+	}
+
+	var err error
+
+	args.action, err = parseProjActionFromFlags()
+	if err != nil {
+		return err
+	}
+
+	// do action-specific arg and flag parsing
+	switch args.action {
+	case projInfo:
+		// no-op; no further checks to do
+	case projGet:
+		// parse the get from the string
+		args.getItem, err = parseProjAttrKey(flagProjGet)
+		if err != nil {
+			return err
+		}
+	case projNew:
+		if err := parseProjSetFlags(cmd, &args.sets); err != nil {
+			return err
+		}
+	case projEdit:
+		if err := parseProjSetFlags(cmd, &args.sets); err != nil {
+			return err
+		}
+	default:
+		panic(fmt.Sprintf("unhandled proj action %q", args.action))
+	}
+
+	return nil
+}
+
+func parseProjSetFlags(cmd *cobra.Command, attrs *projAttrValues) error {
+	if cmd.Flags().Lookup("name").Changed {
+		attrs.name = optionalC[string]{set: true, v: flagProjName}
+	}
+
+	if cmd.Flags().Lookup("history-file").Changed {
+		attrs.histFile = optionalC[string]{set: true, v: flagProjHistoryFile}
+	}
+
+	if cmd.Flags().Lookup("cookies-file").Changed {
+		attrs.seshFile = optionalC[string]{set: true, v: flagProjSessionFile}
+	}
+
+	if cmd.Flags().Lookup("cookie-lifetime").Changed {
+		cl, err := time.ParseDuration(flagProjCookieLifetime)
+		if err != nil {
+			return fmt.Errorf("cookie-lifetime: %w", err)
+		}
+		attrs.cookieLifetime = optionalC[time.Duration]{set: true, v: cl}
+	}
+
+	if cmd.Flags().Lookup("cookies").Changed {
+		isOn, err := parseOnOff(flagProjRecordCookies)
+		if err != nil {
+			return fmt.Errorf("cookies: %w", err)
+		}
+		attrs.recordCookies = optionalC[bool]{set: true, v: isOn}
+	}
+
+	if cmd.Flags().Lookup("history").Changed {
+		isOn, err := parseOnOff(flagProjRecordHistory)
+		if err != nil {
+			return fmt.Errorf("history: %w", err)
+		}
+		attrs.recordHistory = optionalC[bool]{set: true, v: isOn}
+	}
+
+	return nil
+}
+
+func projSetFlagIsPresent() bool {
+	return flagProjName != "" || flagProjHistoryFile != "" || flagProjSessionFile != "" || flagProjCookieLifetime != "" || flagProjRecordCookies != "" || flagProjRecordHistory != ""
+}
+
+func parseProjActionFromFlags() (projAction, error) {
+	// Enforcements assumed:
+	// * mutual-exclusion enforced by cobra: --new and --get will not both be
+	// present.
+	// * mutual-exclusion enforced by cobra: Iff --get present, set-flags will
+	// not be present.
+	// * No-args.
+
+	if flagProjGet != "" {
+		return projGet, nil
+	} else if flagProjNew {
+		return projNew, nil
+	} else if projSetFlagIsPresent() {
+		return projEdit, nil
+	}
+	return projInfo, nil
 }
 
 type projAction int
@@ -322,11 +306,15 @@ func parseProjAttrKey(s string) (projKey, error) {
 	}
 }
 
-type projOptions struct {
+type projArgs struct {
 	projFile string
 	action   projAction
+	getItem  projKey
+	sets     projAttrValues
+}
 
-	name           optionalC[string] // only used directly in edit; new takes new name directly
+type projAttrValues struct {
+	name           optionalC[string]
 	recordHistory  optionalC[bool]
 	recordCookies  optionalC[bool]
 	seshFile       optionalC[string]
@@ -334,18 +322,18 @@ type projOptions struct {
 	cookieLifetime optionalC[time.Duration]
 }
 
-func (eo projOptions) changesFilePaths() bool {
-	return eo.seshFile.set || eo.histFile.set
+func (sfv projAttrValues) changesFilePaths() bool {
+	return sfv.seshFile.set || sfv.histFile.set
 }
 
-func invokeProjEdit(io cmdio.IO, opts projOptions) error {
+func invokeProjEdit(io cmdio.IO, projFile string, attrs projAttrValues) error {
 	// if either the history file or session file are altered, or if cookie
 	// lifetime is altered, we need to load the current files to mutate or
 	// copy the data
-	modifyAllFiles := opts.changesFilePaths() || opts.cookieLifetime.set
+	modifyAllFiles := attrs.changesFilePaths() || attrs.cookieLifetime.set
 
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(opts.projFile, modifyAllFiles)
+	p, err := morc.LoadProjectFromDisk(projFile, modifyAllFiles)
 	if err != nil {
 		return err
 	}
@@ -353,102 +341,102 @@ func invokeProjEdit(io cmdio.IO, opts projOptions) error {
 	modifiedVals := map[projKey]interface{}{}
 	noChangeVals := map[projKey]interface{}{}
 
-	if opts.name.set {
-		if opts.name.v == p.Name {
+	if attrs.name.set {
+		if attrs.name.v == p.Name {
 			noChangeVals[projKeyName] = p.Name
 		} else {
-			p.Name = opts.name.v
+			p.Name = attrs.name.v
 			modifiedVals[projKeyName] = p.Name
 		}
 	}
 
-	if opts.histFile.set {
-		if opts.histFile.v == "" {
+	if attrs.histFile.set {
+		if attrs.histFile.v == "" {
 			// set to empty string effectively disables history, so we cannot do
 			// this if history is enabled or if it is about to be.
 
 			// history is on and not turning it off
-			if p.Config.RecordHistory && !opts.recordHistory.Is(false) {
+			if p.Config.RecordHistory && !attrs.recordHistory.Is(false) {
 				return fmt.Errorf("cannot set history file to empty string: history recording must be disabled first")
 			}
 
 			// history is off and turning it on
-			if !p.Config.RecordHistory && opts.recordHistory.Is(true) {
+			if !p.Config.RecordHistory && attrs.recordHistory.Is(true) {
 				return fmt.Errorf("cannot set history file to empty string when passing --hist-on")
 			}
 
 			// otherwise, it is safe to set it.
 		}
 
-		if opts.histFile.v == p.Config.HistFile {
+		if attrs.histFile.v == p.Config.HistFile {
 			noChangeVals[projKeyHistFile] = p.Config.HistFile
 		} else {
-			p.Config.HistFile = opts.histFile.v
+			p.Config.HistFile = attrs.histFile.v
 			modifiedVals[projKeyHistFile] = p.Config.HistFile
 		}
 	}
 
-	if opts.seshFile.set {
-		if opts.seshFile.v == "" {
+	if attrs.seshFile.set {
+		if attrs.seshFile.v == "" {
 			// set to empty string effectively disables session saving, so we
 			// cannot do this if cookie saving is enabled or if it is about to
 			// be.
 
 			// cookies are on and not turning it off
-			if p.Config.RecordSession && !opts.recordCookies.Is(false) {
+			if p.Config.RecordSession && !attrs.recordCookies.Is(false) {
 				return fmt.Errorf("cannot set session file to empty string: cookie recording must be disabled first")
 			}
 
 			// cookies are off and turning it on
-			if !p.Config.RecordSession && opts.recordCookies.Is(true) {
+			if !p.Config.RecordSession && attrs.recordCookies.Is(true) {
 				return fmt.Errorf("cannot set session file to empty string when passing --cookies-on")
 			}
 
 			// otherwise, it is safe to set it.
 		}
 
-		if opts.seshFile.v == p.Config.SeshFile {
+		if attrs.seshFile.v == p.Config.SeshFile {
 			noChangeVals[projKeySeshFile] = p.Config.SeshFile
 		} else {
-			p.Config.SeshFile = opts.seshFile.v
+			p.Config.SeshFile = attrs.seshFile.v
 			modifiedVals[projKeySeshFile] = p.Config.SeshFile
 		}
 	}
 
-	if opts.cookieLifetime.set {
-		if opts.cookieLifetime.v == p.Config.CookieLifetime {
+	if attrs.cookieLifetime.set {
+		if attrs.cookieLifetime.v == p.Config.CookieLifetime {
 			noChangeVals[projKeyCookieLifetime] = p.Config.CookieLifetime
 		} else {
-			p.Config.CookieLifetime = opts.cookieLifetime.v
+			p.Config.CookieLifetime = attrs.cookieLifetime.v
 			p.EvictOldCookies()
 			modifiedVals[projKeyCookieLifetime] = p.Config.CookieLifetime
 		}
 	}
 
-	if opts.recordHistory.set {
+	if attrs.recordHistory.set {
 		// enabling is not allowed if the history file is unset
-		if p.Config.HistFile == "" && opts.recordHistory.Is(true) {
+		if p.Config.HistFile == "" && attrs.recordHistory.Is(true) {
 			return fmt.Errorf("cannot enable history recording: no history file set")
 		}
 
-		if opts.recordHistory.v == p.Config.RecordHistory {
+		if attrs.recordHistory.v == p.Config.RecordHistory {
 			noChangeVals[projKeyHistory] = p.Config.RecordHistory
 		} else {
-			p.Config.RecordHistory = opts.recordHistory.v
+			p.Config.RecordHistory = attrs.recordHistory.v
 			modifiedVals[projKeyHistory] = p.Config.RecordHistory
 		}
 	}
 
-	if opts.recordCookies.set {
+	if attrs.recordCookies.set {
 		// enabling is not allowed if the session file is unset
-		if p.Config.SeshFile == "" && opts.recordCookies.Is(true) {
+		if p.Config.SeshFile == "" && attrs.recordCookies.Is(true) {
 			return fmt.Errorf("cannot enable cookie recording: no session file set")
 		}
 
-		if opts.recordCookies.v == p.Config.RecordSession {
+		if attrs.recordCookies.v == p.Config.RecordSession {
 			noChangeVals[projKeyCookies] = p.Config.RecordSession
 		} else {
-			p.Config.RecordSession = opts.recordCookies.v
+			p.Config.RecordSession = attrs.recordCookies.v
 			modifiedVals[projKeyCookies] = p.Config.RecordSession
 		}
 	}
@@ -463,33 +451,33 @@ func invokeProjEdit(io cmdio.IO, opts projOptions) error {
 	return nil
 }
 
-func invokeProjNew(io cmdio.IO, name string, opts projOptions) error {
+func invokeProjNew(io cmdio.IO, projFile string, attrs projAttrValues) error {
 	// make sure the user isn't about to turn on history without setting a file
-	if opts.recordHistory.set && opts.recordHistory.v && opts.histFile.v == "" {
+	if attrs.recordHistory.set && attrs.recordHistory.v && attrs.histFile.v == "" {
 		return fmt.Errorf("cannot create project with history enabled without setting a history file")
 	}
 
 	// make sure the user isn't about to turn on cookies without setting a file
-	if opts.recordCookies.set && opts.recordCookies.v && opts.seshFile.v == "" {
+	if attrs.recordCookies.set && attrs.recordCookies.v && attrs.seshFile.v == "" {
 		return fmt.Errorf("cannot create project with cookie recording enabled without setting a session file")
 	}
 
 	// okay we are good, proceed to create the project
 
 	p := morc.Project{
-		Name:      name,
+		Name:      attrs.name.v,
 		Templates: map[string]morc.RequestTemplate{},
 		Flows:     map[string]morc.Flow{},
 		Vars:      morc.NewVarStore(),
 		History:   []morc.HistoryEntry{},
 		Session:   morc.Session{},
 		Config: morc.Settings{
-			ProjFile:       opts.projFile,
-			HistFile:       opts.histFile.v,
-			SeshFile:       opts.seshFile.v,
-			CookieLifetime: opts.cookieLifetime.Or(24 * time.Hour),
-			RecordSession:  opts.recordCookies.v,
-			RecordHistory:  opts.recordHistory.v,
+			ProjFile:       projFile,
+			HistFile:       attrs.histFile.v,
+			SeshFile:       attrs.seshFile.v,
+			CookieLifetime: attrs.cookieLifetime.Or(24 * time.Hour),
+			RecordSession:  attrs.recordCookies.v,
+			RecordHistory:  attrs.recordHistory.v,
 		},
 	}
 
@@ -498,7 +486,7 @@ func invokeProjNew(io cmdio.IO, name string, opts projOptions) error {
 		return err
 	}
 
-	if opts.histFile.v != "" {
+	if attrs.histFile.v != "" {
 		// persist at least once so user knows right away if it is a bad path
 
 		err = p.PersistHistoryToDisk()
@@ -507,7 +495,7 @@ func invokeProjNew(io cmdio.IO, name string, opts projOptions) error {
 		}
 	}
 
-	if opts.seshFile.v != "" {
+	if attrs.seshFile.v != "" {
 		// persist at least once so user knows right away if it is a bad path
 
 		err = p.PersistSessionToDisk()
@@ -516,13 +504,13 @@ func invokeProjNew(io cmdio.IO, name string, opts projOptions) error {
 		}
 	}
 
-	io.PrintLoudf("Project created successfully in %s\n", opts.projFile)
+	io.PrintLoudf("Project created successfully in %s\n", projFile)
 
 	return nil
 }
 
-func invokeProjGet(io cmdio.IO, item projKey, opts projOptions) error {
-	proj, err := morc.LoadProjectFromDisk(opts.projFile, true)
+func invokeProjGet(io cmdio.IO, projFile string, item projKey) error {
+	proj, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -547,8 +535,8 @@ func invokeProjGet(io cmdio.IO, item projKey, opts projOptions) error {
 	return nil
 }
 
-func invokeProjShow(io cmdio.IO, opts projOptions) error {
-	proj, err := morc.LoadProjectFromDisk(opts.projFile, true)
+func invokeProjShow(io cmdio.IO, projFile string) error {
+	proj, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}

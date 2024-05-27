@@ -19,19 +19,33 @@ var (
 	flagFlowStepRemovals []int
 	flagFlowStepAdds     []string
 	flagFlowStepMoves    []string
+	flagFlowStepReplaces []string
+	flagFlowStepName     string
 )
 
 var flowsCmd = &cobra.Command{
 	Use: "flows [-F FILE]\n" +
-		"flows FLOW --new REQ1 REQ2 [REQN]... [-F FILE]\n" +
-		"flows FLOW [-F FILE]\n" +
-		"flows FLOW -d [-F FILE]\n" +
-		"flows FLOW ATTR/IDX [-F FILE]\n" +
-		"flows FLOW [ATTR/IDX VAL]... [-r IDX]... [-a [IDX]:REQ]... [-m FROM:TO]... [-F FILE]",
+		"flows [-F FILE] --delete FLOW\n" +
+		"flows [-F FILE] --new FLOW REQ1 REQ2 [REQN]...\n" +
+		"flows [-F FILE] FLOW\n" +
+		"flows [-F FILE] FLOW --get ATTR\n" +
+		"flows [-F FILE] FLOW [-damrn]...",
 	GroupID: "project",
 	Short:   "Get or modify request flows",
-	Long:    "Performs operations on the flows defined in the project. By itself, lists out the names of all flows in the project. If given a flow name FLOW with no other arguments, shows the steps in the flow. A new flow can be created by including the --new flag when providing the name of the flow and 2 or more names of requests to be included, in order. A flow can be deleted by passing the -d flag when providing the name of the flow. If a numerical flow step index IDX is provided after the flow name, the name of the req at that step is output. If a non-numerical flow attribute ATTR is provided after the flow name, that attribute is output. If a value is provided after ATTR or IDX, the attribute or step at the given index is updated to the new value. Format for the new value for an ATTR is dependent on the ATTR, and format for the new value for an IDX is the name of the request to call at that step index.\n\nFlow step mutations other than a step replacing an existing one are handled by giving the name of the FLOW and one or more step mutation options. --remove/-r IDX can be used to remove the step at the given index. --add/-a [IDX]:REQ will add a new step at the given index, or at the end if IDX is omitted; double the colon to insert a template whose name begins with a colon at the end of the flow.. --move/-m IDX->IDX will move the step at the first index to the second index; if the new index is higher than the old, all indexes in between move down to accommodate, and if the new index is lower, all other indexes are pushed up to accommodate. Multiple moves, adds, and removes can be given in a single command; all removes are applied from highest to lowest index, then any adds from lowest to highest, then any moves.",
-	Args:    cobra.ArbitraryArgs,
+	Long: "Performs operations on the flows defined in the project. With no other arguments, a listing of all flows is shown.\n\n" +
+		"A new flow can be created by providing the name of the new flow with the --new flag and providing the names of least " +
+		"two requests to be included in the flow.\n\n" +
+		"A flow can be examined by providing FLOW, the name of it. This will display the list of all steps in the flow. To see a particular " +
+		"attribute of a flow, --get can be used to select it. --get takes either the string \"name\" to explicitly get the flow's name as " +
+		"it is recorded by MORC, or the 1-based index number of a flow's step.\n\n" +
+		"To modify a flow, provide the name of the FLOW and give one or more modification flags. --name/-n is used to change the name, and " +
+		"can only be specified once. Steps are modified with other flags: --remove/-R to remove a step, --add/-a to add a step, " +
+		"--move/-m to move a step to a new position, and --replace/-r to change the request a step calls. All step-modification steps " +
+		"can be specified more than once to update multiple steps in the same call to MORC. All step removals are applied first, from " +
+		"highest to lowest index, then all adds are applied, from lowest to highest index, followed by all moves in the order they were " +
+		"given in CLI flags, and then finally all replacements are processed.\n\n" +
+		"A flow is deleted by providing the --delete/-D flag with the FLOW to be deleted as its argument.",
+	Args: cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		disallowStepMutations := func(reason string) error {
 			if len(flagFlowStepRemovals) > 0 {
@@ -306,9 +320,9 @@ var flowsCmd = &cobra.Command{
 
 func init() {
 	flowsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
-	flowsCmd.PersistentFlags().BoolVarP(&flagFlowDelete, "delete", "d", false, "Delete the flow with the given name. Can only be used when flow name is also given.")
+	flowsCmd.PersistentFlags().BoolVarP(&flagFlowDelete, "delete", "D", false, "Delete the flow with the given name. Can only be used when flow name is also given.")
 	flowsCmd.PersistentFlags().BoolVarP(&flagFlowNew, "new", "", false, "Create a new flow with the given name and request steps. If given, arguments to the command are interpreted as the new flow name and the request steps, in order.")
-	flowsCmd.PersistentFlags().IntSliceVarP(&flagFlowStepRemovals, "remove", "r", nil, "Remove the step at index `IDX` from the flow. Can be given multiple times; if so, will be applied from highest to lowest index. Will be applied after all step replacements are applied.")
+	flowsCmd.PersistentFlags().IntSliceVarP(&flagFlowStepRemovals, "delete", "d", nil, "Remove the step at index `IDX` from the flow. Can be given multiple times; if so, will be applied from highest to lowest index. Will be applied after all step replacements are applied.")
 	flowsCmd.PersistentFlags().StringArrayVarP(&flagFlowStepAdds, "add", "a", nil, "Add a new step calling request REQ at index IDX, or at the end of current steps if index is omitted. Argument must be a string in form `[IDX]:REQ`. Can be given multiple times; if so, will be applied from lowest to highest index after all replacements and removals are applied.")
 	flowsCmd.PersistentFlags().StringArrayVarP(&flagFlowStepMoves, "move", "m", nil, "Move the step at index FROM to index TO. Argument must be a string in form `FROM:[TO]`. Can be given multiple times; if so, will be applied in order given after all replacements, removals, and adds are applied. If TO is not given, the step is moved to the end of the flow.")
 

@@ -31,21 +31,21 @@ func Test_Flows_Delete(t *testing.T) {
 	}{
 		{
 			name:      "no flows present - empty project",
-			args:      []string{"flows", "test", "-d"},
+			args:      []string{"flows", "-D", "test"},
 			p:         morc.Project{},
 			expectErr: "no flow named test exists",
 		},
 		{
 			name:      "no flows present - empty Flows",
-			args:      []string{"flows", "test", "-d"},
+			args:      []string{"flows", "-D", "test"},
 			p:         morc.Project{Flows: map[string]morc.Flow{}},
 			expectErr: "no flow named test exists",
 		},
 		{
-			name:      "delete needs 2 args",
-			args:      []string{"flows", "-d"},
+			name:      "delete needs value",
+			args:      []string{"flows", "-D"},
 			p:         testProject_singleFlowWithNSteps(3),
-			expectErr: "-d requires a flow name",
+			expectErr: "-D requires a flow name",
 		},
 		{
 			name: "normal delete",
@@ -584,11 +584,14 @@ func Test_Flows_List(t *testing.T) {
 }
 
 func resetFlowsFlags() {
-	flagFlowNew = false
-	flagFlowDelete = false
+	flagFlowNew = ""
+	flagFlowDelete = ""
+	flagFlowGet = ""
+	flagFlowName = ""
 	flagFlowStepRemovals = nil
 	flagFlowStepAdds = nil
 	flagFlowStepMoves = nil
+	flagFlowStepReplaces = nil
 
 	flowsCmd.Flags().VisitAll(func(fl *pflag.Flag) {
 		fl.Changed = false
@@ -600,7 +603,19 @@ func runTestCommand(cmd *cobra.Command, projFilePath string, args []string) (std
 	stdoutCapture := &bytes.Buffer{}
 	stderrCapture := &bytes.Buffer{}
 
-	args = append(args, "-F", projFilePath)
+	// add -F immediately after the first arg
+	if len(args) >= 1 {
+		newArgs := make([]string, 0, len(args)+2)
+		newArgs[0] = args[0]
+		newArgs[1] = "-F"
+		newArgs[2] = projFilePath
+		if len(args) >= 2 {
+			copy(newArgs[3:], args[1:])
+		}
+		args = newArgs
+	} else {
+		args = append(args, "-F", projFilePath)
+	}
 
 	cmd.Root().SetOut(stdoutCapture)
 	cmd.Root().SetErr(stderrCapture)

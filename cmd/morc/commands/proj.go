@@ -378,7 +378,7 @@ func (sfv projAttrValues) changesFilePaths() bool {
 	return sfv.seshFile.set || sfv.histFile.set
 }
 
-func parseProjArgs(cmd *cobra.Command, posArgs []string, args *projArgs) error {
+func parseProjArgs(cmd *cobra.Command, _ []string, args *projArgs) error {
 	args.projFile = commonflags.ProjectFile
 	if args.projFile == "" {
 		return fmt.Errorf("project file cannot be set to empty string")

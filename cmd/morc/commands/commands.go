@@ -104,3 +104,13 @@ func parseOnOff(s string) (bool, error) {
 
 	return false, fmt.Errorf("invalid value %q; must be ON or OFF (case-insensitive)", s)
 }
+
+// Invoker gathers args and holds definitions for invoked commands. IO and
+// project file are always available and must be set before invoking most
+// commands.
+//
+// TODO: use this or delete it.
+// type Invoker struct {
+// 	io       cmdio.IO
+// 	projFile string
+// }

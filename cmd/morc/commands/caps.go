@@ -37,6 +37,99 @@ func init() {
 	rootCmd.AddCommand(capsCmd)
 }
 
+func parseCapsSetFlags(cmd *cobra.Command, attrs *capAttrValues) error {
+	if cmd.Flags().Lookup("spec").Changed {
+		spec, err := morc.ParseVarScraperSpec("", flagCapsSpec)
+		if err != nil {
+			return fmt.Errorf("--spec/-s: %w", err)
+		}
+
+		attrs.spec = optional[morc.VarScraper]{set: true, v: spec}
+	}
+
+	if cmd.Flags().Lookup("var").Changed {
+		name, err := morc.ParseVarName(flagCapsVar)
+		if err != nil {
+			return fmt.Errorf("--var/-V: %w", err)
+		}
+		attrs.capVar = optional[string]{set: true, v: name}
+	}
+
+	return nil
+}
+
+func parseCapsActionFromFlags(cmd *cobra.Command, posArgs []string) (capsAction, error) {
+	// Enforcements assumed:
+	// * mut-exc enforced by cobra: --new and --get will not both be present.
+	// * mut-exc enforced by cobra: --new and --delete will not both be present.
+	// * mut-exc enforced by cobra: --get and --delete will not both be present.
+	// * mut-exc enforced by cobra: --delete and setOpts will not both be
+	// present.
+	// * mut-exc enforced by cobra: --get and setOpts will not both be set
+	// * mut-exc enforced by cobra: --new and --var setOpt will not be set
+	// * Min args 1.
+
+	if flagCapsDelete != "" {
+		if len(posArgs) < 1 {
+			return capsDelete, fmt.Errorf("missing request REQ to delete capture from")
+		}
+		if len(posArgs) > 1 {
+			return capsDelete, fmt.Errorf("unknown 2nd positional argument: %q", posArgs[1])
+		}
+		return capsDelete, nil
+	} else if flagCapsNew != "" {
+		if len(posArgs) < 1 {
+			return capsNew, fmt.Errorf("missing request REQ to add new capture to")
+		}
+		if len(posArgs) > 1 {
+			return capsNew, fmt.Errorf("unknown 2nd positional argument: %q", posArgs[1])
+		}
+		if !cmd.Flags().Changed("spec") {
+			return capsNew, fmt.Errorf("--new/-N requires --spec/-s")
+		}
+		if cmd.Flags().Changed("var") {
+			return capsNew, fmt.Errorf("--new/-N already gives var name; cannot be used with --var/-V")
+		}
+		return capsNew, nil
+	} else if flagCapsGet != "" {
+		if len(posArgs) < 1 {
+			return capsGet, fmt.Errorf("missing request REQ and capture VAR to get attribute from")
+		}
+		if len(posArgs) < 2 {
+			return capsGet, fmt.Errorf("missing capture VAR to get attribute from")
+		}
+		if len(posArgs) > 2 {
+			return capsGet, fmt.Errorf("unknown 3rd positional argument: %q", posArgs[2])
+		}
+		return capsGet, nil
+	} else if capsSetFlagIsPresent() {
+		if len(posArgs) < 1 {
+			return capsEdit, fmt.Errorf("missing request REQ and capture VAR to edit")
+		}
+		if len(posArgs) < 2 {
+			return capsEdit, fmt.Errorf("missing capture var to edit")
+		}
+		if len(posArgs) > 2 {
+			return capsEdit, fmt.Errorf("unknown 3rd positional argument: %q", posArgs[2])
+		}
+		return capsEdit, nil
+	}
+
+	if len(posArgs) == 0 {
+		return capsList, fmt.Errorf("missing request REQ to list captures for")
+	} else if len(posArgs) == 1 {
+		return capsList, nil
+	} else if len(posArgs) == 2 {
+		return capsShow, nil
+	} else {
+		return capsShow, fmt.Errorf("unknown 3rd positional argument: %q", posArgs[2])
+	}
+}
+
+func capsSetFlagIsPresent() bool {
+	return flagCapsVar != "" || flagCapsSpec != ""
+}
+
 // if --delete is present:
 //  * CHECK: exactly 1 arg. (or ERR)
 //  * ACTION: DELETE
@@ -84,142 +177,100 @@ var capsCmd = &cobra.Command{
 		"A capture is removed from a request by providing --delete and the VAR of the capture to be deleted.\n\n" +
 		"Capture specifications can be given in one of two formats. They can be in format ':START,END' for a byte offset (ex: \":4,20\") or a jq-ish path with only keys and array indexes (ex: \"records[1].auth.token\")",
 	Args: cobra.MinimumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		opts := capsOptions{
-			projFile: commonflags.ProjectFile,
-		}
-
-		if opts.projFile == "" {
-			return fmt.Errorf("project file is set to empty string")
-		}
-
-		reqName := args[0]
-		if reqName == "" {
-			return fmt.Errorf("request name cannot be empty")
-		}
-
-		// parse args and decide action based on flags and number of args
-
-		var varName string
-		var varSpec string
-		var getItem capKey
-
-		// first ensure user isn't trying to use -d with anyfin other than a single CAP
-		if flagCapsDelete {
-			if len(args) < 2 {
-				return fmt.Errorf("-d flag can only be used if REQ and CAP are given")
-			}
-			if len(args) > 2 {
-				return fmt.Errorf("-d flag cannot be used with arguments other than REQ and CAP")
-			}
-		}
-		// do the same check but for NEW, user must give only a spec
-		if flagCapsNew {
-			if len(args) < 3 {
-				return fmt.Errorf("--new flag can only be used if REQ, CAP, and SPECIFICATION are given")
-			}
-			if len(args) > 3 {
-				return fmt.Errorf("--new flag cannot be used with arguments other than REQ, CAP, and SPECIFICATION")
-			}
-		}
-
-		// normal parsing and checking now
-		if len(args) == 1 {
-			// only one possible action: list
-			opts.action = capsList
-		} else if len(args) == 2 {
-			// this is a show or a delete, depending on whether -d is set
-			varName = args[1]
-
-			if flagCapsDelete {
-				opts.action = capsDelete
-			} else {
-				opts.action = capsShow
-			}
-		} else {
-			varName = args[1]
-
-			// either a new or a get item
-
-			if flagCapsNew {
-				opts.action = capsNew
-
-				// var spec needs to be grabbed but save parsing for post-usage
-				// printing error
-				varSpec = args[2]
-			} else {
-				// full arg parsing mode
-				var curKey capKey
-				var err error
-
-				for i, arg := range args[2:] {
-					if i%2 == 0 {
-						// if even, should be an attribute.
-						curKey, err = parseCapAttrKey(arg)
-						if err != nil {
-							return fmt.Errorf("attribute #%d: %w", (i/2)+1, err)
-						}
-
-						// do an "already set" check
-						setTwice := false
-						switch curKey {
-						case capKeyVar:
-							setTwice = opts.capVar.set
-						case capKeySpec:
-							setTwice = opts.spec.set
-						}
-
-						if setTwice {
-							return fmt.Errorf("%s is set more than once", curKey)
-						}
-					} else {
-						// if odd, it is a value
-						switch curKey {
-						case capKeyVar:
-							opts.capVar = optional[string]{set: true, v: arg}
-						case capKeySpec:
-							opts.spec = optional[string]{set: true, v: arg}
-						}
-					}
-				}
-
-				// now that we are done, do an arg-count check and use it to set
-				// action.
-				// doing AFTER parsing so that we can give a betta error message if
-				// missing last value
-				if len(args[2:]) == 1 {
-					// that's fine, we just want to get the one item
-					opts.action = capsGet
-					getItem = curKey
-				} else if len(args[2:])%2 != 0 {
-					return fmt.Errorf("%s is missing a value", curKey)
-				} else {
-					opts.action = capsEdit
-				}
-			}
+	RunE: func(cmd *cobra.Command, posArgs []string) error {
+		var args capsArgs
+		if err := parseCapsArgs(cmd, posArgs, &args); err != nil {
+			return err
 		}
 
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
 
-		switch opts.action {
+		switch args.action {
 		case capsList:
-			return invokeCapsList(io, reqName, opts)
+			return invokeCapsList(io, args.projFile, args.request)
 		case capsShow:
-			return invokeCapsShow(io, reqName, varName, opts)
+			return invokeCapsShow(io, args.projFile, args.request, args.capture)
 		case capsDelete:
-			return invokeCapsDelete(io, reqName, varName, opts)
+			return invokeCapsDelete(io, args.projFile, args.request, args.capture)
 		case capsNew:
-			return invokeCapsNew(io, reqName, varName, varSpec, opts)
+			return invokeCapsNew(io, args.projFile, args.request, args.capture, args.sets)
 		case capsGet:
-			return invokeCapsGet(io, reqName, varName, getItem, opts)
+			return invokeCapsGet(io, args.projFile, args.request, args.capture, args.getItem)
 		case capsEdit:
-			return invokeCapsEdit(io, reqName, varName, opts)
+			return invokeCapsEdit(io, args.projFile, args.request, args.capture, args.sets)
 		default:
-			return fmt.Errorf("unknown action %d", opts.action)
+			return fmt.Errorf("unknown action %d", args.action)
 		}
 	},
+}
+
+func parseCapsArgs(cmd *cobra.Command, posArgs []string, args *capsArgs) error {
+	args.projFile = commonflags.ProjectFile
+	if args.projFile == "" {
+		return fmt.Errorf("project file cannot be set to empty string")
+	}
+
+	var err error
+
+	args.action, err = parseCapsActionFromFlags(cmd, posArgs)
+	if err != nil {
+		return err
+	}
+
+	// assume arg 1 exists and be the request name (already enforced by parse func above)
+	args.request = posArgs[0]
+
+	// do action-specific arg and flag parsing
+	switch args.action {
+	case capsList:
+		// nothing else to do; all args already gathered
+	case capsShow:
+		// set arg 2 as the capture name
+		args.capture = posArgs[1]
+	case capsDelete:
+		// special case of capture set from a CLI flag rather than pos arg.
+		args.capture = flagCapsDelete
+	case capsGet:
+		// set arg 2 as the capture name
+		args.capture = posArgs[1]
+
+		// parse the get from the string
+		args.getItem, err = parseCapAttrKey(flagProjGet)
+		if err != nil {
+			return err
+		}
+	case capsNew:
+		// above parsing already checked that -V will not be present and -s will
+		// so we can just run through normal parseCapsSetFlags and then use
+		// --new argument to set the new cap var manaully.
+		if err := parseCapsSetFlags(cmd, &args.sets); err != nil {
+			return err
+		}
+
+		// still need to parse the new name, above func won't hit it
+		name, err := morc.ParseVarName(flagCapsVar)
+		if err != nil {
+			return fmt.Errorf("--new/-N: %w", err)
+		}
+
+		// apply it to both the sets and the capture name. callers SHOULD only
+		// grab from args.capture, but this way is a bit more defensive.
+		args.sets.capVar = optional[string]{set: true, v: name}
+		args.capture = name
+	case capsEdit:
+		// set arg 2 as the capture name
+		args.capture = posArgs[1]
+
+		if err := parseCapsSetFlags(cmd, &args.sets); err != nil {
+			return err
+		}
+	default:
+		panic(fmt.Sprintf("unhandled caps action %q", args.action))
+	}
+
+	return nil
 }
 
 type capsAction int
@@ -284,17 +335,23 @@ func parseCapAttrKey(s string) (capKey, error) {
 	}
 }
 
-type capsOptions struct {
+type capsArgs struct {
 	projFile string
 	action   capsAction
-
-	capVar optional[string]
-	spec   optional[string]
+	request  string
+	capture  string
+	getItem  capKey
+	sets     capAttrValues
 }
 
-func invokeCapsDelete(io cmdio.IO, reqName, varName string, opts capsOptions) error {
+type capAttrValues struct {
+	capVar optional[string]
+	spec   optional[morc.VarScraper]
+}
+
+func invokeCapsDelete(io cmdio.IO, projFile string, reqName, varName string) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(opts.projFile, false)
+	p, err := morc.LoadProjectFromDisk(projFile, false)
 	if err != nil {
 		return err
 	}
@@ -330,9 +387,9 @@ func invokeCapsDelete(io cmdio.IO, reqName, varName string, opts capsOptions) er
 	return nil
 }
 
-func invokeCapsEdit(io cmdio.IO, reqName, varName string, opts capsOptions) error {
+func invokeCapsEdit(io cmdio.IO, projFile, reqName, varName string, attrs capAttrValues) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(opts.projFile, false)
+	p, err := morc.LoadProjectFromDisk(projFile, false)
 	if err != nil {
 		return err
 	}
@@ -355,7 +412,7 @@ func invokeCapsEdit(io cmdio.IO, reqName, varName string, opts capsOptions) erro
 	}
 
 	// okay did the user actually ask to change somefin
-	if !opts.capVar.set && !opts.spec.set {
+	if !attrs.capVar.set && !attrs.spec.set {
 		return fmt.Errorf("no changes requested")
 	}
 
@@ -363,14 +420,14 @@ func invokeCapsEdit(io cmdio.IO, reqName, varName string, opts capsOptions) erro
 	noChangeVals := map[capKey]interface{}{}
 
 	// if we have a name change, apply that first
-	if opts.capVar.set {
-		newNameUpper := strings.ToUpper(opts.capVar.v)
+	if attrs.capVar.set {
+		newNameUpper := strings.ToUpper(attrs.capVar.v)
 
 		// if new name same as old, no reason to do additional work
 		if newNameUpper != varUpper {
 			// check if the new name is already in use
 			if _, ok := req.Captures[newNameUpper]; ok {
-				return fmt.Errorf("capture to variable $%s already exists in request %s", opts.capVar.v, reqName)
+				return fmt.Errorf("capture to variable $%s already exists in request %s", attrs.capVar.v, reqName)
 			}
 
 			// remove the old name
@@ -378,24 +435,19 @@ func invokeCapsEdit(io cmdio.IO, reqName, varName string, opts capsOptions) erro
 
 			// add the new one; we will update the name when we save it back to
 			// the project
-			cap.Name = opts.capVar.v
+			cap.Name = attrs.capVar.v
 
-			modifiedVals[capKeyVar] = opts.capVar.v
+			modifiedVals[capKeyVar] = attrs.capVar.v
 		} else {
 			noChangeVals[capKeyVar] = varUpper
 		}
 	}
 
 	// if we have a spec change, apply that next
-	if opts.spec.set {
-		newCap, err := morc.ParseVarScraperSpec(cap.Name, opts.spec.v)
-		if err != nil {
-			return fmt.Errorf("spec: %w", err)
-		}
-
-		if !cap.EqualSpec(newCap) {
-			cap = newCap
-			modifiedVals[capKeySpec] = opts.spec.v
+	if attrs.spec.set {
+		if !cap.EqualSpec(attrs.spec.v) {
+			cap = attrs.spec.v
+			modifiedVals[capKeySpec] = attrs.spec.v.Spec()
 		} else {
 			noChangeVals[capKeySpec] = cap.Spec()
 		}
@@ -416,9 +468,9 @@ func invokeCapsEdit(io cmdio.IO, reqName, varName string, opts capsOptions) erro
 	return nil
 }
 
-func invokeCapsGet(io cmdio.IO, reqName, capName string, getItem capKey, opts capsOptions) error {
+func invokeCapsGet(io cmdio.IO, projFile, reqName, capName string, getItem capKey) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -448,9 +500,16 @@ func invokeCapsGet(io cmdio.IO, reqName, capName string, getItem capKey, opts ca
 	return nil
 }
 
-func invokeCapsNew(io cmdio.IO, reqName, varName, varCap string, opts capsOptions) error {
+// additional constraints: attrs.spec must be set to valid spec or this will panic.
+// arguably this means we should not be accepting the attrs as its the only other
+// property at this time, but doing it for consistency and extensibility.
+func invokeCapsNew(io cmdio.IO, projFile, reqName, varName string, attrs capAttrValues) error {
+	if !attrs.spec.set {
+		panic("invokeCapsNew called without spec attribute set")
+	}
+
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -462,13 +521,7 @@ func invokeCapsNew(io cmdio.IO, reqName, varName, varCap string, opts capsOption
 		return fmt.Errorf("no request template %s", reqName)
 	}
 
-	// parse the var scraper
-	varName, err = morc.ParseVarName(varName)
-	if err != nil {
-		return err
-	}
-
-	// var name normalized to upper case
+	// parsing already done; just coerce case
 	varUpper := strings.ToUpper(varName)
 	if len(req.Captures) > 0 {
 		if _, ok := req.Captures[varUpper]; ok {
@@ -476,11 +529,8 @@ func invokeCapsNew(io cmdio.IO, reqName, varName, varCap string, opts capsOption
 		}
 	}
 
-	// parse the capture spec
-	cap, err := morc.ParseVarScraperSpec(varName, varCap)
-	if err != nil {
-		return err
-	}
+	cap := attrs.spec.v
+	cap.Name = varUpper
 
 	// otherwise, we have a valid capture, so add it to the request.
 	if req.Captures == nil {
@@ -507,9 +557,9 @@ func invokeCapsNew(io cmdio.IO, reqName, varName, varCap string, opts capsOption
 	return nil
 }
 
-func invokeCapsList(io cmdio.IO, reqName string, opts capsOptions) error {
+func invokeCapsList(io cmdio.IO, projFile string, reqName string) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -533,9 +583,9 @@ func invokeCapsList(io cmdio.IO, reqName string, opts capsOptions) error {
 	return nil
 }
 
-func invokeCapsShow(io cmdio.IO, reqName, capName string, opts capsOptions) error {
+func invokeCapsShow(io cmdio.IO, projFile, reqName, capName string) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}

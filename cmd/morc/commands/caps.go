@@ -18,145 +18,6 @@ var (
 	flagCapsVar    string
 )
 
-func init() {
-	capsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
-	capsCmd.PersistentFlags().StringVarP(&flagCapsNew, "new", "N", "", "Create a new capture on REQ that saves captured data to `VAR`. If given, the specification of the new capture must also be given with --spec/-s.")
-	capsCmd.PersistentFlags().StringVarP(&flagCapsDelete, "delete", "D", "", "Delete the given variable capture `VAR` from the request.")
-	capsCmd.PersistentFlags().StringVarP(&flagCapsGet, "get", "G", "", "Get the value of the given attribute of the capture. Can only be used if giving REQ and CAP and no other arguments.")
-	capsCmd.PersistentFlags().StringVarP(&flagCapsSpec, "spec", "s", "", "Specify where in responses that data should be captured from. `SPEC` is a specially-formatted string of form :FROM,TO to specify a byte-offset or a jq-ish syntax string to specify a path to a value within a JSON response body.")
-	capsCmd.PersistentFlags().StringVarP(&flagCapsVar, "var", "V", "", "Set the variable that the capture saves to.")
-
-	// cannot delete while doing new
-	capsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get")
-	capsCmd.MarkFlagsMutuallyExclusive("delete", "spec")
-	capsCmd.MarkFlagsMutuallyExclusive("delete", "var")
-	capsCmd.MarkFlagsMutuallyExclusive("get", "spec")
-	capsCmd.MarkFlagsMutuallyExclusive("get", "var")
-	capsCmd.MarkFlagsMutuallyExclusive("new", "var")
-
-	rootCmd.AddCommand(capsCmd)
-}
-
-func parseCapsSetFlags(cmd *cobra.Command, attrs *capAttrValues) error {
-	if cmd.Flags().Lookup("spec").Changed {
-		spec, err := morc.ParseVarScraperSpec("", flagCapsSpec)
-		if err != nil {
-			return fmt.Errorf("--spec/-s: %w", err)
-		}
-
-		attrs.spec = optional[morc.VarScraper]{set: true, v: spec}
-	}
-
-	if cmd.Flags().Lookup("var").Changed {
-		name, err := morc.ParseVarName(flagCapsVar)
-		if err != nil {
-			return fmt.Errorf("--var/-V: %w", err)
-		}
-		attrs.capVar = optional[string]{set: true, v: name}
-	}
-
-	return nil
-}
-
-func parseCapsActionFromFlags(cmd *cobra.Command, posArgs []string) (capsAction, error) {
-	// Enforcements assumed:
-	// * mut-exc enforced by cobra: --new and --get will not both be present.
-	// * mut-exc enforced by cobra: --new and --delete will not both be present.
-	// * mut-exc enforced by cobra: --get and --delete will not both be present.
-	// * mut-exc enforced by cobra: --delete and setOpts will not both be
-	// present.
-	// * mut-exc enforced by cobra: --get and setOpts will not both be set
-	// * mut-exc enforced by cobra: --new and --var setOpt will not be set
-	// * Min args 1.
-
-	if flagCapsDelete != "" {
-		if len(posArgs) < 1 {
-			return capsDelete, fmt.Errorf("missing request REQ to delete capture from")
-		}
-		if len(posArgs) > 1 {
-			return capsDelete, fmt.Errorf("unknown 2nd positional argument: %q", posArgs[1])
-		}
-		return capsDelete, nil
-	} else if flagCapsNew != "" {
-		if len(posArgs) < 1 {
-			return capsNew, fmt.Errorf("missing request REQ to add new capture to")
-		}
-		if len(posArgs) > 1 {
-			return capsNew, fmt.Errorf("unknown 2nd positional argument: %q", posArgs[1])
-		}
-		if !cmd.Flags().Changed("spec") {
-			return capsNew, fmt.Errorf("--new/-N requires --spec/-s")
-		}
-		if cmd.Flags().Changed("var") {
-			return capsNew, fmt.Errorf("--new/-N already gives var name; cannot be used with --var/-V")
-		}
-		return capsNew, nil
-	} else if flagCapsGet != "" {
-		if len(posArgs) < 1 {
-			return capsGet, fmt.Errorf("missing request REQ and capture VAR to get attribute from")
-		}
-		if len(posArgs) < 2 {
-			return capsGet, fmt.Errorf("missing capture VAR to get attribute from")
-		}
-		if len(posArgs) > 2 {
-			return capsGet, fmt.Errorf("unknown 3rd positional argument: %q", posArgs[2])
-		}
-		return capsGet, nil
-	} else if capsSetFlagIsPresent() {
-		if len(posArgs) < 1 {
-			return capsEdit, fmt.Errorf("missing request REQ and capture VAR to edit")
-		}
-		if len(posArgs) < 2 {
-			return capsEdit, fmt.Errorf("missing capture var to edit")
-		}
-		if len(posArgs) > 2 {
-			return capsEdit, fmt.Errorf("unknown 3rd positional argument: %q", posArgs[2])
-		}
-		return capsEdit, nil
-	}
-
-	if len(posArgs) == 0 {
-		return capsList, fmt.Errorf("missing request REQ to list captures for")
-	} else if len(posArgs) == 1 {
-		return capsList, nil
-	} else if len(posArgs) == 2 {
-		return capsShow, nil
-	} else {
-		return capsShow, fmt.Errorf("unknown 3rd positional argument: %q", posArgs[2])
-	}
-}
-
-func capsSetFlagIsPresent() bool {
-	return flagCapsVar != "" || flagCapsSpec != ""
-}
-
-// if --delete is present:
-//  * CHECK: exactly 1 arg. (or ERR)
-//  * ACTION: DELETE
-//
-// if --new is present:
-//  * CHECK: exactly 1 args. (or ERR)
-//  * CHECK: -s must be present (or ERR)
-//  * CHECK: -V must not be present (or ERR)
-//  * ACTION: NEW
-//
-// If --get is present:
-//  * CHECK: exactly 2 args. (or ERR)
-//  * ACTION: GET
-//
-// If any set flag is present:
-//  * CHECK: exactly 2 args. (or ERR)
-//  * ACTION: EDIT
-//
-// ELSE:
-//
-// If exactly 1 arg:
-//  * ACTION: LIST
-//
-// If exactly 2 args:
-// * ACTION: SHOW
-//
-
 var capsCmd = &cobra.Command{
 	Use: "caps [-F FILE] REQ\n" +
 		"caps [-F FILE] REQ --delete VAR\n" +
@@ -206,147 +67,23 @@ var capsCmd = &cobra.Command{
 	},
 }
 
-func parseCapsArgs(cmd *cobra.Command, posArgs []string, args *capsArgs) error {
-	args.projFile = commonflags.ProjectFile
-	if args.projFile == "" {
-		return fmt.Errorf("project file cannot be set to empty string")
-	}
+func init() {
+	capsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+	capsCmd.PersistentFlags().StringVarP(&flagCapsNew, "new", "N", "", "Create a new capture on REQ that saves captured data to `VAR`. If given, the specification of the new capture must also be given with --spec/-s.")
+	capsCmd.PersistentFlags().StringVarP(&flagCapsDelete, "delete", "D", "", "Delete the given variable capture `VAR` from the request.")
+	capsCmd.PersistentFlags().StringVarP(&flagCapsGet, "get", "G", "", "Get the value of the given attribute of the capture. Can only be used if giving REQ and CAP and no other arguments.")
+	capsCmd.PersistentFlags().StringVarP(&flagCapsSpec, "spec", "s", "", "Specify where in responses that data should be captured from. `SPEC` is a specially-formatted string of form :FROM,TO to specify a byte-offset or a jq-ish syntax string to specify a path to a value within a JSON response body.")
+	capsCmd.PersistentFlags().StringVarP(&flagCapsVar, "var", "V", "", "Set the variable that the capture saves to.")
 
-	var err error
+	// cannot delete while doing new
+	capsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get")
+	capsCmd.MarkFlagsMutuallyExclusive("delete", "spec")
+	capsCmd.MarkFlagsMutuallyExclusive("delete", "var")
+	capsCmd.MarkFlagsMutuallyExclusive("get", "spec")
+	capsCmd.MarkFlagsMutuallyExclusive("get", "var")
+	capsCmd.MarkFlagsMutuallyExclusive("new", "var")
 
-	args.action, err = parseCapsActionFromFlags(cmd, posArgs)
-	if err != nil {
-		return err
-	}
-
-	// assume arg 1 exists and be the request name (already enforced by parse func above)
-	args.request = posArgs[0]
-
-	// do action-specific arg and flag parsing
-	switch args.action {
-	case capsList:
-		// nothing else to do; all args already gathered
-	case capsShow:
-		// set arg 2 as the capture name
-		args.capture = posArgs[1]
-	case capsDelete:
-		// special case of capture set from a CLI flag rather than pos arg.
-		args.capture = flagCapsDelete
-	case capsGet:
-		// set arg 2 as the capture name
-		args.capture = posArgs[1]
-
-		// parse the get from the string
-		args.getItem, err = parseCapAttrKey(flagProjGet)
-		if err != nil {
-			return err
-		}
-	case capsNew:
-		// above parsing already checked that -V will not be present and -s will
-		// so we can just run through normal parseCapsSetFlags and then use
-		// --new argument to set the new cap var manaully.
-		if err := parseCapsSetFlags(cmd, &args.sets); err != nil {
-			return err
-		}
-
-		// still need to parse the new name, above func won't hit it
-		name, err := morc.ParseVarName(flagCapsVar)
-		if err != nil {
-			return fmt.Errorf("--new/-N: %w", err)
-		}
-
-		// apply it to both the sets and the capture name. callers SHOULD only
-		// grab from args.capture, but this way is a bit more defensive.
-		args.sets.capVar = optional[string]{set: true, v: name}
-		args.capture = name
-	case capsEdit:
-		// set arg 2 as the capture name
-		args.capture = posArgs[1]
-
-		if err := parseCapsSetFlags(cmd, &args.sets); err != nil {
-			return err
-		}
-	default:
-		panic(fmt.Sprintf("unhandled caps action %q", args.action))
-	}
-
-	return nil
-}
-
-type capsAction int
-
-const (
-	capsList capsAction = iota
-	capsShow
-	capsGet
-	capsDelete
-	capsNew
-	capsEdit
-)
-
-type capKey string
-
-const (
-	capKeyVar  capKey = "VAR"
-	capKeySpec capKey = "SPEC"
-)
-
-// Human prints the human-readable description of the key.
-func (ck capKey) Human() string {
-	switch ck {
-	case capKeyVar:
-		return "captured-to variable"
-	case capKeySpec:
-		return "capture specification"
-	default:
-		return fmt.Sprintf("unknown capture key %q", ck)
-	}
-}
-
-func (ck capKey) Name() string {
-	return string(ck)
-}
-
-var (
-	// ordering of capKeys in output is set here
-
-	capAttrKeys = []capKey{
-		capKeyVar,
-		capKeySpec,
-	}
-)
-
-func capAttrKeyNames() []string {
-	names := make([]string, len(capAttrKeys))
-	for i, k := range capAttrKeys {
-		names[i] = k.Name()
-	}
-	return names
-}
-
-func parseCapAttrKey(s string) (capKey, error) {
-	switch strings.ToUpper(s) {
-	case capKeyVar.Name():
-		return capKeyVar, nil
-	case capKeySpec.Name():
-		return capKeySpec, nil
-	default:
-		return "", fmt.Errorf("invalid attribute %q; must be one of %s", s, strings.Join(capAttrKeyNames(), ", "))
-	}
-}
-
-type capsArgs struct {
-	projFile string
-	action   capsAction
-	request  string
-	capture  string
-	getItem  capKey
-	sets     capAttrValues
-}
-
-type capAttrValues struct {
-	capVar optional[string]
-	spec   optional[morc.VarScraper]
+	rootCmd.AddCommand(capsCmd)
 }
 
 func invokeCapsDelete(io cmdio.IO, projFile string, reqName, varName string) error {
@@ -607,4 +344,240 @@ func invokeCapsShow(io cmdio.IO, projFile, reqName, capName string) error {
 
 	io.PrintLoudln(cap)
 	return nil
+}
+
+type capsArgs struct {
+	projFile string
+	action   capsAction
+	request  string
+	capture  string
+	getItem  capKey
+	sets     capAttrValues
+}
+
+type capAttrValues struct {
+	capVar optional[string]
+	spec   optional[morc.VarScraper]
+}
+
+func parseCapsArgs(cmd *cobra.Command, posArgs []string, args *capsArgs) error {
+	args.projFile = commonflags.ProjectFile
+	if args.projFile == "" {
+		return fmt.Errorf("project file cannot be set to empty string")
+	}
+
+	var err error
+
+	args.action, err = parseCapsActionFromFlags(cmd, posArgs)
+	if err != nil {
+		return err
+	}
+
+	// assume arg 1 exists and be the request name (already enforced by parse func above)
+	args.request = posArgs[0]
+
+	// do action-specific arg and flag parsing
+	switch args.action {
+	case capsList:
+		// nothing else to do; all args already gathered
+	case capsShow:
+		// set arg 2 as the capture name
+		args.capture = posArgs[1]
+	case capsDelete:
+		// special case of capture set from a CLI flag rather than pos arg.
+		args.capture = flagCapsDelete
+	case capsGet:
+		// set arg 2 as the capture name
+		args.capture = posArgs[1]
+
+		// parse the get from the string
+		args.getItem, err = parseCapAttrKey(flagProjGet)
+		if err != nil {
+			return err
+		}
+	case capsNew:
+		// above parsing already checked that -V will not be present and -s will
+		// so we can just run through normal parseCapsSetFlags and then use
+		// --new argument to set the new cap var manaully.
+		if err := parseCapsSetFlags(cmd, &args.sets); err != nil {
+			return err
+		}
+
+		// still need to parse the new name, above func won't hit it
+		name, err := morc.ParseVarName(flagCapsVar)
+		if err != nil {
+			return fmt.Errorf("--new/-N: %w", err)
+		}
+
+		// apply it to both the sets and the capture name. callers SHOULD only
+		// grab from args.capture, but this way is a bit more defensive.
+		args.sets.capVar = optional[string]{set: true, v: name}
+		args.capture = name
+	case capsEdit:
+		// set arg 2 as the capture name
+		args.capture = posArgs[1]
+
+		if err := parseCapsSetFlags(cmd, &args.sets); err != nil {
+			return err
+		}
+	default:
+		panic(fmt.Sprintf("unhandled caps action %q", args.action))
+	}
+
+	return nil
+}
+
+func parseCapsActionFromFlags(cmd *cobra.Command, posArgs []string) (capsAction, error) {
+	// Enforcements assumed:
+	// * mut-exc enforced by cobra: --new and --get will not both be present.
+	// * mut-exc enforced by cobra: --new and --delete will not both be present.
+	// * mut-exc enforced by cobra: --get and --delete will not both be present.
+	// * mut-exc enforced by cobra: --delete and setOpts will not both be
+	// present.
+	// * mut-exc enforced by cobra: --get and setOpts will not both be set
+	// * mut-exc enforced by cobra: --new and --var setOpt will not be set
+	// * Min args 1.
+
+	if flagCapsDelete != "" {
+		if len(posArgs) < 1 {
+			return capsDelete, fmt.Errorf("missing request REQ to delete capture from")
+		}
+		if len(posArgs) > 1 {
+			return capsDelete, fmt.Errorf("unknown 2nd positional argument: %q", posArgs[1])
+		}
+		return capsDelete, nil
+	} else if flagCapsNew != "" {
+		if len(posArgs) < 1 {
+			return capsNew, fmt.Errorf("missing request REQ to add new capture to")
+		}
+		if len(posArgs) > 1 {
+			return capsNew, fmt.Errorf("unknown 2nd positional argument: %q", posArgs[1])
+		}
+		if !cmd.Flags().Changed("spec") {
+			return capsNew, fmt.Errorf("--new/-N requires --spec/-s")
+		}
+		if cmd.Flags().Changed("var") {
+			return capsNew, fmt.Errorf("--new/-N already gives var name; cannot be used with --var/-V")
+		}
+		return capsNew, nil
+	} else if flagCapsGet != "" {
+		if len(posArgs) < 1 {
+			return capsGet, fmt.Errorf("missing request REQ and capture VAR to get attribute from")
+		}
+		if len(posArgs) < 2 {
+			return capsGet, fmt.Errorf("missing capture VAR to get attribute from")
+		}
+		if len(posArgs) > 2 {
+			return capsGet, fmt.Errorf("unknown 3rd positional argument: %q", posArgs[2])
+		}
+		return capsGet, nil
+	} else if capsSetFlagIsPresent() {
+		if len(posArgs) < 1 {
+			return capsEdit, fmt.Errorf("missing request REQ and capture VAR to edit")
+		}
+		if len(posArgs) < 2 {
+			return capsEdit, fmt.Errorf("missing capture var to edit")
+		}
+		if len(posArgs) > 2 {
+			return capsEdit, fmt.Errorf("unknown 3rd positional argument: %q", posArgs[2])
+		}
+		return capsEdit, nil
+	}
+
+	if len(posArgs) == 0 {
+		return capsList, fmt.Errorf("missing request REQ to list captures for")
+	} else if len(posArgs) == 1 {
+		return capsList, nil
+	} else if len(posArgs) == 2 {
+		return capsShow, nil
+	} else {
+		return capsShow, fmt.Errorf("unknown 3rd positional argument: %q", posArgs[2])
+	}
+}
+
+func parseCapsSetFlags(cmd *cobra.Command, attrs *capAttrValues) error {
+	if cmd.Flags().Lookup("spec").Changed {
+		spec, err := morc.ParseVarScraperSpec("", flagCapsSpec)
+		if err != nil {
+			return fmt.Errorf("--spec/-s: %w", err)
+		}
+
+		attrs.spec = optional[morc.VarScraper]{set: true, v: spec}
+	}
+
+	if cmd.Flags().Lookup("var").Changed {
+		name, err := morc.ParseVarName(flagCapsVar)
+		if err != nil {
+			return fmt.Errorf("--var/-V: %w", err)
+		}
+		attrs.capVar = optional[string]{set: true, v: name}
+	}
+
+	return nil
+}
+
+func capsSetFlagIsPresent() bool {
+	return flagCapsVar != "" || flagCapsSpec != ""
+}
+
+type capsAction int
+
+const (
+	capsList capsAction = iota
+	capsShow
+	capsGet
+	capsDelete
+	capsNew
+	capsEdit
+)
+
+type capKey string
+
+const (
+	capKeyVar  capKey = "VAR"
+	capKeySpec capKey = "SPEC"
+)
+
+// Human prints the human-readable description of the key.
+func (ck capKey) Human() string {
+	switch ck {
+	case capKeyVar:
+		return "captured-to variable"
+	case capKeySpec:
+		return "capture specification"
+	default:
+		return fmt.Sprintf("unknown capture key %q", ck)
+	}
+}
+
+func (ck capKey) Name() string {
+	return string(ck)
+}
+
+var (
+	// ordering of capKeys in output is set here
+
+	capAttrKeys = []capKey{
+		capKeyVar,
+		capKeySpec,
+	}
+)
+
+func capAttrKeyNames() []string {
+	names := make([]string, len(capAttrKeys))
+	for i, k := range capAttrKeys {
+		names[i] = k.Name()
+	}
+	return names
+}
+
+func parseCapAttrKey(s string) (capKey, error) {
+	switch strings.ToUpper(s) {
+	case capKeyVar.Name():
+		return capKeyVar, nil
+	case capKeySpec.Name():
+		return capKeySpec, nil
+	default:
+		return "", fmt.Errorf("invalid attribute %q; must be one of %s", s, strings.Join(capAttrKeyNames(), ", "))
+	}
 }

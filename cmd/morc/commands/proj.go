@@ -23,6 +23,40 @@ var (
 	flagProjRecordHistory  string
 )
 
+var projCmd = &cobra.Command{
+	Use: "proj [-F FILE]\n" +
+		"proj [-F FILE] --new [-nHSCcR]\n" +
+		"proj [-F FILE] --get ATTR\n" +
+		"proj [-F FILE] [-nHSCcR]",
+	GroupID: "project",
+	Short:   "Show or manipulate project attributes and config",
+	Long:    projCmdHelp,
+	Args:    cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		var opts projArgs
+		if err := parseProjArgs(cmd, args, &opts); err != nil {
+			return err
+		}
+
+		// done checking args, don't show usage on error
+		cmd.SilenceUsage = true
+		io := cmdio.From(cmd)
+
+		switch opts.action {
+		case projInfo:
+			return invokeProjShow(io, opts.projFile)
+		case projGet:
+			return invokeProjGet(io, opts.projFile, opts.getItem)
+		case projNew:
+			return invokeProjNew(io, opts.projFile, opts.sets)
+		case projEdit:
+			return invokeProjEdit(io, opts.projFile, opts.sets)
+		default:
+			panic(fmt.Sprintf("unhandled proj action %q", opts.action))
+		}
+	},
+}
+
 func init() {
 	projCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
 	projCmd.PersistentFlags().BoolVarP(&flagProjNew, "new", "N", false, "Create a new project instead of reading/editing one. Combine with other arguments to specify values for the new project.")
@@ -44,7 +78,6 @@ func init() {
 	rootCmd.AddCommand(projCmd)
 }
 
-// TODO: greatly update this help to actually be correct.
 var (
 	projCmdHelp = func() string {
 		s := "Shows and manipulates MORC project files. By default, this will "
@@ -87,244 +120,6 @@ var (
 			String()
 	}()
 )
-
-var projCmd = &cobra.Command{
-	Use: "proj [-F FILE]\n" +
-		"proj [-F FILE] --new [-nHSCcR]\n" +
-		"proj [-F FILE] --get ATTR\n" +
-		"proj [-F FILE] [-nHSCcR]",
-	GroupID: "project",
-	Short:   "Show or manipulate project attributes and config",
-	Long:    projCmdHelp,
-	Args:    cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		var opts projArgs
-		if err := parseProjArgs(cmd, args, &opts); err != nil {
-			return err
-		}
-
-		// done checking args, don't show usage on error
-		cmd.SilenceUsage = true
-		io := cmdio.From(cmd)
-
-		switch opts.action {
-		case projInfo:
-			return invokeProjShow(io, opts.projFile)
-		case projGet:
-			return invokeProjGet(io, opts.projFile, opts.getItem)
-		case projNew:
-			return invokeProjNew(io, opts.projFile, opts.sets)
-		case projEdit:
-			return invokeProjEdit(io, opts.projFile, opts.sets)
-		default:
-			panic(fmt.Sprintf("unhandled proj action %q", opts.action))
-		}
-	},
-}
-
-func parseProjArgs(cmd *cobra.Command, posArgs []string, args *projArgs) error {
-	args.projFile = commonflags.ProjectFile
-	if args.projFile == "" {
-		return fmt.Errorf("project file cannot be set to empty string")
-	}
-
-	var err error
-
-	args.action, err = parseProjActionFromFlags()
-	if err != nil {
-		return err
-	}
-
-	// do action-specific arg and flag parsing
-	switch args.action {
-	case projInfo:
-		// no-op; no further checks to do
-	case projGet:
-		// parse the get from the string
-		args.getItem, err = parseProjAttrKey(flagProjGet)
-		if err != nil {
-			return err
-		}
-	case projNew:
-		if err := parseProjSetFlags(cmd, &args.sets); err != nil {
-			return err
-		}
-	case projEdit:
-		if err := parseProjSetFlags(cmd, &args.sets); err != nil {
-			return err
-		}
-	default:
-		panic(fmt.Sprintf("unhandled proj action %q", args.action))
-	}
-
-	return nil
-}
-
-func parseProjSetFlags(cmd *cobra.Command, attrs *projAttrValues) error {
-	if cmd.Flags().Lookup("name").Changed {
-		attrs.name = optionalC[string]{set: true, v: flagProjName}
-	}
-
-	if cmd.Flags().Lookup("history-file").Changed {
-		attrs.histFile = optionalC[string]{set: true, v: flagProjHistoryFile}
-	}
-
-	if cmd.Flags().Lookup("cookies-file").Changed {
-		attrs.seshFile = optionalC[string]{set: true, v: flagProjSessionFile}
-	}
-
-	if cmd.Flags().Lookup("cookie-lifetime").Changed {
-		cl, err := time.ParseDuration(flagProjCookieLifetime)
-		if err != nil {
-			return fmt.Errorf("cookie-lifetime: %w", err)
-		}
-		attrs.cookieLifetime = optionalC[time.Duration]{set: true, v: cl}
-	}
-
-	if cmd.Flags().Lookup("cookies").Changed {
-		isOn, err := parseOnOff(flagProjRecordCookies)
-		if err != nil {
-			return fmt.Errorf("cookies: %w", err)
-		}
-		attrs.recordCookies = optionalC[bool]{set: true, v: isOn}
-	}
-
-	if cmd.Flags().Lookup("history").Changed {
-		isOn, err := parseOnOff(flagProjRecordHistory)
-		if err != nil {
-			return fmt.Errorf("history: %w", err)
-		}
-		attrs.recordHistory = optionalC[bool]{set: true, v: isOn}
-	}
-
-	return nil
-}
-
-func projSetFlagIsPresent() bool {
-	return flagProjName != "" || flagProjHistoryFile != "" || flagProjSessionFile != "" || flagProjCookieLifetime != "" || flagProjRecordCookies != "" || flagProjRecordHistory != ""
-}
-
-func parseProjActionFromFlags() (projAction, error) {
-	// Enforcements assumed:
-	// * mutual-exclusion enforced by cobra: --new and --get will not both be
-	// present.
-	// * mutual-exclusion enforced by cobra: Iff --get present, set-flags will
-	// not be present.
-	// * No-args.
-
-	if flagProjGet != "" {
-		return projGet, nil
-	} else if flagProjNew {
-		return projNew, nil
-	} else if projSetFlagIsPresent() {
-		return projEdit, nil
-	}
-	return projInfo, nil
-}
-
-type projAction int
-
-const (
-	projInfo projAction = iota
-	projGet
-	projNew
-	projEdit
-)
-
-type projKey string
-
-const (
-	projKeyName           projKey = "NAME"
-	projKeyHistFile       projKey = "HISTORY-FILE"
-	projKeySeshFile       projKey = "SESSION-FILE"
-	projKeyCookieLifetime projKey = "COOKIE-LIFETIME"
-	projKeyCookies        projKey = "COOKIES"
-	projKeyHistory        projKey = "HISTORY"
-)
-
-// Human prints the human-readable description of the key.
-func (pk projKey) Human() string {
-	switch pk {
-	case projKeyName:
-		return "project name"
-	case projKeyHistFile:
-		return "history file"
-	case projKeySeshFile:
-		return "session file"
-	case projKeyCookieLifetime:
-		return "cookie lifetime"
-	case projKeyCookies:
-		return "cookie recording"
-	case projKeyHistory:
-		return "history recording"
-	default:
-		return fmt.Sprintf("unknown project key %q", pk)
-	}
-}
-
-func (pk projKey) Name() string {
-	return string(pk)
-}
-
-var (
-	// ordering of projAttrKeys in output is set here
-
-	projAttrKeys = []projKey{
-		projKeyName,
-		projKeyHistFile,
-		projKeyHistory,
-		projKeySeshFile,
-		projKeyCookies,
-		projKeyCookieLifetime,
-	}
-)
-
-func projAttrKeyNames() []string {
-	names := make([]string, len(projAttrKeys))
-	for i, k := range projAttrKeys {
-		names[i] = k.Name()
-	}
-	return names
-}
-
-func parseProjAttrKey(s string) (projKey, error) {
-	switch strings.ToUpper(s) {
-	case projKeyName.Name():
-		return projKeyName, nil
-	case projKeyHistFile.Name():
-		return projKeyHistFile, nil
-	case projKeySeshFile.Name():
-		return projKeySeshFile, nil
-	case projKeyCookieLifetime.Name():
-		return projKeyCookieLifetime, nil
-	case projKeyCookies.Name():
-		return projKeyCookies, nil
-	case projKeyHistory.Name():
-		return projKeyHistory, nil
-	default:
-		return "", fmt.Errorf("invalid attribute %q; must be one of %s", s, strings.Join(projAttrKeyNames(), ", "))
-	}
-}
-
-type projArgs struct {
-	projFile string
-	action   projAction
-	getItem  projKey
-	sets     projAttrValues
-}
-
-type projAttrValues struct {
-	name           optionalC[string]
-	recordHistory  optionalC[bool]
-	recordCookies  optionalC[bool]
-	seshFile       optionalC[string]
-	histFile       optionalC[string]
-	cookieLifetime optionalC[time.Duration]
-}
-
-func (sfv projAttrValues) changesFilePaths() bool {
-	return sfv.seshFile.set || sfv.histFile.set
-}
 
 func invokeProjEdit(io cmdio.IO, projFile string, attrs projAttrValues) error {
 	// if either the history file or session file are altered, or if cookie
@@ -561,4 +356,208 @@ func invokeProjShow(io cmdio.IO, projFile string) error {
 	}
 
 	return nil
+}
+
+type projArgs struct {
+	projFile string
+	action   projAction
+	getItem  projKey
+	sets     projAttrValues
+}
+
+type projAttrValues struct {
+	name           optionalC[string]
+	recordHistory  optionalC[bool]
+	recordCookies  optionalC[bool]
+	seshFile       optionalC[string]
+	histFile       optionalC[string]
+	cookieLifetime optionalC[time.Duration]
+}
+
+func (sfv projAttrValues) changesFilePaths() bool {
+	return sfv.seshFile.set || sfv.histFile.set
+}
+
+func parseProjArgs(cmd *cobra.Command, posArgs []string, args *projArgs) error {
+	args.projFile = commonflags.ProjectFile
+	if args.projFile == "" {
+		return fmt.Errorf("project file cannot be set to empty string")
+	}
+
+	var err error
+
+	args.action, err = parseProjActionFromFlags()
+	if err != nil {
+		return err
+	}
+
+	// do action-specific arg and flag parsing
+	switch args.action {
+	case projInfo:
+		// no-op; no further checks to do
+	case projGet:
+		// parse the get from the string
+		args.getItem, err = parseProjAttrKey(flagProjGet)
+		if err != nil {
+			return err
+		}
+	case projNew:
+		if err := parseProjSetFlags(cmd, &args.sets); err != nil {
+			return err
+		}
+	case projEdit:
+		if err := parseProjSetFlags(cmd, &args.sets); err != nil {
+			return err
+		}
+	default:
+		panic(fmt.Sprintf("unhandled proj action %q", args.action))
+	}
+
+	return nil
+}
+
+func parseProjActionFromFlags() (projAction, error) {
+	// Enforcements assumed:
+	// * mutual-exclusion enforced by cobra: --new and --get will not both be
+	// present.
+	// * mutual-exclusion enforced by cobra: Iff --get present, set-flags will
+	// not be present.
+	// * No-args.
+
+	if flagProjGet != "" {
+		return projGet, nil
+	} else if flagProjNew {
+		return projNew, nil
+	} else if projSetFlagIsPresent() {
+		return projEdit, nil
+	}
+	return projInfo, nil
+}
+
+func parseProjSetFlags(cmd *cobra.Command, attrs *projAttrValues) error {
+	if cmd.Flags().Lookup("name").Changed {
+		attrs.name = optionalC[string]{set: true, v: flagProjName}
+	}
+
+	if cmd.Flags().Lookup("history-file").Changed {
+		attrs.histFile = optionalC[string]{set: true, v: flagProjHistoryFile}
+	}
+
+	if cmd.Flags().Lookup("cookies-file").Changed {
+		attrs.seshFile = optionalC[string]{set: true, v: flagProjSessionFile}
+	}
+
+	if cmd.Flags().Lookup("cookie-lifetime").Changed {
+		cl, err := time.ParseDuration(flagProjCookieLifetime)
+		if err != nil {
+			return fmt.Errorf("cookie-lifetime: %w", err)
+		}
+		attrs.cookieLifetime = optionalC[time.Duration]{set: true, v: cl}
+	}
+
+	if cmd.Flags().Lookup("cookies").Changed {
+		isOn, err := parseOnOff(flagProjRecordCookies)
+		if err != nil {
+			return fmt.Errorf("cookies: %w", err)
+		}
+		attrs.recordCookies = optionalC[bool]{set: true, v: isOn}
+	}
+
+	if cmd.Flags().Lookup("history").Changed {
+		isOn, err := parseOnOff(flagProjRecordHistory)
+		if err != nil {
+			return fmt.Errorf("history: %w", err)
+		}
+		attrs.recordHistory = optionalC[bool]{set: true, v: isOn}
+	}
+
+	return nil
+}
+
+func projSetFlagIsPresent() bool {
+	return flagProjName != "" || flagProjHistoryFile != "" || flagProjSessionFile != "" || flagProjCookieLifetime != "" || flagProjRecordCookies != "" || flagProjRecordHistory != ""
+}
+
+type projAction int
+
+const (
+	projInfo projAction = iota
+	projGet
+	projNew
+	projEdit
+)
+
+type projKey string
+
+const (
+	projKeyName           projKey = "NAME"
+	projKeyHistFile       projKey = "HISTORY-FILE"
+	projKeySeshFile       projKey = "SESSION-FILE"
+	projKeyCookieLifetime projKey = "COOKIE-LIFETIME"
+	projKeyCookies        projKey = "COOKIES"
+	projKeyHistory        projKey = "HISTORY"
+)
+
+// Human prints the human-readable description of the key.
+func (pk projKey) Human() string {
+	switch pk {
+	case projKeyName:
+		return "project name"
+	case projKeyHistFile:
+		return "history file"
+	case projKeySeshFile:
+		return "session file"
+	case projKeyCookieLifetime:
+		return "cookie lifetime"
+	case projKeyCookies:
+		return "cookie recording"
+	case projKeyHistory:
+		return "history recording"
+	default:
+		return fmt.Sprintf("unknown project key %q", pk)
+	}
+}
+
+func (pk projKey) Name() string {
+	return string(pk)
+}
+
+var (
+	// ordering of projAttrKeys in output is set here
+
+	projAttrKeys = []projKey{
+		projKeyName,
+		projKeyHistFile,
+		projKeyHistory,
+		projKeySeshFile,
+		projKeyCookies,
+		projKeyCookieLifetime,
+	}
+)
+
+func projAttrKeyNames() []string {
+	names := make([]string, len(projAttrKeys))
+	for i, k := range projAttrKeys {
+		names[i] = k.Name()
+	}
+	return names
+}
+
+func parseProjAttrKey(s string) (projKey, error) {
+	switch strings.ToUpper(s) {
+	case projKeyName.Name():
+		return projKeyName, nil
+	case projKeyHistFile.Name():
+		return projKeyHistFile, nil
+	case projKeySeshFile.Name():
+		return projKeySeshFile, nil
+	case projKeyCookieLifetime.Name():
+		return projKeyCookieLifetime, nil
+	case projKeyCookies.Name():
+		return projKeyCookies, nil
+	case projKeyHistory.Name():
+		return projKeyHistory, nil
+	default:
+		return "", fmt.Errorf("invalid attribute %q; must be one of %s", s, strings.Join(projAttrKeyNames(), ", "))
+	}
 }

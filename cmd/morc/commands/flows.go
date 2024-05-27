@@ -21,21 +21,6 @@ var (
 	flagFlowStepMoves    []string
 )
 
-func init() {
-	flowsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
-	flowsCmd.PersistentFlags().BoolVarP(&flagFlowDelete, "delete", "d", false, "Delete the flow with the given name. Can only be used when flow name is also given.")
-	flowsCmd.PersistentFlags().BoolVarP(&flagFlowNew, "new", "", false, "Create a new flow with the given name and request steps. If given, arguments to the command are interpreted as the new flow name and the request steps, in order.")
-	flowsCmd.PersistentFlags().IntSliceVarP(&flagFlowStepRemovals, "remove", "r", nil, "Remove the step at index `IDX` from the flow. Can be given multiple times; if so, will be applied from highest to lowest index. Will be applied after all step replacements are applied.")
-	flowsCmd.PersistentFlags().StringArrayVarP(&flagFlowStepAdds, "add", "a", nil, "Add a new step calling request REQ at index IDX, or at the end of current steps if index is omitted. Argument must be a string in form `[IDX]:REQ`. Can be given multiple times; if so, will be applied from lowest to highest index after all replacements and removals are applied.")
-	flowsCmd.PersistentFlags().StringArrayVarP(&flagFlowStepMoves, "move", "m", nil, "Move the step at index FROM to index TO. Argument must be a string in form `FROM:[TO]`. Can be given multiple times; if so, will be applied in order given after all replacements, removals, and adds are applied. If TO is not given, the step is moved to the end of the flow.")
-
-	flowsCmd.MarkFlagsMutuallyExclusive("delete", "new", "remove")
-	flowsCmd.MarkFlagsMutuallyExclusive("delete", "new", "add")
-	flowsCmd.MarkFlagsMutuallyExclusive("delete", "new", "move")
-
-	rootCmd.AddCommand(flowsCmd)
-}
-
 var flowsCmd = &cobra.Command{
 	Use: "flows [-F FILE]\n" +
 		"flows FLOW --new REQ1 REQ2 [REQN]... [-F FILE]\n" +
@@ -317,6 +302,21 @@ var flowsCmd = &cobra.Command{
 			panic(fmt.Sprintf("unhandled flow action %q", opts.action))
 		}
 	},
+}
+
+func init() {
+	flowsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+	flowsCmd.PersistentFlags().BoolVarP(&flagFlowDelete, "delete", "d", false, "Delete the flow with the given name. Can only be used when flow name is also given.")
+	flowsCmd.PersistentFlags().BoolVarP(&flagFlowNew, "new", "", false, "Create a new flow with the given name and request steps. If given, arguments to the command are interpreted as the new flow name and the request steps, in order.")
+	flowsCmd.PersistentFlags().IntSliceVarP(&flagFlowStepRemovals, "remove", "r", nil, "Remove the step at index `IDX` from the flow. Can be given multiple times; if so, will be applied from highest to lowest index. Will be applied after all step replacements are applied.")
+	flowsCmd.PersistentFlags().StringArrayVarP(&flagFlowStepAdds, "add", "a", nil, "Add a new step calling request REQ at index IDX, or at the end of current steps if index is omitted. Argument must be a string in form `[IDX]:REQ`. Can be given multiple times; if so, will be applied from lowest to highest index after all replacements and removals are applied.")
+	flowsCmd.PersistentFlags().StringArrayVarP(&flagFlowStepMoves, "move", "m", nil, "Move the step at index FROM to index TO. Argument must be a string in form `FROM:[TO]`. Can be given multiple times; if so, will be applied in order given after all replacements, removals, and adds are applied. If TO is not given, the step is moved to the end of the flow.")
+
+	flowsCmd.MarkFlagsMutuallyExclusive("delete", "new", "remove")
+	flowsCmd.MarkFlagsMutuallyExclusive("delete", "new", "add")
+	flowsCmd.MarkFlagsMutuallyExclusive("delete", "new", "move")
+
+	rootCmd.AddCommand(flowsCmd)
 }
 
 func invokeFlowsDelete(io cmdio.IO, name string, opts flowsOptions) error {
@@ -668,6 +668,27 @@ func invokeFlowsList(io cmdio.IO, opts flowsOptions) error {
 	return nil
 }
 
+type flowsOptions struct {
+	projFile string
+	action   flowAction
+
+	newName          optional[string]
+	stepReplacements []flowStepUpsert
+	stepAdds         []flowStepUpsert
+	stepRemovals     []int
+	stepMoves        []flowStepMove
+}
+
+type flowStepUpsert struct {
+	index    int
+	template string
+}
+
+type flowStepMove struct {
+	from int
+	to   int
+}
+
 type flowAction int
 
 const (
@@ -752,27 +773,6 @@ func parseFlowAttrKey(s string) (flowKey, error) {
 	default:
 		return flowKey{}, fmt.Errorf("must be a step index or one of %s", strings.Join(flowAttrKeyNames(), ", "))
 	}
-}
-
-type flowStepUpsert struct {
-	index    int
-	template string
-}
-
-type flowStepMove struct {
-	from int
-	to   int
-}
-
-type flowsOptions struct {
-	projFile string
-	action   flowAction
-
-	newName          optional[string]
-	stepReplacements []flowStepUpsert
-	stepAdds         []flowStepUpsert
-	stepRemovals     []int
-	stepMoves        []flowStepMove
 }
 
 func flowStepIndexFromOrdinal(steps []morc.FlowStep, idx int, autoClampMax bool) (int, error) {

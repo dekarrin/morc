@@ -12,8 +12,17 @@ import (
 )
 
 var (
-	flagReqsNew    bool
-	flagReqsDelete bool
+	flagReqsNew           string
+	flagReqsDelete        string
+	flagReqsGet           string
+	flagReqsGetHeader     string
+	flagReqsRemoveHeaders []string
+	flagReqsRemoveBody    bool
+	flagReqsBodyData      string
+	flagReqsHeaders       []string
+	flagReqsMethod        string
+	flagReqsURL           string
+	flagReqsName          string
 )
 
 // TODO: the attr/index system is ridiculously overcomplicated; just use optionally-valued args ffs.
@@ -37,7 +46,7 @@ var ReqsCmd = &cobra.Command{
 		"reqs [-F FILE] --new REQ [-H HDR]... [-d DATA | -d @FILE] [-X METHOD] [-u URL] [-F FILE]\n" +
 		"reqs [-F FILE] REQ\n" +
 		"reqs [-F FILE] REQ --get ATTR\n" +
-		"reqs [-F FILE] REQ [-ndXuH]...",
+		"reqs [-F FILE] REQ [-ndXuHr]... [--remove-body]",
 	GroupID: "project",
 	Short:   "Show or modify request templates",
 	Long: "Manipulate project request templates. By itself, prints out a listing of the names and methods of the request templates " +
@@ -48,9 +57,9 @@ var ReqsCmd = &cobra.Command{
 		"multiple -H flags. The URL of the request is set with the the -u/--url flag.\n\nA particular request can be viewed by providing " +
 		"the name of the request, REQ, as a positional argument to the flows command. This will show all details of a request template. " +
 		"To see only a specific attribute of a request, provide --get along with the name of the attribute of the request to show. " +
-		"The attribute, ATTR, can either be a header key with a leading ':' or one of the following: " +
+		"The attribute, ATTR, must be one of the following: " +
 		strings.Join(reqAttrKeyNames(), ", ") + ". If 'HEADERS' is selected, all headers on the request are printed. To see the value(s) of " +
-		"only a particular header, provide the name of the header as the argument to --get, prepended with a leading ':'.\n\n" +
+		"only a particular header, use --get-header with the name of the header to see instead.\n\n" +
 		"Modifications to existing request templates are performed by giving REQ as a positional argument followed by one or more flag " +
 		"that sets a property of the request. For example, to change the method of a request, provide the -X flag followed by the new " +
 		"method. All flags that are supported during request creation are also supported when modifying a request (-X, -d, -u, -H), in " +
@@ -72,19 +81,12 @@ var ReqsCmd = &cobra.Command{
 
 		// reqs - LIST
 		// reqs REQ > SHOW
-		// reqs REQ -d > DELETE (cannot be used with --new ever)
-		// reqs REQ --new (other set flags)/ATTR1 VALUE1 > NEW
-		// reqs REQ (other set flags)/ATTR1 VALUE1 > EDIT
-		// reqs REQ ATTR > GET
+		// reqs -d REQ > DELETE (cannot be used with --new ever)
+		// reqs --new REQ (other set flags (NOT NAME)) > NEW
+		// reqs REQ (other set flags) > EDIT
+		// reqs REQ --get ATTR > GET
+		// reqs REQ --get-header > GET
 
-		// reqs REQ HDR - LIST HDRS
-		// reqs REQ -H - LIST HDRS
-		// reqs REQ --header-value 'my-key' - GET HDR
-		// reqs REQ -H 'my-key: value' - SET HDR
-		// reqs REQ -v/--header-value 'my-key'
-		// reqs REQ
-
-		// First, sanity arg checking.
 		//
 		// * mut excl --new and -d
 		// * mut excl -d and all other set options
@@ -125,6 +127,17 @@ var ReqsCmd = &cobra.Command{
 
 func init() {
 	ReqsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+	ReqsCmd.PersistentFlags().StringVarP(&flagReqsNew, "new", "N", "", "Create a new request template named `REQ`.")
+	ReqsCmd.PersistentFlags().StringVarP(&flagReqsDelete, "delete", "D", "", "Delete the request template named `REQ`.")
+	ReqsCmd.PersistentFlags().StringVarP(&flagReqsGet, "get", "G", "", "Get the value of the given attribute `ATTR` from the request. To get a particular header's value, use --get-header instead. ATTR must be one of: "+strings.Join(reqAttrKeyNames(), ", "))
+	ReqsCmd.PersistentFlags().StringVarP(&flagReqsGetHeader, "get-header", "", "", "Get the value(s) of the given header `KEY` that is currently set on the request.")
+	ReqsCmd.PersistentFlags().StringVarP(&flagReqsName, "name", "n", "", "Change the name of a request template to `NAME`.")
+	ReqsCmd.PersistentFlags().StringArrayVarP(&flagReqsRemoveHeaders, "remove-header", "r", []string{}, "Remove header with key `KEY` from the request. If multiple headers with the same key exist, only the most recently added one will be deleted.")
+	ReqsCmd.PersistentFlags().StringVarP(&flagReqsBodyData, "data", "d", "", "Add the given `DATA` as a body to the request; prefix with @ to read data from a file")
+	ReqsCmd.PersistentFlags().StringArrayVarP(&flagReqsHeaders, "header", "H", []string{}, "Add a header to the request. Format is `KEY:VALUE`. Multiple headers may be set by providing multiple -H flags. If multiple headers with the same key are set, they will be set in the order they were given.")
+	ReqsCmd.PersistentFlags().StringVarP(&flagReqsMethod, "method", "X", "GET", "Set the request method to `METHOD`.")
+	ReqsCmd.PersistentFlags().StringVarP(&flagReqsURL, "url", "u", "http://example.com", "Specify the `URL` for the request.")
+	ReqsCmd.PersistentFlags().BoolVarP(&flagReqsRemoveBody, "remove-body", "", false, "Delete all existing body data from the request")
 }
 
 func invokeReqList(io cmdio.IO, filename string) error {
@@ -167,6 +180,17 @@ func invokeReqList(io cmdio.IO, filename string) error {
 	return nil
 }
 
+func reqsSetFlagIsPresent(cmd *cobra.Command) bool {
+	f := cmd.Flags()
+	return f.Changed("method") ||
+		f.Changed("url") ||
+		f.Changed("header") ||
+		f.Changed("name") ||
+		f.Changed("header") ||
+		f.Changed("remove-header") ||
+		f.Changed("remove-body")
+}
+
 type reqsAction int
 
 const (
@@ -184,11 +208,13 @@ type reqKey struct {
 }
 
 var (
-	reqKeyName    reqKey = reqKey{name: "NAME"}
-	reqKeyMethod  reqKey = reqKey{name: "METHOD"}
-	reqKeyURL     reqKey = reqKey{name: "URL"}
-	reqKeyData    reqKey = reqKey{name: "DATA"}
-	reqKeyHeaders reqKey = reqKey{name: "HEADERS"}
+	reqKeyName     reqKey = reqKey{name: "NAME"}
+	reqKeyMethod   reqKey = reqKey{name: "METHOD"}
+	reqKeyURL      reqKey = reqKey{name: "URL"}
+	reqKeyData     reqKey = reqKey{name: "DATA"}
+	reqKeyHeaders  reqKey = reqKey{name: "HEADERS"}
+	reqKeyAuthFlow reqKey = reqKey{name: "AUTH"}
+	reqKeyCaptures reqKey = reqKey{name: "CAPTURES"}
 
 	// OR a specific header key denoted via leading ":".
 )
@@ -210,6 +236,10 @@ func (rk reqKey) Human() string {
 		return "request body data"
 	case reqKeyHeaders.name:
 		return "request headers"
+	case reqKeyAuthFlow.name:
+		return "request auth flow"
+	case reqKeyCaptures.name:
+		return "request var captures"
 	default:
 		return fmt.Sprintf("unknown req key %q", rk.name)
 	}
@@ -232,6 +262,8 @@ var (
 		reqKeyURL,
 		reqKeyData,
 		reqKeyHeaders,
+		reqKeyAuthFlow,
+		reqKeyCaptures,
 	}
 )
 
@@ -247,12 +279,24 @@ func parseReqAttrKey(s string) (reqKey, error) {
 	switch strings.ToUpper(s) {
 	case reqKeyName.Name():
 		return reqKeyName, nil
+	case reqKeyMethod.Name():
+		return reqKeyMethod, nil
+	case reqKeyURL.Name():
+		return reqKeyURL, nil
+	case reqKeyData.Name():
+		return reqKeyData, nil
+	case reqKeyHeaders.Name():
+		return reqKeyHeaders, nil
+	case reqKeyAuthFlow.Name():
+		return reqKeyAuthFlow, nil
+	case reqKeyCaptures.Name():
+		return reqKeyCaptures, nil
 	default:
 		// must be at least 2 chars or it may as well be empty.
 		if len(s) > 1 && s[0] == ':' {
 			return reqKey{header: s[1:]}, nil
 		} else {
-			return reqKey{}, fmt.Errorf("must be a header key starting with ':' or one of: %s", strings.Join(reqAttrKeyNames(), ", "))
+			return reqKey{}, fmt.Errorf("must be one of: %s", strings.Join(reqAttrKeyNames(), ", "))
 		}
 	}
 }

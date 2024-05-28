@@ -2,6 +2,9 @@ package reqs
 
 import (
 	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"sort"
 	"strings"
 
@@ -70,58 +73,32 @@ var ReqsCmd = &cobra.Command{
 		"Requests are deleted by passing the --delete flag with a request name as its argument. This will irreversibly remove the request " +
 		"from the project entirely.",
 	Args: cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		filename := commonflags.ProjectFile
-
-		if filename == "" {
-			return fmt.Errorf("project file is set to empty string")
+	RunE: func(cmd *cobra.Command, posArgs []string) error {
+		var args reqsArgs
+		if err := parseReqsArgs(cmd, posArgs, &args); err != nil {
+			return err
 		}
-
-		// ACTION PARSE SKETCHING:
-
-		// reqs - LIST
-		// reqs REQ > SHOW
-		// reqs -d REQ > DELETE (cannot be used with --new ever)
-		// reqs --new REQ (other set flags (NOT NAME)) > NEW
-		// reqs REQ (other set flags) > EDIT
-		// reqs REQ --get ATTR > GET
-		// reqs REQ --get-header > GET
-
-		//
-		// * mut excl --new and -d
-		// * mut excl -d and all other set options
-		// * if --delete set, Nargs = 1.
-		// * if --new set, Nargs >= 1 and Nargs-1 %2 == 0.
-		// * if set option set, check -d must not be set. Nargs must be >=1 and Nargs-1 %2 == 0.
-		//
-		// args should be valid in all cases now, sans certain ones.
-		//
-		// if Nargs == 0:
-		// * set options not allowed (ALREADY CHECKED)
-		// * --new not allowed (ALREADY CHECKED)
-		// * --delete not allowed (ALREADY CHECKED)
-		// * MODE = LIST
-		// if Nargs == 1:
-		// * if --delete set:
-		//   * set options not allowed (ALREADY CHECKED)
-		//   * --new not allowed (ALREADY CHECKED)
-		//   * MODE = DELETE
-		// * else if --new set:
-		//   * --delete not allowed (ALREADY CHECKED)
-		//   * MODE = NEW
-		//   * PROCESS ATTR ARGS
-		// * else if any set option set:
-		//   * MODE = EDIT
-		// * else:
-		//   * MODE = SHOW
-		// if Nargs >= 2:
-		//   // either a GET, EDIT, or NEW
-		//   // * process attr
 
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
-		return invokeReqList(io, filename)
+
+		switch args.action {
+		case reqsList:
+			return invokeReqsList(io, args.projFile)
+		case reqsShow:
+			return invokeReqsShow(io, args.projFile, args.req)
+		case reqsDelete:
+			return invokeReqsDelete(io, args.projFile, args.req)
+		case reqsGet:
+			return invokeReqsGet(io, args.projFile, args.req, args.getItem)
+		case reqsNew:
+			return invokeReqsNew(io, args.projFile, args.req, args.sets)
+		case reqsEdit:
+			return invokeReqsEdit(io, args.projFile, args.req, args.sets)
+		default:
+			panic(fmt.Sprintf("unhandled reqs action %q", args.action))
+		}
 	},
 }
 
@@ -138,10 +115,19 @@ func init() {
 	ReqsCmd.PersistentFlags().StringVarP(&flagReqsMethod, "method", "X", "GET", "Set the request method to `METHOD`.")
 	ReqsCmd.PersistentFlags().StringVarP(&flagReqsURL, "url", "u", "http://example.com", "Specify the `URL` for the request.")
 	ReqsCmd.PersistentFlags().BoolVarP(&flagReqsRemoveBody, "remove-body", "", false, "Delete all existing body data from the request")
+
+	ReqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "get-header", "name")
+	ReqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "get-header", "remove-header")
+	ReqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "get-header", "remove-body")
+	ReqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "get-header", "data")
+	ReqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "get-header", "method")
+	ReqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "get-header", "header")
+	ReqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "get-header", "url")
+	ReqsCmd.MarkFlagsMutuallyExclusive("data", "remove-body")
 }
 
-func invokeReqList(io cmdio.IO, filename string) error {
-	p, err := morc.LoadProjectFromDisk(filename, true)
+func invokeReqsList(io cmdio.IO, projFile string) error {
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -175,6 +161,205 @@ func invokeReqList(io cmdio.IO, filename string) error {
 			}
 			io.Printf("%-*s %s\n", maxLen, meth, name)
 		}
+	}
+
+	return nil
+}
+
+type reqsArgs struct {
+	projFile string
+	action   reqsAction
+	getItem  reqKey
+	req      string
+
+	sets reqAttrValues
+}
+
+type reqAttrValues struct {
+	name          optional[string]
+	method        optional[string]
+	url           optional[string]
+	body          optional[[]byte]
+	headers       optional[http.Header]
+	removeHeaders optional[[]string]
+}
+
+func parseReqsArgs(cmd *cobra.Command, posArgs []string, args *reqsArgs) error {
+	args.projFile = commonflags.ProjectFile
+	if args.projFile == "" {
+		return fmt.Errorf("project file cannot be set to empty string")
+	}
+
+	var err error
+
+	args.action, err = parseReqsActionFromFlags(cmd, posArgs)
+	if err != nil {
+		return err
+	}
+
+	// do action-specific arg and flag parsing
+	switch args.action {
+	case reqsList:
+		// nothing else to do
+	case reqsShow:
+		// use arg 1 as the req name
+		args.req = posArgs[0]
+	case reqsDelete:
+		// special case of req name set from a CLI flag rather than pos arg.
+		args.req = flagReqsDelete
+	case reqsGet:
+		// use arg 1 as the req name
+		args.req = posArgs[0]
+
+		// user is either doing this via flagReqsGet or flagReqsGetHeader;
+		// parsing is different based on which one.
+		if flagReqsGet != "" {
+			args.getItem, err = parseReqAttrKey(flagReqsGet)
+			if err != nil {
+				return err
+			}
+		} else {
+			args.getItem = reqKey{header: flagReqsGetHeader}
+		}
+	case reqsNew:
+		// above action parsing already checked that invalid set opts will not
+		// be present so we can just call parseReqsSetFlags and then use
+		// --new argument to set the new request name.
+		if err := parseReqsSetFlags(cmd, &args.sets); err != nil {
+			return err
+		}
+
+		// set req name from the flag
+		args.req = flagReqsNew
+		args.sets.name = optional[string]{set: true, v: flagReqsNew}
+	case reqsEdit:
+		// use arg 1 as the req name
+		args.req = posArgs[0]
+
+		if err := parseReqsSetFlags(cmd, &args.sets); err != nil {
+			return err
+		}
+	default:
+		panic(fmt.Sprintf("unhandled reqs action %q", args.action))
+	}
+
+	return nil
+}
+
+func parseReqsActionFromFlags(cmd *cobra.Command, posArgs []string) (reqsAction, error) {
+	// mutual exclusions enforced by cobra (and therefore we do not check them here):
+	// * --new, --delete, --get, and --get-header.
+	// * --new with non-new mod flags
+	// * --delete with mod flags
+	// * --get with mod flags
+	// * --get-header with mod flags
+	// * --remove-body with --data
+
+	if flagReqsDelete != "" {
+		if len(posArgs) > 0 {
+			return reqsAction(0), fmt.Errorf("unknown positional argument %q", posArgs[0])
+		}
+		return reqsDelete, nil
+	} else if flagReqsNew != "" {
+		if len(posArgs) > 0 {
+			return reqsAction(0), fmt.Errorf("unknown positional argument %q", posArgs[0])
+		}
+		return reqsNew, nil
+	} else if flagReqsGet != "" || flagReqsGetHeader != "" {
+		if len(posArgs) < 1 {
+			return reqsGet, fmt.Errorf("missing name of REQ to get from")
+		}
+		if len(posArgs) > 1 {
+			return reqsGet, fmt.Errorf("unknown positional argument %q", posArgs[1])
+		}
+		return reqsGet, nil
+	} else if reqsSetFlagIsPresent(cmd) {
+		if len(posArgs) < 1 {
+			return reqsEdit, fmt.Errorf("missing name of REQ to update")
+		}
+		if len(posArgs) > 1 {
+			return reqsEdit, fmt.Errorf("unknown positional argument %q", posArgs[1])
+		}
+		return reqsEdit, nil
+	}
+
+	if len(posArgs) == 0 {
+		return reqsList, nil
+	} else if len(posArgs) == 1 {
+		return reqsShow, nil
+	} else {
+		return reqsList, fmt.Errorf("unknown positional argument %q", posArgs[1])
+	}
+}
+
+func parseReqsSetFlags(cmd *cobra.Command, attrs *reqAttrValues) error {
+	f := cmd.Flags()
+
+	if f.Changed("name") {
+		attrs.name = optional[string]{set: true, v: flagReqsName}
+	}
+
+	if f.Changed("method") {
+		attrs.method = optional[string]{set: true, v: strings.ToUpper(flagReqsMethod)}
+	}
+
+	if f.Changed("url") {
+		// DO NOT PARSE UNTIL SEND TIME; parsing could clobber var uses.
+		attrs.url = optional[string]{set: true, v: flagReqsURL}
+	}
+
+	if f.Changed("data") {
+		if strings.HasPrefix(flagReqsBodyData, "@") {
+			// read entire file now
+			fRaw, err := os.Open(flagEditBodyData[1:])
+			if err != nil {
+				return fmt.Errorf("open %q: %w", flagEditBodyData[1:], err)
+			}
+			defer fRaw.Close()
+			bodyData, err := io.ReadAll(fRaw)
+			if err != nil {
+				return fmt.Errorf("read %q: %w", flagEditBodyData[1:], err)
+			}
+			attrs.body = optional[[]byte]{set: true, v: bodyData}
+		} else {
+			attrs.body = optional[[]byte]{set: true, v: []byte(flagEditBodyData)}
+		}
+	}
+
+	if f.Changed("remove-body") {
+		attrs.body = optional[[]byte]{set: true, v: nil}
+	}
+
+	if f.Changed("header") {
+		headers := make(http.Header)
+		for idx, h := range flagReqsHeaders {
+
+			// split the header into key and value
+			parts := strings.SplitN(h, ":", 2)
+			if len(parts) != 2 {
+				return fmt.Errorf("header add #%d (%q) is not in format key: value", idx+1, h)
+			}
+			canonKey := http.CanonicalHeaderKey(strings.TrimSpace(parts[0]))
+			if canonKey == "" {
+				return fmt.Errorf("header add #%d (%q) does not have a valid header key", idx+1, h)
+			}
+			value := strings.TrimSpace(parts[1])
+			headers.Add(canonKey, value)
+		}
+		attrs.headers = optional[http.Header]{set: true, v: headers}
+	}
+
+	if f.Changed("remove-header") {
+		delHeaders := make([]string, len(flagReqsRemoveHeaders))
+		for idx, h := range flagReqsRemoveHeaders {
+			trimmed := strings.TrimSpace(h)
+			if strings.Contains(trimmed, " ") || strings.Contains(trimmed, ":") {
+				return fmt.Errorf("header delete #%d (%q) is not a valid header key", idx+1, h)
+			}
+			delHeaders[idx] = trimmed
+		}
+
+		attrs.removeHeaders = optional[[]string]{set: true, v: delHeaders}
 	}
 
 	return nil
@@ -292,11 +477,6 @@ func parseReqAttrKey(s string) (reqKey, error) {
 	case reqKeyCaptures.Name():
 		return reqKeyCaptures, nil
 	default:
-		// must be at least 2 chars or it may as well be empty.
-		if len(s) > 1 && s[0] == ':' {
-			return reqKey{header: s[1:]}, nil
-		} else {
-			return reqKey{}, fmt.Errorf("must be one of: %s", strings.Join(reqAttrKeyNames(), ", "))
-		}
+		return reqKey{}, fmt.Errorf("must be one of: %s", strings.Join(reqAttrKeyNames(), ", "))
 	}
 }

@@ -3,6 +3,7 @@ package reqs
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/dekarrin/morc"
 	"github.com/dekarrin/morc/cmd/morc/cmdio"
@@ -15,10 +16,6 @@ var (
 	flagReqsDelete bool
 )
 
-func init() {
-	ReqsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
-}
-
 // TODO: the attr/index system is ridiculously overcomplicated; just use optionally-valued args ffs.
 // oh no, we'll have to enforce whether a value was set. Or at least do --get to make it an explicit
 // action. Then we can do normals for setting.
@@ -30,58 +27,39 @@ func init() {
 // REQS REQ --get ATTR                                                     GET
 // REQS REQ (implied show)                                                 SHOW
 // REQS REQ (!--new) followed by flag arg sets (or extended for hdr edit)  EDIT
-//
-// PROJ:
-// PROJ --new/-N (no name required), followed by specific args.      NEW
-// PROJ --get ATTR                                                   GET
-// PROJ (implied show)                                               SHOW
-// PROJ (!--new,!--get) followed by flag arg sets                    EDIT
-//
-// CAPS:
-// CAPS REQ                                                          LIST
-// CAPS REQ --new (REQUIRES SPECIFICATION)                           NEW
-// CAPS REQ CAP --delete                                             DELETE
-// CAPS REQ CAP --get ATTR 										     GET
-// CAPS REQ CAP (implied show)                                       SHOW
-// CAPS REQ CAP (!--new) followed by flag arg sets                   EDIT
-//
-// FLOWS:
-// FLOWS 														        LIST
-// FLOWS --new/-N (NAME REQUIRED) followed by manual check, min 2 reqs  NEW
-// FLOWS FLOW --delete                                                  DELETE
-// FLOWS FLOW --get ATTR  											    GET
-// FLOWS FLOW (implied show) 										    SHOW
-// FLOWS FLOW (!--new) followed by flag arg sets extended for step mod  EDIT
 
 // -G sounds good for now.
 //
 // cond - if changed but value was not provided.
 var ReqsCmd = &cobra.Command{
 	Use: "reqs [-F FILE]\n" +
-		"reqs REQ --new [ATTR VALUE]... [-H HDR]... [-d DATA | -d @FILE] [-X METHOD] [-u URL] [-F FILE]\n" +
-		"reqs REQ [-F FILE]\n" +
-		"reqs REQ --delete [-F FILE]\n" +
-		"reqs REQ ATTR [-dXuH] [-v HDR-KEY] [-F FILE]\n" +
-		"reqs REQ [ATTR VALUE]... [-dXuH]... [-F FILE]",
+		"reqs [-F FILE] --delete REQ\n" +
+		"reqs [-F FILE] --new REQ [-H HDR]... [-d DATA | -d @FILE] [-X METHOD] [-u URL] [-F FILE]\n" +
+		"reqs [-F FILE] REQ\n" +
+		"reqs [-F FILE] REQ --get ATTR\n" +
+		"reqs [-F FILE] REQ [-ndXuH]...",
 	GroupID: "project",
 	Short:   "Show or modify request templates",
 	Long: "Manipulate project request templates. By itself, prints out a listing of the names and methods of the request templates " +
-		"in the project.\n\nA new request template can be created with the --new flag along with the name of the new request, REQ, and " +
-		"any attributes to set on the new request along with their values. Some attributes may be specified by name or by flag. The " +
-		"method of the request is set with either the METHOD attribute and a value or the -X/--method flag. The payload in the request " +
-		"body can be set either by providing the DATA attribute and a value or the -d/--data flag. Headers are set with the -H/--header " +
-		"flag; they cannot be specified with attributes. Multiple headers may be specified by providing multiple -H flags. The URL of the " +
-		"request is set with the URL attribute and a value or " +
-		"the -u/--url flag.\n\nA particular request is shown by providing only the name of the request, REQ, with no other options. This " +
-		"will show all details of a request template. To see only a specific attribute of a request, provide the name of the request REQ " +
-		"along with the name of the attribute to show. Alternatively, a single flag without a value can be provided to get only the " +
-		"associated attribute: -X, -d, -u, or -H. -H behaves a bit differently; it will cause all headers to be printed. A single header's " +
-		"values can be selected by instead giving -v/--header-value along with the name of a header key. This will print only the value(s) " +
-		"of that header, one per line.\n\nA request template is deleted " +
-		"by passing the --delete flag when providing a request name REQ. This will irreversibly remove the request from the project " +
-		"entirely.\n\nTo edit an existing request template, provide the name of the request REQ along with attribute-value pairs to set and/or " +
-		"any number of the -dXuH flags. -H will always add a new header. Use --remove-header/-r along with the name of the header to remove to " +
-		"erase it. Data can be removed by providing a blank value to -d or by providing the -D/--delete-data flag.",
+		"in the project.\n\nA new request template can be created by providing the name of it to the --new flag and using flags to " +
+		"specify attributes to set on the new request. The method of the request is set with the --method/-X flag. The payload in the " +
+		"request body is set with the -d/--data flag, either directly by providing the body as the argument or indirectly by loading from " +
+		"a filename given after a leading '@'. Headers are set with the -H/--header flag. Multiple headers may be specified by providing " +
+		"multiple -H flags. The URL of the request is set with the the -u/--url flag.\n\nA particular request can be viewed by providing " +
+		"the name of the request, REQ, as a positional argument to the flows command. This will show all details of a request template. " +
+		"To see only a specific attribute of a request, provide --get along with the name of the attribute of the request to show. " +
+		"The attribute, ATTR, can either be a header key with a leading ':' or one of the following: " +
+		strings.Join(reqAttrKeyNames(), ", ") + ". If 'HEADERS' is selected, all headers on the request are printed. To see the value(s) of " +
+		"only a particular header, provide the name of the header as the argument to --get, prepended with a leading ':'.\n\n" +
+		"Modifications to existing request templates are performed by giving REQ as a positional argument followed by one or more flag " +
+		"that sets a property of the request. For example, to change the method of a request, provide the -X flag followed by the new " +
+		"method. All flags that are supported during request creation are also supported when modifying a request (-X, -d, -u, -H), in " +
+		"addition to a few others. The name of the request is updated with -n/--name. Since -H only *adds* new header values, " +
+		"--remove-header/-r can be used to remove all values of an existing header from the request. Removing only a single value of " +
+		"a multi-valued header is not supported at this time; it is all or nothing. Finally, calling --remove-body will remove the " +
+		"body payload entirely, which may differ from simply setting it to the empty string.\n\n" +
+		"Requests are deleted by passing the --delete flag with a request name as its argument. This will irreversibly remove the request " +
+		"from the project entirely.",
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		filename := commonflags.ProjectFile
@@ -145,6 +123,10 @@ var ReqsCmd = &cobra.Command{
 	},
 }
 
+func init() {
+	ReqsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+}
+
 func invokeReqList(io cmdio.IO, filename string) error {
 	p, err := morc.LoadProjectFromDisk(filename, true)
 	if err != nil {
@@ -183,4 +165,94 @@ func invokeReqList(io cmdio.IO, filename string) error {
 	}
 
 	return nil
+}
+
+type reqsAction int
+
+const (
+	reqsList reqsAction = iota
+	reqsShow
+	reqsNew
+	reqsDelete
+	reqsGet
+	reqsEdit
+)
+
+type reqKey struct {
+	name   string
+	header string
+}
+
+var (
+	reqKeyName    reqKey = reqKey{name: "NAME"}
+	reqKeyMethod  reqKey = reqKey{name: "METHOD"}
+	reqKeyURL     reqKey = reqKey{name: "URL"}
+	reqKeyData    reqKey = reqKey{name: "DATA"}
+	reqKeyHeaders reqKey = reqKey{name: "HEADERS"}
+
+	// OR a specific header key denoted via leading ":".
+)
+
+// Human prints the human-readable description of the key.
+func (rk reqKey) Human() string {
+	if rk.header != "" {
+		return fmt.Sprintf("header %s", rk.header)
+	}
+
+	switch rk.name {
+	case reqKeyName.name:
+		return "request name"
+	case reqKeyMethod.name:
+		return "request method"
+	case reqKeyURL.name:
+		return "request URL"
+	case reqKeyData.name:
+		return "request body data"
+	case reqKeyHeaders.name:
+		return "request headers"
+	default:
+		return fmt.Sprintf("unknown req key %q", rk.name)
+	}
+}
+
+func (rk reqKey) Name() string {
+	if rk.header != "" {
+		return fmt.Sprintf(":%s", rk.header)
+	} else {
+		return string(rk.name)
+	}
+}
+
+var (
+	// ordering of reqAttrKeys in output is set here
+
+	reqAttrKeys = []reqKey{
+		reqKeyName,
+		reqKeyMethod,
+		reqKeyURL,
+		reqKeyData,
+		reqKeyHeaders,
+	}
+)
+
+func reqAttrKeyNames() []string {
+	names := make([]string, len(reqAttrKeys))
+	for i, k := range reqAttrKeys {
+		names[i] = k.Name()
+	}
+	return names
+}
+
+func parseReqAttrKey(s string) (reqKey, error) {
+	switch strings.ToUpper(s) {
+	case reqKeyName.Name():
+		return reqKeyName, nil
+	default:
+		// must be at least 2 chars or it may as well be empty.
+		if len(s) > 1 && s[0] == ':' {
+			return reqKey{header: s[1:]}, nil
+		} else {
+			return reqKey{}, fmt.Errorf("must be a header key starting with ':' or one of: %s", strings.Join(reqAttrKeyNames(), ", "))
+		}
+	}
 }

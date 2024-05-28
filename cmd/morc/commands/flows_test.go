@@ -45,11 +45,11 @@ func Test_Flows_Delete(t *testing.T) {
 			name:      "delete needs value",
 			args:      []string{"flows", "-D"},
 			p:         testProject_singleFlowWithNSteps(3),
-			expectErr: "-D requires a flow name",
+			expectErr: "flag needs an argument: 'D'",
 		},
 		{
 			name: "normal delete",
-			args: []string{"flows", "test", "-d"},
+			args: []string{"flows", "-D", "test"},
 			p:    testProject_singleFlowWithNSteps(3),
 			expectP: morc.Project{
 				Flows:     map[string]morc.Flow{},
@@ -113,21 +113,21 @@ func Test_Flows_Edit(t *testing.T) {
 	}{
 		{
 			name:               "set name",
-			args:               []string{"flows", "test", "name", "nepeta"},
+			args:               []string{"flows", "test", "-n", "nepeta"},
 			p:                  testProject_singleFlowWithNSteps(2),
 			expectP:            testProject_singleFlowWithNameAndNSteps("nepeta", 2),
 			expectStdoutOutput: "Set flow name to nepeta\n",
 		},
 		{
-			name:               "replace 2nd step",
-			args:               []string{"flows", "test", "2", "req1"},
+			name:               "update 2nd step",
+			args:               []string{"flows", "test", "-u", "2:req1"},
 			p:                  testProject_singleFlowWithSequence(1, 2, 3),
 			expectP:            testProject_singleFlowWithSequence(1, 1, 3),
 			expectStdoutOutput: "Set step #2 to req1\n",
 		},
 		{
-			name:               "replace no-op",
-			args:               []string{"flows", "test", "2", "req2"},
+			name:               "update no-op",
+			args:               []string{"flows", "test", "-u", "2:req2"},
 			p:                  testProject_singleFlowWithNSteps(3),
 			expectP:            testProject_singleFlowWithNSteps(3),
 			expectStderrOutput: "No change to step #2; already set to req2\n",
@@ -251,37 +251,37 @@ func Test_Flows_Get(t *testing.T) {
 	}{
 		{
 			name:      "flow not present",
-			args:      []string{"flows", testFlowName},
+			args:      []string{"flows", "test"},
 			p:         morc.Project{},
-			expectErr: "no flow named " + testFlowName + " exists in project",
+			expectErr: "no flow named test exists in project",
 		},
 		{
 			name:               "get first request",
-			args:               []string{"flows", testFlowName, "1"},
+			args:               []string{"flows", "test", "--get", "1"},
 			p:                  testProject_singleFlowWithNSteps(2),
 			expectStdoutOutput: testReq(1) + "\n",
 		},
 		{
 			name:               "get second request",
-			args:               []string{"flows", testFlowName, "2"},
+			args:               []string{"flows", "test", "--get", "2"},
 			p:                  testProject_singleFlowWithNSteps(2),
 			expectStdoutOutput: testReq(2) + "\n",
 		},
 		{
 			name:               "get name",
-			args:               []string{"flows", testFlowName, "NAME"},
+			args:               []string{"flows", "test", "-G", "NAME"},
 			p:                  testProject_singleFlowWithNSteps(2),
 			expectStdoutOutput: testFlowName + "\n",
 		},
 		{
 			name:      "error: get 0th step",
-			args:      []string{"flows", testFlowName, "0"},
+			args:      []string{"flows", "test", "--get", "0"},
 			p:         testProject_singleFlowWithNSteps(2),
 			expectErr: "does not exist",
 		},
 		{
 			name:      "get too big errors",
-			args:      []string{"flows", testFlowName, "3"},
+			args:      []string{"flows", "test", "--get", "3"},
 			p:         testProject_singleFlowWithNSteps(2),
 			expectErr: "does not exist",
 		},
@@ -348,7 +348,7 @@ func Test_Flows_New(t *testing.T) {
 		},
 		{
 			name:               "happy path - 3 requests",
-			args:               []string{"flows", "test", "req1", "req2", "req3", "--new"},
+			args:               []string{"flows", "req1", "req2", "req3", "--new", "test"},
 			p:                  testProject_nRequests(3),
 			expectP:            testProject_singleFlowWithNSteps(3),
 			expectStdoutOutput: "Created new flow test with 3 steps\n",
@@ -357,7 +357,7 @@ func Test_Flows_New(t *testing.T) {
 			name:      "need more than 1 request",
 			args:      []string{"flows", "--new", "test", "req1"},
 			p:         testProject_nRequests(2),
-			expectErr: "--new requires a name and at least two requests",
+			expectErr: "--new requires at least two requests",
 		},
 	}
 
@@ -605,7 +605,7 @@ func runTestCommand(cmd *cobra.Command, projFilePath string, args []string) (std
 
 	// add -F immediately after the first arg
 	if len(args) >= 1 {
-		newArgs := make([]string, 0, len(args)+2)
+		newArgs := make([]string, len(args)+2)
 		newArgs[0] = args[0]
 		newArgs[1] = "-F"
 		newArgs[2] = projFilePath

@@ -30,7 +30,7 @@ var flowsCmd = &cobra.Command{
 		"flows [-F FILE] --new FLOW REQ1 REQ2 [REQN]...\n" +
 		"flows [-F FILE] FLOW\n" +
 		"flows [-F FILE] FLOW --get ATTR\n" +
-		"flows [-F FILE] FLOW [-Ramrn]...",
+		"flows [-F FILE] FLOW [-nuram]...",
 	GroupID: "project",
 	Short:   "Get or modify request flows",
 	Long: "Performs operations on the flows defined in the project. With no other arguments, a listing of all flows is shown.\n\n" +
@@ -40,10 +40,11 @@ var flowsCmd = &cobra.Command{
 		"attribute of a flow, --get can be used to select it. --get takes either the string \"name\" to explicitly get the flow's name as " +
 		"it is recorded by MORC, or the 1-based index number of a flow's step.\n\n" +
 		"To modify a flow, provide the name of the FLOW and give one or more modification flags. --name/-n is used to change the name, and " +
-		"can only be specified once. Steps are modified with other flags: --replace/-r to change the request a step calls, --remove/-R to " +
+		"can only be specified once. Steps are modified with other flags: --update/-u to change the request a step calls, --remove/-r to " +
 		"remove a step, --add/-a to add a step, and --move/-m to move a step to a new position. All step-modification flags " +
-		"can be specified more than once to apply multiple updates in the same call to MORC. All step replacements are are applied first in " +
-		"the order they were given in CLI flags, then all deletes are applied from highest to lowest index, followed by all adds " +
+		"can be specified more than once to apply multiple updates in the same call to MORC. For handling multiple types of step " +
+		"modifications given in the same invocation, MORC will apply the modifications in the following order: step template updates are " +
+		"applied in the order they were given in CLI flags, then all deletes are applied from highest to lowest index, followed by all adds " +
 		"from lowest to to highest index, and finally all moves in the order they were given in CLI flags.\n\n" +
 		"A flow is deleted by providing the --delete/-D flag with the FLOW to be deleted as its argument.",
 	Args: cobra.ArbitraryArgs,
@@ -82,16 +83,16 @@ func init() {
 	flowsCmd.PersistentFlags().StringVarP(&flagFlowDelete, "delete", "D", "", "Delete the flow with the name `FLOW`.")
 	flowsCmd.PersistentFlags().StringVarP(&flagFlowNew, "new", "N", "", "Create a new flow with the name `FLOW`. When given, positional arguments are interpreted as ordered names of requests that make up the new flow's steps. At least two requests must be present.")
 	flowsCmd.PersistentFlags().StringVarP(&flagFlowGet, "get", "G", "", "Get the value of an attribute of the flow. `ATTR` can either be 'name', to get the flow name, or the 1-based index of a specific step in the flow.")
-	flowsCmd.PersistentFlags().IntSliceVarP(&flagFlowStepRemovals, "remove", "R", nil, "Remove the step at index `IDX` from the flow. Can be given multiple times; if so, will be applied from highest to lowest index. Will be applied after all step replacements are applied.")
-	flowsCmd.PersistentFlags().StringArrayVarP(&flagFlowStepAdds, "add", "a", nil, "Add a new step calling request REQ at index IDX, or at the end of current steps if index is omitted. Argument must be a string in form `[IDX]:REQ`. Can be given multiple times; if so, will be applied from lowest to highest index after all replacements and removals are applied.")
+	flowsCmd.PersistentFlags().IntSliceVarP(&flagFlowStepRemovals, "remove", "r", nil, "Remove the step at index `IDX` from the flow. Can be given multiple times; if so, will be applied from highest to lowest index. Will be applied after all step updates from --update are applied.")
+	flowsCmd.PersistentFlags().StringArrayVarP(&flagFlowStepAdds, "add", "a", nil, "Add a new step calling request REQ at index IDX, or at the end of current steps if index is omitted. Argument must be a string in form `[IDX]:REQ`. Can be given multiple times; if so, will be applied from lowest to highest index after all updates and removals are applied.")
 	flowsCmd.PersistentFlags().StringArrayVarP(&flagFlowStepMoves, "move", "m", nil, "Move the step at index FROM to index TO. Argument must be a string in form `FROM:[TO]`. Can be given multiple times; if so, will be applied in order given after all replacements, removals, and adds are applied. If TO is not given, the step is moved to the end of the flow.")
-	flowsCmd.PersistentFlags().StringArrayVarP(&flagFlowStepReplaces, "replace", "r", nil, "Update the template called in step IDX to REQ. Argument must be a string in form `IDX:REQ`. Can be given multiple times; if so, will be applied in order given before any other step modifications.")
+	flowsCmd.PersistentFlags().StringArrayVarP(&flagFlowStepReplaces, "update", "u", nil, "Update the template called in step IDX to REQ. Argument must be a string in form `IDX:REQ`. Can be given multiple times; if so, will be applied in order given before any other step modifications.")
 	flowsCmd.PersistentFlags().StringVarP(&flagFlowName, "name", "n", "", "Change the name of the flow to `NAME`.")
 
 	flowsCmd.MarkFlagsMutuallyExclusive("delete", "new", "get", "remove")
 	flowsCmd.MarkFlagsMutuallyExclusive("delete", "new", "get", "add")
 	flowsCmd.MarkFlagsMutuallyExclusive("delete", "new", "get", "move")
-	flowsCmd.MarkFlagsMutuallyExclusive("delete", "new", "get", "replace")
+	flowsCmd.MarkFlagsMutuallyExclusive("delete", "new", "get", "update")
 	flowsCmd.MarkFlagsMutuallyExclusive("delete", "new", "get", "name")
 
 	rootCmd.AddCommand(flowsCmd)
@@ -500,7 +501,7 @@ func parseFlowsArgs(cmd *cobra.Command, posArgs []string, args *flowsArgs) error
 		args.flow = posArgs[0]
 
 		// parse the get from the string
-		args.getItem, err = parseFlowAttrKey(flagProjGet)
+		args.getItem, err = parseFlowAttrKey(flagFlowGet)
 		if err != nil {
 			return err
 		}
@@ -542,7 +543,7 @@ func parseFlowsActionFromFlags(cmd *cobra.Command, posArgs []string) (flowAction
 		return flowsDelete, nil
 	} else if f.Changed("new") {
 		if len(posArgs) < 2 {
-			return flowsNew, fmt.Errorf("--new requires at two requests in positional args")
+			return flowsNew, fmt.Errorf("--new requires at least two requests in positional args")
 		}
 		return flowsNew, nil
 	} else if f.Changed("get") {
@@ -552,7 +553,7 @@ func parseFlowsActionFromFlags(cmd *cobra.Command, posArgs []string) (flowAction
 		if len(posArgs) > 1 {
 			return flowsGet, fmt.Errorf("unknown positional argument %q", posArgs[1])
 		}
-		return flowsGet, fmt.Errorf("--get requires a single positional argument")
+		return flowsGet, nil
 	} else if flowsSetFlagIsPresent(cmd) {
 		if len(posArgs) < 1 {
 			return flowsEdit, fmt.Errorf("missing name of FLOW to update")
@@ -579,12 +580,12 @@ func parseFlowsSetFlags(cmd *cobra.Command, attrs *flowAttrValues) error {
 		attrs.name = optional[string]{set: true, v: flagFlowName}
 	}
 
-	if f.Lookup("replace").Changed {
+	if f.Lookup("update").Changed {
 		// replace is in form IDX:REQ, no exceptions.
 		for flagIdx, repl := range flagFlowStepReplaces {
 			up, err := parseFlowUpsertArg(repl, false)
 			if err != nil {
-				return fmt.Errorf("--replace #%d: %w", flagIdx+1, err)
+				return fmt.Errorf("--update #%d: %w", flagIdx+1, err)
 			}
 
 			attrs.stepReplacements = append(attrs.stepReplacements, up)
@@ -683,7 +684,7 @@ func parseFlowUpsertArg(s string, optionalIndex bool) (flowStepUpsert, error) {
 
 func flowsSetFlagIsPresent(cmd *cobra.Command) bool {
 	f := cmd.Flags()
-	return f.Changed("add") || f.Changed("remove") || f.Changed("move") || f.Changed("reolace") || f.Changed("name")
+	return f.Changed("add") || f.Changed("remove") || f.Changed("move") || f.Changed("update") || f.Changed("name")
 }
 
 type flowAction int
@@ -758,7 +759,7 @@ func parseFlowAttrKey(s string) (flowKey, error) {
 	if len(s) > 0 && s[0] >= '0' && s[0] <= '9' {
 		idx, err := strconv.Atoi(s)
 		if err != nil {
-			return flowKey{}, fmt.Errorf("must be a step index or one of %s", strings.Join(flowAttrKeyNames(), ", "))
+			return flowKey{}, fmt.Errorf("must be a step index or one of: %s", strings.Join(flowAttrKeyNames(), ", "))
 		}
 
 		return flowKey{stepIndex: idx}, nil
@@ -768,7 +769,7 @@ func parseFlowAttrKey(s string) (flowKey, error) {
 	case flowKeyName.Name():
 		return flowKeyName, nil
 	default:
-		return flowKey{}, fmt.Errorf("must be a step index or one of %s", strings.Join(flowAttrKeyNames(), ", "))
+		return flowKey{}, fmt.Errorf("must be a step index or one of: %s", strings.Join(flowAttrKeyNames(), ", "))
 	}
 }
 

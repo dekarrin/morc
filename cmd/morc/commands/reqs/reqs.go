@@ -14,6 +14,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type optional[E any] struct {
+	set bool
+	v   E
+}
+
+func (o optional[E]) Or(v E) E {
+	if o.set {
+		return o.v
+	}
+	return v
+}
+
 var (
 	flagReqsNew           string
 	flagReqsDelete        string
@@ -127,6 +139,202 @@ func init() {
 	ReqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "get-header", "url")
 	ReqsCmd.MarkFlagsMutuallyExclusive("data", "remove-body")
 	ReqsCmd.MarkFlagsMutuallyExclusive("new", "get", "get-header", "force")
+}
+
+func invokeReqsEdit(io cmdio.IO, projFile, reqName string, attrs reqAttrValues) error {
+	// first, are we updating the name? this determines whether we need to load
+	// and save history
+	loadAllFiles := attrs.name.set
+
+	// load the project file
+	p, err := morc.LoadProjectFromDisk(projFile, loadAllFiles)
+	if err != nil {
+		return err
+	}
+
+	// case doesn't matter for request template names
+	reqLower := strings.ToLower(reqName)
+	req, ok := p.Templates[reqLower]
+	if !ok {
+		return morc.NewReqNotFoundError(reqLower)
+	}
+
+	modifiedVals := map[reqKey]interface{}{}
+	noChangeVals := map[reqKey]interface{}{}
+
+	// build up order slice as we go to contain our non-predefined values
+	attrOrdering := make([]reqKey, len(reqAttrKeys))
+	copy(attrOrdering, reqAttrKeys)
+	nonPredefinedAttrCount := 0
+
+	// if changing names, do that first
+	if attrs.name.set {
+		newName := strings.ToLower(attrs.name.v)
+
+		if newName != reqLower {
+			if _, exists := p.Templates[newName]; exists {
+				return morc.NewReqExistsError(newName)
+			}
+
+			// update the name in the history
+			for idx, h := range p.History {
+				if strings.ToLower(h.Template) == reqLower {
+					p.History[idx].Template = newName
+				}
+			}
+
+			// update the name in the flows
+			for flowName, flow := range p.Flows {
+				for idx, step := range flow.Steps {
+					if strings.ToLower(step.Template) == reqLower {
+						p.Flows[flowName].Steps[idx].Template = newName
+					}
+				}
+			}
+
+			// update the name in the project
+			req.Name = newName
+			delete(p.Templates, reqLower)
+			modifiedVals[reqKeyName] = newName
+		} else {
+			noChangeVals[reqKeyName] = newName
+		}
+	}
+
+	// any name changes will have gone to req.Name at this point; be shore to
+	// use that for any name displaying from this point forward
+
+	// body modifications
+	if attrs.body.set {
+		if !(attrs.body.v == nil && req.Body == nil) {
+			req.Body = attrs.body.v
+
+			if req.Body == nil {
+				modifiedVals[reqKeyData] = "(none)"
+			} else {
+				modifiedVals[reqKeyData] = "data with length " + fmt.Sprint(len(req.Body))
+			}
+		} else {
+			noChangeVals[reqKeyData] = "(none)"
+		}
+	}
+
+	// header removals
+	if attrs.removeHeaders.set {
+		if req.Headers == nil {
+			req.Headers = make(http.Header)
+		}
+
+		for _, key := range attrs.removeHeaders.v {
+			vals := req.Headers.Values(key)
+
+			modKey := reqKey{header: key, uniqueInt: nonPredefinedAttrCount}
+			nonPredefinedAttrCount++
+
+			if len(vals) < 1 {
+				noChangeVals[modKey] = "not exist"
+			} else {
+				// delete the most recently added header with this key.
+				req.Headers.Del(key)
+
+				oldVal := vals[len(vals)-1]
+				// if there's more than one value, put the other ones back to honor
+				// deleting only the most recent one
+				if len(vals) > 1 {
+					modifiedVals[modKey] = fmt.Sprintf("no longer have value %s", oldVal)
+					for _, v := range vals[:len(vals)-1] {
+						req.Headers.Add(key, v)
+					}
+				} else {
+					modifiedVals[modKey] = fmt.Sprintf("no longer exist %s", oldVal)
+				}
+				attrOrdering = append(attrOrdering, modKey)
+			}
+		}
+	}
+
+	// header adds
+	if attrs.headers.set {
+		if req.Headers == nil {
+			req.Headers = make(http.Header)
+		}
+
+		for key, vals := range attrs.headers.v {
+			for _, v := range vals {
+				modKey := reqKey{header: key, uniqueInt: nonPredefinedAttrCount}
+				nonPredefinedAttrCount++
+
+				modifiedVals[modKey] = fmt.Sprintf("have new value %s", v)
+				req.Headers.Add(key, v)
+			}
+		}
+	}
+
+	// method and URL modifications
+	if attrs.method.set {
+		if req.Method != attrs.method.v {
+			req.Method = attrs.method.v
+			modifiedVals[reqKeyMethod] = attrs.method.v
+		} else {
+			noChangeVals[reqKeyMethod] = attrs.method.v
+		}
+	}
+	if attrs.url.set {
+		if req.URL != attrs.url.v {
+			req.URL = attrs.url.v
+			modifiedVals[reqKeyURL] = attrs.url.v
+		} else {
+			noChangeVals[reqKeyURL] = attrs.url.v
+		}
+	}
+
+	p.Templates[strings.ToLower(req.Name)] = req
+
+	// save the project file
+	err = p.PersistToDisk(loadAllFiles)
+	if err != nil {
+		return err
+	}
+
+	// io mod output
+	cmdio.OutputLoudEditAttrsResult(io, modifiedVals, noChangeVals, attrOrdering)
+
+	return nil
+}
+
+func invokeReqsNew(io cmdio.IO, projFile, reqName string, attrs reqAttrValues) error {
+	// load the project file
+	p, err := morc.LoadProjectFromDisk(projFile, true)
+	if err != nil {
+		return err
+	}
+
+	// case doesn't matter for request template names
+	reqLower := strings.ToLower(reqName)
+	// check if the project already has a request with the same name
+	if _, exists := p.Templates[reqLower]; exists {
+		return morc.NewReqExistsError(reqLower)
+	}
+
+	// create the new request template
+	req := morc.RequestTemplate{
+		Name:    reqName,
+		Method:  attrs.method.Or("GET"),
+		URL:     attrs.url.Or("http://example.com"),
+		Headers: attrs.headers.v,
+		Body:    attrs.body.v,
+	}
+	p.Templates[reqLower] = req
+
+	// save the project file
+	err = p.PersistToDisk(false)
+	if err != nil {
+		return err
+	}
+
+	io.PrintLoudf("Created request %s\n", reqLower)
+
+	return nil
 }
 
 func invokeReqsDelete(io cmdio.IO, projFile, reqName string, force bool) error {
@@ -331,8 +539,8 @@ func invokeReqsGet(io cmdio.IO, projFile, reqName string, item reqKey) error {
 			}
 			sort.Strings(sortedNames)
 
-			for name, vals := range sortedNames {
-				for _, val := range vals {
+			for _, name := range sortedNames {
+				for _, val := range req.Headers[name] {
 					io.Printf("%s: %s\n", name, val)
 				}
 			}
@@ -524,18 +732,18 @@ func parseReqsSetFlags(cmd *cobra.Command, attrs *reqAttrValues) error {
 	if f.Changed("data") {
 		if strings.HasPrefix(flagReqsBodyData, "@") {
 			// read entire file now
-			fRaw, err := os.Open(flagEditBodyData[1:])
+			fRaw, err := os.Open(flagReqsBodyData[1:])
 			if err != nil {
-				return fmt.Errorf("open %q: %w", flagEditBodyData[1:], err)
+				return fmt.Errorf("open %q: %w", flagReqsBodyData[1:], err)
 			}
 			defer fRaw.Close()
 			bodyData, err := io.ReadAll(fRaw)
 			if err != nil {
-				return fmt.Errorf("read %q: %w", flagEditBodyData[1:], err)
+				return fmt.Errorf("read %q: %w", flagReqsBodyData[1:], err)
 			}
 			attrs.body = optional[[]byte]{set: true, v: bodyData}
 		} else {
-			attrs.body = optional[[]byte]{set: true, v: []byte(flagEditBodyData)}
+			attrs.body = optional[[]byte]{set: true, v: []byte(flagReqsBodyData)}
 		}
 	}
 
@@ -601,8 +809,9 @@ const (
 )
 
 type reqKey struct {
-	name   string
-	header string
+	name      string
+	header    string
+	uniqueInt int // only used for sorting in edit output
 }
 
 var (
@@ -645,7 +854,7 @@ func (rk reqKey) Human() string {
 
 func (rk reqKey) Name() string {
 	if rk.header != "" {
-		return fmt.Sprintf(":%s", rk.header)
+		return rk.header
 	} else {
 		return string(rk.name)
 	}

@@ -26,6 +26,7 @@ var (
 	flagReqsMethod        string
 	flagReqsURL           string
 	flagReqsName          string
+	flagReqsDeleteForce   bool
 )
 
 // TODO: the attr/index system is ridiculously overcomplicated; just use optionally-valued args ffs.
@@ -45,7 +46,7 @@ var (
 // cond - if changed but value was not provided.
 var ReqsCmd = &cobra.Command{
 	Use: "reqs [-F FILE]\n" +
-		"reqs [-F FILE] --delete REQ\n" +
+		"reqs [-F FILE] --delete REQ [-f]\n" +
 		"reqs [-F FILE] --new REQ [-H HDR]... [-d DATA | -d @FILE] [-X METHOD] [-u URL] [-F FILE]\n" +
 		"reqs [-F FILE] REQ\n" +
 		"reqs [-F FILE] REQ --get ATTR\n" +
@@ -89,7 +90,7 @@ var ReqsCmd = &cobra.Command{
 		case reqsShow:
 			return invokeReqsShow(io, args.projFile, args.req)
 		case reqsDelete:
-			return invokeReqsDelete(io, args.projFile, args.req)
+			return invokeReqsDelete(io, args.projFile, args.req, args.force)
 		case reqsGet:
 			return invokeReqsGet(io, args.projFile, args.req, args.getItem)
 		case reqsNew:
@@ -115,6 +116,7 @@ func init() {
 	ReqsCmd.PersistentFlags().StringVarP(&flagReqsMethod, "method", "X", "GET", "Set the request method to `METHOD`.")
 	ReqsCmd.PersistentFlags().StringVarP(&flagReqsURL, "url", "u", "http://example.com", "Specify the `URL` for the request.")
 	ReqsCmd.PersistentFlags().BoolVarP(&flagReqsRemoveBody, "remove-body", "", false, "Delete all existing body data from the request")
+	ReqsCmd.PersistentFlags().BoolVarP(&flagReqsDeleteForce, "force", "f", false, "Force deletion of the request template even if it is used in flows. Only valid with --delete/-D.")
 
 	ReqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "get-header", "name")
 	ReqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "get-header", "remove-header")
@@ -124,6 +126,48 @@ func init() {
 	ReqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "get-header", "header")
 	ReqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "get-header", "url")
 	ReqsCmd.MarkFlagsMutuallyExclusive("data", "remove-body")
+	ReqsCmd.MarkFlagsMutuallyExclusive("new", "get", "get-header", "force")
+}
+
+func invokeReqsDelete(io cmdio.IO, projFile, reqName string, force bool) error {
+	// load the project file
+	p, err := morc.LoadProjectFromDisk(projFile, true)
+	if err != nil {
+		return err
+	}
+
+	// case doesn't matter for request template names
+	reqLower := strings.ToLower(reqName)
+	if _, ok := p.Templates[reqLower]; !ok {
+		return morc.NewReqNotFoundError(reqLower)
+	}
+
+	if !force {
+		// check if this req is in any flows; cannot delete it if so
+		inFlows := p.FlowsWithTemplate(reqLower)
+
+		if len(inFlows) > 0 {
+			flowS := "s"
+			if len(inFlows) == 1 {
+				flowS = ""
+			}
+			return fmt.Errorf("%s is used in flow%s %s\nUse -f to force the deletion", reqLower, flowS, strings.Join(inFlows, ", "))
+		}
+	}
+
+	// if we are forcing, there's no checks to make.
+
+	delete(p.Templates, reqLower)
+
+	// save the project file
+	err = p.PersistToDisk(false)
+	if err != nil {
+		return err
+	}
+
+	io.PrintLoudf("Deleted request %s\n", reqLower)
+
+	return nil
 }
 
 func invokeReqsShow(io cmdio.IO, projFile, reqName string) error {
@@ -137,7 +181,7 @@ func invokeReqsShow(io cmdio.IO, projFile, reqName string) error {
 	reqLower := strings.ToLower(reqName)
 	req, ok := p.Templates[reqLower]
 	if !ok {
-		return morc.NewReqNotFoundError(reqName)
+		return morc.NewReqNotFoundError(reqLower)
 	}
 
 	// print out the request details
@@ -330,6 +374,7 @@ type reqsArgs struct {
 	projFile string
 	action   reqsAction
 	getItem  reqKey
+	force    bool
 	req      string
 
 	sets reqAttrValues
@@ -367,6 +412,8 @@ func parseReqsArgs(cmd *cobra.Command, posArgs []string, args *reqsArgs) error {
 	case reqsDelete:
 		// special case of req name set from a CLI flag rather than pos arg.
 		args.req = flagReqsDelete
+
+		args.force = flagReqsDeleteForce
 	case reqsGet:
 		// use arg 1 as the req name
 		args.req = posArgs[0]
@@ -414,6 +461,12 @@ func parseReqsActionFromFlags(cmd *cobra.Command, posArgs []string) (reqsAction,
 	// * --get with mod flags
 	// * --get-header with mod flags
 	// * --remove-body with --data
+	// * --force with --get, --get-header, and --new
+
+	// make sure user isn't invalidly using -f because cobra is not enforcing this
+	if flagReqsDeleteForce && flagReqsDelete == "" {
+		return reqsEdit, fmt.Errorf("--force/-f can only be used with --delete/-D")
+	}
 
 	if flagReqsDelete != "" {
 		if len(posArgs) > 0 {

@@ -126,6 +126,79 @@ func init() {
 	ReqsCmd.MarkFlagsMutuallyExclusive("data", "remove-body")
 }
 
+func invokeReqsShow(io cmdio.IO, projFile, reqName string) error {
+	// load the project file
+	p, err := morc.LoadProjectFromDisk(projFile, true)
+	if err != nil {
+		return err
+	}
+
+	// case doesn't matter for request template names
+	reqLower := strings.ToLower(reqName)
+	req, ok := p.Templates[reqLower]
+	if !ok {
+		return morc.NewReqNotFoundError(reqName)
+	}
+
+	// print out the request details
+	meth := req.Method
+	if meth == "" {
+		meth = "(no-method)"
+	}
+	url := req.URL
+	if url == "" {
+		url = "(no-url)"
+	}
+	io.Printf("%s %s\n\n", meth, url)
+
+	// print out headers, if any
+	if len(req.Headers) > 0 {
+		io.Printf("HEADERS:\n")
+
+		// alphabetize headers
+		var sortedNames []string
+		for name := range req.Headers {
+			sortedNames = append(sortedNames, name)
+		}
+		sort.Strings(sortedNames)
+
+		for _, name := range sortedNames {
+			for _, val := range req.Headers[name] {
+				io.Printf("%s: %s\n", name, val)
+			}
+		}
+	} else {
+		io.Printf("HEADERS: (none)\n")
+	}
+	io.Printf("\n")
+
+	if len(req.Body) > 0 {
+		io.Printf("BODY:\n")
+		io.Printf("%s\n", string(req.Body))
+	} else {
+		io.Printf("BODY: (none)\n")
+	}
+	io.Printf("\n")
+
+	if len(req.Captures) > 0 {
+		io.Printf("VAR CAPTURES:\n")
+		for _, cap := range req.Captures {
+			io.Printf("%s\n", cap.String())
+		}
+	} else {
+		io.Printf("VAR CAPTURES: (none)\n")
+	}
+	io.Printf("\n")
+
+	if req.AuthFlow == "" {
+		io.Printf("AUTH FLOW: (none)\n")
+	} else {
+		io.Printf("AUTH FLOW: %s\n", req.AuthFlow)
+	}
+
+	return nil
+}
+
 func invokeReqsList(io cmdio.IO, projFile string) error {
 	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
@@ -160,6 +233,93 @@ func invokeReqsList(io cmdio.IO, projFile string) error {
 				meth = "???"
 			}
 			io.Printf("%-*s %s\n", maxLen, meth, name)
+		}
+	}
+
+	return nil
+}
+
+func invokeReqsGet(io cmdio.IO, projFile, reqName string, item reqKey) error {
+	// load the project file
+	p, err := morc.LoadProjectFromDisk(projFile, true)
+	if err != nil {
+		return err
+	}
+
+	// case doesn't matter for request template names
+	reqLower := strings.ToLower(reqName)
+
+	req, ok := p.Templates[reqLower]
+	if !ok {
+		return morc.NewReqNotFoundError(reqLower)
+	}
+
+	// print out the request details
+	switch item {
+	case reqKeyName:
+		io.Printf("%s\n", req.Name)
+	case reqKeyMethod:
+		if req.Method == "" {
+			io.PrintLoudf("%s\n", "(none)")
+		} else {
+			io.Printf("%s\n", strings.ToUpper(req.Method))
+		}
+	case reqKeyURL:
+		if req.URL == "" {
+			io.PrintLoudf("%s\n", "(none)")
+		} else {
+			io.Printf("%s\n", req.URL)
+		}
+	case reqKeyData:
+		if len(req.Body) == 0 {
+			io.PrintLoudf("(none)\n")
+		} else {
+			io.Printf("%s\n", string(req.Body))
+		}
+	case reqKeyHeaders:
+		if len(req.Headers) == 0 {
+			io.PrintLoudf("(none)\n")
+		} else {
+			// alphabetize headers
+			var sortedNames []string
+			for name := range req.Headers {
+				sortedNames = append(sortedNames, name)
+			}
+			sort.Strings(sortedNames)
+
+			for name, vals := range sortedNames {
+				for _, val := range vals {
+					io.Printf("%s: %s\n", name, val)
+				}
+			}
+		}
+	case reqKeyAuthFlow:
+		if req.AuthFlow == "" {
+			io.PrintLoudf("(none)\n")
+		} else {
+			io.Printf("%s\n", req.AuthFlow)
+		}
+	case reqKeyCaptures:
+		if len(req.Captures) == 0 {
+			io.PrintLoudf("(none)\n")
+		} else {
+			for _, cap := range req.Captures {
+				io.Printf("%s\n", cap.String())
+			}
+		}
+	default:
+		// it is a header key. read the header and print its values, one per line.
+		if len(req.Headers) == 0 {
+			io.PrintLoudf("(none)\n")
+		} else {
+			vals := req.Headers.Values(item.header)
+			if len(vals) == 0 {
+				io.PrintLoudf("(none)\n")
+			} else {
+				for _, val := range vals {
+					io.Printf("%s\n", val)
+				}
+			}
 		}
 	}
 

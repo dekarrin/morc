@@ -115,6 +115,27 @@ func testProject_singleFlowWithSequence(reqNums ...int) morc.Project {
 	}
 }
 
+func testProject_singleReqWillAllPropertiesSet() morc.Project {
+	return morc.Project{
+		Templates: map[string]morc.RequestTemplate{
+			"req1": testRequest_withAllPropertiesSet(),
+		},
+	}
+}
+
+func testRequest_withAllPropertiesSet() morc.RequestTemplate {
+	return morc.RequestTemplate{
+		Name:   "req1",
+		Method: "GET",
+		URL:    "https://example.com",
+		Headers: map[string][]string{
+			"Content-Type": {"application/json"},
+		},
+		Body:     []byte("{\n    \"username\": \"grimAuxiliatrix\"\n}"),
+		AuthFlow: "auth1",
+	}
+}
+
 func testRequestsN(n int) map[string]morc.RequestTemplate {
 	methods := []string{"GET", "POST", "PATCH", "DELETE", "PUT"}
 	urlAppend := 0

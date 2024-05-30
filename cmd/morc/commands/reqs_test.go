@@ -10,6 +10,86 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func Test_Reqs_Get(t *testing.T) {
+	testCases := []struct {
+		name               string
+		args               []string // DO NOT INCLUDE -F; it is automatically set to a project file
+		p                  morc.Project
+		expectErr          string // set if command.Execute expected to fail, with a string that would be in the error message
+		expectStderrOutput string // set with expected output to stderr
+		expectStdoutOutput string // set with expected output to stdout
+	}{
+		{
+			name:      "req not present",
+			args:      []string{"reqs", "test"},
+			p:         morc.Project{},
+			expectErr: "no request named test exists in project",
+		},
+		{
+			name:               "get name",
+			args:               []string{"reqs", "req1", "--get", "name"},
+			p:                  testProject_singleReqWillAllPropertiesSet(),
+			expectStdoutOutput: "req1\n",
+		},
+		// {
+		// 	name:               "get second request",
+		// 	args:               []string{"flows", "test", "--get", "2"},
+		// 	p:                  testProject_singleFlowWithNSteps(2),
+		// 	expectStdoutOutput: testReq(2) + "\n",
+		// },
+		// {
+		// 	name:               "get name",
+		// 	args:               []string{"flows", "test", "-G", "NAME"},
+		// 	p:                  testProject_singleFlowWithNSteps(2),
+		// 	expectStdoutOutput: testFlowName + "\n",
+		// },
+		// {
+		// 	name:      "error: get 0th step",
+		// 	args:      []string{"flows", "test", "--get", "0"},
+		// 	p:         testProject_singleFlowWithNSteps(2),
+		// 	expectErr: "does not exist",
+		// },
+		// {
+		// 	name:      "get too big errors",
+		// 	args:      []string{"flows", "test", "--get", "3"},
+		// 	p:         testProject_singleFlowWithNSteps(2),
+		// 	expectErr: "does not exist",
+		// },
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+			resetReqsFlags()
+
+			// create project and dump config to a temp dir
+			projFilePath := createTestProjectFiles(t, tc.p)
+			// set up the root command and run
+			output, outputErr, err := runTestCommand(reqsCmd, projFilePath, tc.args)
+
+			// assert and check stdout and stderr
+			if err != nil {
+				if tc.expectErr == "" {
+					t.Fatalf("unexpected returned error: %v", err)
+					return
+				}
+				if !strings.Contains(err.Error(), tc.expectErr) {
+					t.Fatalf("expected returned error to contain %q, got %q", tc.expectErr, err)
+				}
+				return
+			}
+
+			// assertions
+
+			assert.Equal(tc.expectStdoutOutput, output)
+			assert.Equal(tc.expectStderrOutput, outputErr)
+
+			assert_projectInFileMatches(assert, tc.p, projFilePath)
+		})
+	}
+
+}
+
 func Test_Reqs_Show(t *testing.T) {
 	testCases := []struct {
 		name               string

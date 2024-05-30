@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"net/http"
 	"strings"
 	"testing"
 
@@ -22,55 +23,110 @@ func Test_Reqs_Show(t *testing.T) {
 			name:      "req not present",
 			args:      []string{"reqs", "test"},
 			p:         morc.Project{},
-			expectErr: "no req named test exists in project",
+			expectErr: "no request named test exists in project",
 		},
 		{
 			name:      "req is explicitly blank",
 			args:      []string{"reqs", ""},
 			p:         morc.Project{},
-			expectErr: "no req named \"\" exists in project",
-		},
-		/*{
-			name:               "flow is present - no steps",
-			args:               []string{"flows", "test"},
-			p:                  testProject_singleFlowWithNSteps(0),
-			expectStdoutOutput: "(no steps in flow)\n",
+			expectErr: "no request named \"\" exists in project",
 		},
 		{
-			name: "flow is present - one step is missing",
-			args: []string{"flows", "test"},
-			p: morc.Project{
-				Flows:     testFlows_singleFlowWithNSteps(2),
-				Templates: testRequestsN(1),
-			},
-			expectStdoutOutput: "1: req1 (GET https://example.com)\n2:! req2 (!non-existent req)\n",
+			name: "req is present",
+			args: []string{"reqs", "req1"},
+			p:    testProject_nRequests(1),
+			expectStdoutOutput: "" +
+				"GET https://example.com\n" +
+				"\n" +
+				"HEADERS: (none)\n" +
+				"\n" +
+				"BODY: (none)\n" +
+				"\n" +
+				"VAR CAPTURES: (none)\n" +
+				"\n" +
+				"AUTH FLOW: (none)\n",
 		},
 		{
-			name: "flow is present - one step is unsendable",
-			args: []string{"flows", "test"},
+			name: "req is present, has only name set",
+			args: []string{"reqs", "req1"},
 			p: morc.Project{
-				Flows: testFlows_singleFlowWithNSteps(2),
 				Templates: map[string]morc.RequestTemplate{
-					testReq(1): {
-						Name:   testReq(1),
-						Method: "",
-						URL:    "https://example.com",
-					},
-					testReq(2): {
-						Name:   testReq(2),
-						Method: "POST",
-						URL:    "https://example.com",
-					},
+					"req1": {Name: "req1"},
 				},
 			},
-			expectStdoutOutput: "1:! req1 (??? https://example.com)\n2: req2 (POST https://example.com)\n",
+			expectStdoutOutput: "" +
+				"(no-method) (no-url)\n" +
+				"\n" +
+				"HEADERS: (none)\n" +
+				"\n" +
+				"BODY: (none)\n" +
+				"\n" +
+				"VAR CAPTURES: (none)\n" +
+				"\n" +
+				"AUTH FLOW: (none)\n",
 		},
 		{
-			name:               "flow is present - all steps are valid",
-			args:               []string{"flows", "test"},
-			p:                  testProject_singleFlowWithNSteps(2),
-			expectStdoutOutput: "1: req1 (GET https://example.com)\n2: req2 (POST https://example.com)\n",
-		},*/
+			name: "req is present, with body",
+			args: []string{"reqs", "req1"},
+			p: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"req1": {Name: "req1", Body: []byte("{\n    \"username\": \"grimAuxiliatrix\"\n}")},
+				},
+			},
+			expectStdoutOutput: "" +
+				"(no-method) (no-url)\n" +
+				"\n" +
+				"HEADERS: (none)\n" +
+				"\n" +
+				"BODY:\n" +
+				"{\n" +
+				"    \"username\": \"grimAuxiliatrix\"\n" +
+				"}\n" +
+				"\n" +
+				"VAR CAPTURES: (none)\n" +
+				"\n" +
+				"AUTH FLOW: (none)\n",
+		},
+		{
+			name: "req is present, with headers",
+			args: []string{"reqs", "req1"},
+			p: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"req1": {Name: "req1", Headers: http.Header(map[string][]string{"Content-Type": {"application/json"}})},
+				},
+			},
+			expectStdoutOutput: "" +
+				"(no-method) (no-url)\n" +
+				"\n" +
+				"HEADERS:\n" +
+				"Content-Type: application/json\n" +
+				"\n" +
+				"BODY: (none)\n" +
+				"\n" +
+				"VAR CAPTURES: (none)\n" +
+				"\n" +
+				"AUTH FLOW: (none)\n",
+		},
+		{
+			name: "req is present, with caps",
+			args: []string{"reqs", "req1"},
+			p: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"req1": {Name: "req1", Captures: map[string]morc.VarScraper{"test": {Name: "test", OffsetStart: 3, OffsetEnd: 5}}},
+				},
+			},
+			expectStdoutOutput: "" +
+				"(no-method) (no-url)\n" +
+				"\n" +
+				"HEADERS: (none)\n" +
+				"\n" +
+				"BODY: (none)\n" +
+				"\n" +
+				"VAR CAPTURES:\n" +
+				"$TEST from offset 3,5\n" +
+				"\n" +
+				"AUTH FLOW: (none)\n",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -79,9 +135,9 @@ func Test_Reqs_Show(t *testing.T) {
 			resetReqsFlags()
 
 			// create project and dump config to a temp dir
-			projTestDir := createTestProjectFiles(t, tc.p)
+			profFilePath := createTestProjectFiles(t, tc.p)
 			// set up the root command and run
-			output, outputErr, err := runTestCommand(reqsCmd, projTestDir, tc.args)
+			output, outputErr, err := runTestCommand(reqsCmd, profFilePath, tc.args)
 
 			// assert and check stdout and stderr
 			if err != nil {
@@ -100,7 +156,7 @@ func Test_Reqs_Show(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output)
 			assert.Equal(tc.expectStderrOutput, outputErr)
 
-			assert_projectInFileMatches(assert, tc.p, projTestDir)
+			assert_projectInFileMatches(assert, tc.p, profFilePath)
 		})
 	}
 }

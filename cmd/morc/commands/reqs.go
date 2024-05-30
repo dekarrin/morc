@@ -58,7 +58,7 @@ var reqsCmd = &cobra.Command{
 		"body payload entirely, which may differ from simply setting it to the empty string.\n\n" +
 		"Requests are deleted by passing the --delete flag with a request name as its argument. This will irreversibly remove the request " +
 		"from the project entirely.",
-	Args: cobra.NoArgs,
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, posArgs []string) error {
 		var args reqsArgs
 		if err := parseReqsArgs(cmd, posArgs, &args); err != nil {

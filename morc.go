@@ -261,7 +261,7 @@ type VarScraper struct {
 }
 
 func (v VarScraper) String() string {
-	s := fmt.Sprintf("%s from ", v.Name)
+	s := fmt.Sprintf("$%s from ", strings.ToUpper(v.Name))
 	s += v.Spec()
 	return s
 }

@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/dekarrin/morc"
-	"github.com/dekarrin/morc/cmd/morc/commands/reqs"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +27,6 @@ func init() {
 	rootCmd.AddGroup(projMetaCommands)
 	rootCmd.AddGroup(sendingCommands)
 	rootCmd.AddGroup(quickreqCommands)
-	rootCmd.AddCommand(reqs.ReqsCmd)
 }
 
 var rootCmd = &cobra.Command{

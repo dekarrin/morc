@@ -1,4 +1,4 @@
-package reqs
+package commands
 
 import (
 	"fmt"
@@ -13,18 +13,6 @@ import (
 	"github.com/dekarrin/morc/cmd/morc/commonflags"
 	"github.com/spf13/cobra"
 )
-
-type optional[E any] struct {
-	set bool
-	v   E
-}
-
-func (o optional[E]) Or(v E) E {
-	if o.set {
-		return o.v
-	}
-	return v
-}
 
 var (
 	flagReqsNew           string
@@ -41,22 +29,7 @@ var (
 	flagReqsDeleteForce   bool
 )
 
-// TODO: the attr/index system is ridiculously overcomplicated; just use optionally-valued args ffs.
-// oh no, we'll have to enforce whether a value was set. Or at least do --get to make it an explicit
-// action. Then we can do normals for setting.
-//
-// interface would be
-// REQS                                                                    LIST
-// REQS --new/-N (TAKES NAME NOW) followed by other args, options.         NEW
-// REQS REQ --delete/-D                                                    DELETE
-// REQS REQ --get ATTR                                                     GET
-// REQS REQ (implied show)                                                 SHOW
-// REQS REQ (!--new) followed by flag arg sets (or extended for hdr edit)  EDIT
-
-// -G sounds good for now.
-//
-// cond - if changed but value was not provided.
-var ReqsCmd = &cobra.Command{
+var reqsCmd = &cobra.Command{
 	Use: "reqs [-F FILE]\n" +
 		"reqs [-F FILE] --delete REQ [-f]\n" +
 		"reqs [-F FILE] --new REQ [-H HDR]... [-d DATA | -d @FILE] [-X METHOD] [-u URL] [-F FILE]\n" +
@@ -116,29 +89,31 @@ var ReqsCmd = &cobra.Command{
 }
 
 func init() {
-	ReqsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
-	ReqsCmd.PersistentFlags().StringVarP(&flagReqsNew, "new", "N", "", "Create a new request template named `REQ`.")
-	ReqsCmd.PersistentFlags().StringVarP(&flagReqsDelete, "delete", "D", "", "Delete the request template named `REQ`.")
-	ReqsCmd.PersistentFlags().StringVarP(&flagReqsGet, "get", "G", "", "Get the value of the given attribute `ATTR` from the request. To get a particular header's value, use --get-header instead. ATTR must be one of: "+strings.Join(reqAttrKeyNames(), ", "))
-	ReqsCmd.PersistentFlags().StringVarP(&flagReqsGetHeader, "get-header", "", "", "Get the value(s) of the given header `KEY` that is currently set on the request.")
-	ReqsCmd.PersistentFlags().StringVarP(&flagReqsName, "name", "n", "", "Change the name of a request template to `NAME`.")
-	ReqsCmd.PersistentFlags().StringArrayVarP(&flagReqsRemoveHeaders, "remove-header", "r", []string{}, "Remove header with key `KEY` from the request. If multiple headers with the same key exist, only the most recently added one will be deleted.")
-	ReqsCmd.PersistentFlags().StringVarP(&flagReqsBodyData, "data", "d", "", "Add the given `DATA` as a body to the request; prefix with @ to read data from a file")
-	ReqsCmd.PersistentFlags().StringArrayVarP(&flagReqsHeaders, "header", "H", []string{}, "Add a header to the request. Format is `KEY:VALUE`. Multiple headers may be set by providing multiple -H flags. If multiple headers with the same key are set, they will be set in the order they were given.")
-	ReqsCmd.PersistentFlags().StringVarP(&flagReqsMethod, "method", "X", "GET", "Set the request method to `METHOD`.")
-	ReqsCmd.PersistentFlags().StringVarP(&flagReqsURL, "url", "u", "http://example.com", "Specify the `URL` for the request.")
-	ReqsCmd.PersistentFlags().BoolVarP(&flagReqsRemoveBody, "remove-body", "", false, "Delete all existing body data from the request")
-	ReqsCmd.PersistentFlags().BoolVarP(&flagReqsDeleteForce, "force", "f", false, "Force deletion of the request template even if it is used in flows. Only valid with --delete/-D.")
+	reqsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+	reqsCmd.PersistentFlags().StringVarP(&flagReqsNew, "new", "N", "", "Create a new request template named `REQ`.")
+	reqsCmd.PersistentFlags().StringVarP(&flagReqsDelete, "delete", "D", "", "Delete the request template named `REQ`.")
+	reqsCmd.PersistentFlags().StringVarP(&flagReqsGet, "get", "G", "", "Get the value of the given attribute `ATTR` from the request. To get a particular header's value, use --get-header instead. ATTR must be one of: "+strings.Join(reqAttrKeyNames(), ", "))
+	reqsCmd.PersistentFlags().StringVarP(&flagReqsGetHeader, "get-header", "", "", "Get the value(s) of the given header `KEY` that is currently set on the request.")
+	reqsCmd.PersistentFlags().StringVarP(&flagReqsName, "name", "n", "", "Change the name of a request template to `NAME`.")
+	reqsCmd.PersistentFlags().StringArrayVarP(&flagReqsRemoveHeaders, "remove-header", "r", []string{}, "Remove header with key `KEY` from the request. If multiple headers with the same key exist, only the most recently added one will be deleted.")
+	reqsCmd.PersistentFlags().StringVarP(&flagReqsBodyData, "data", "d", "", "Add the given `DATA` as a body to the request; prefix with @ to read data from a file")
+	reqsCmd.PersistentFlags().StringArrayVarP(&flagReqsHeaders, "header", "H", []string{}, "Add a header to the request. Format is `KEY:VALUE`. Multiple headers may be set by providing multiple -H flags. If multiple headers with the same key are set, they will be set in the order they were given.")
+	reqsCmd.PersistentFlags().StringVarP(&flagReqsMethod, "method", "X", "GET", "Set the request method to `METHOD`.")
+	reqsCmd.PersistentFlags().StringVarP(&flagReqsURL, "url", "u", "http://example.com", "Specify the `URL` for the request.")
+	reqsCmd.PersistentFlags().BoolVarP(&flagReqsRemoveBody, "remove-body", "", false, "Delete all existing body data from the request")
+	reqsCmd.PersistentFlags().BoolVarP(&flagReqsDeleteForce, "force", "f", false, "Force deletion of the request template even if it is used in flows. Only valid with --delete/-D.")
 
-	ReqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "get-header", "name")
-	ReqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "get-header", "remove-header")
-	ReqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "get-header", "remove-body")
-	ReqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "get-header", "data")
-	ReqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "get-header", "method")
-	ReqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "get-header", "header")
-	ReqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "get-header", "url")
-	ReqsCmd.MarkFlagsMutuallyExclusive("data", "remove-body")
-	ReqsCmd.MarkFlagsMutuallyExclusive("new", "get", "get-header", "force")
+	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "get-header", "name")
+	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "get-header", "remove-header")
+	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "get-header", "remove-body")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "get-header", "data")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "get-header", "method")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "get-header", "header")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "get-header", "url")
+	reqsCmd.MarkFlagsMutuallyExclusive("data", "remove-body")
+	reqsCmd.MarkFlagsMutuallyExclusive("new", "get", "get-header", "force")
+
+	rootCmd.AddCommand(reqsCmd)
 }
 
 func invokeReqsEdit(io cmdio.IO, projFile, reqName string, attrs reqAttrValues) error {

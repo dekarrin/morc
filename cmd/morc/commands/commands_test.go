@@ -130,9 +130,23 @@ func testRequest_withAllPropertiesSet() morc.RequestTemplate {
 		URL:    "https://example.com",
 		Headers: map[string][]string{
 			"Content-Type": {"application/json"},
+			"User-Agent":   {"morc/0.0.0", "test/0.0.0"},
 		},
 		Body:     []byte("{\n    \"username\": \"grimAuxiliatrix\"\n}"),
 		AuthFlow: "auth1",
+		Captures: map[string]morc.VarScraper{
+			"var1": {
+				Name:        "var1",
+				OffsetStart: 1,
+				OffsetEnd:   3,
+			},
+			"var2": {
+				Name: "var2",
+				Steps: []morc.TraversalStep{
+					{Key: "key1"},
+				},
+			},
+		},
 	}
 }
 

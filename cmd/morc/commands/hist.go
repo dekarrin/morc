@@ -38,7 +38,9 @@ func init() {
 }
 
 var histCmd = &cobra.Command{
-	Use:     "hist [ENTRY [output-control-opts]] [-F project_file] [--on]|[--off]|[--clear]|[--info]",
+	Use: "hist [-F FILE]\n" +
+		"hist [-F FILE] ENTRY [output-flags]\n" +
+		"hist [-F FILE] [--on]|[--off]|[--clear]|[--info]",
 	GroupID: "project",
 	Short:   "View and perform operations on request template sending history",
 	Long:    "With no other arguments, prints out a listing of all summarized entries in the history. If an ENTRY is given by index number from the listing, the exact response as received from the initial send of the template is output. If --on is given, request history is enabled for future requests made by calling morc send or morc exec. If --off is given, history is instead disabled, although existing entries are kept. If --info is given, basic info about the history as a whole is output. If --clear is given, all existing history entries are immediately deleted.\n\nHistory only applies to requests created from request templates in a project; one-off requests such as those sent by morc request or any of the method shorthand versions are not saved in history.",

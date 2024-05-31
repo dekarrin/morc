@@ -27,7 +27,7 @@ type execOptions struct {
 }
 
 var execCmd = &cobra.Command{
-	Use:     "exec FLOW [-F project_file] [output_control_flags] [-V var:value]...",
+	Use:     "exec [-F FILE] FLOW [output-flags] [-V var:value]...",
 	Short:   "Execute a flow of requests",
 	Long:    "Execute a sequence of requests defined in a flow stored in the project. Initial variables can be set with -V.",
 	Args:    cobra.ExactArgs(1),

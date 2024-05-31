@@ -27,7 +27,7 @@ Send a request using a project:
 
 ```shell
 morc init   # create the project, if it doesn't yet exist
-morc reqs new get-google --url http://google.com/ -X GET
+morc reqs --new get-google --url http://google.com/ -X GET
 morc send get-google  # actually fire it off
 ```
 
@@ -100,16 +100,16 @@ History tracking is ON
 Using default var environment
 ```
 
-If you want to change things about the project, you can do that with the edit
-subcommand:
+If you want to change things about the project, you can do that by passing flags
+to set project attributes:
 
 ```shell
-morc proj edit --name 'My Cool Project'
+morc proj --name 'My Cool Project'
 ```
 
 Or if you are looking for *very* fine-grained control over new project creation,
-you can use the `morc proj new` command. See `morc help proj new` for
-information on running it.
+you can instead use `morc proj` with the `--new` flag. See `morc help proj` for
+information on using it.
 
 ### Project Requests
 
@@ -124,10 +124,10 @@ If this is in a brand new project, there won't be anything there.
 
 #### Request Creation
 
-You can add a new request with the `new` subcommand:
+You can add a new request with the `--new` flag:
 
 ```shell
-morc reqs new create-user --url localhost:8080/users -X POST -d '{"name":"Vriska Serket"}' -H 'Content-Type: application/json'
+morc reqs --new create-user --url localhost:8080/users -X POST -d '{"name":"Vriska Serket"}' -H 'Content-Type: application/json'
 ```
 
 The URL, method, body payload, and headers can be specified with flags.
@@ -136,7 +136,7 @@ file name as the argument for `-d` and it will load the body data from that
 file and use that as the body of the newly-created request:
 
 ```shell
-morc reqs new update-user --url localhost:8080/users -X PATCH -d '@vriska.json' -H 'Content-Type: application/json'
+morc reqs --new update-user --url localhost:8080/users -X PATCH -d '@vriska.json' -H 'Content-Type: application/json'
 ```
 
 After adding several requests, `morc reqs` will have much more interesting
@@ -195,10 +195,10 @@ Variables below for more information on using variables within requests.
 
 #### Request Viewing
 
-You can examine a request in detail with the `show` subcommand:
+You can examine a request in detail by passing it as an argument to `reqs`:
 
 ```shell
-morc reqs show create-user
+morc reqs create-user
 ```
 
 Output:
@@ -221,10 +221,11 @@ The request method and URL are shown first, along with any headers, body, and
 variable captures. Auth flow is for an upcoming feature and is not currently
 used.
 
-To see only one of the items in a request, you can specify it as a CLI flag:
+To see only one of the items in a request, you can specify the item to get with
+the `--get` CLI flag:
 
 ```shell
-morc reqs show create-user --body
+morc reqs create-user --get data
 ```
 
 Ouput:
@@ -233,18 +234,26 @@ Ouput:
 {"name": "Vriska Serket"}
 ```
 
+The `--get` flag can be used to retrieve any of the following attributes:
+`name`, `data`, `method`, `url`, `headers`, `captures`, and `auth`.
+
+The `headers` attribute will print all headers set on the request. If you want
+to get only the value (or values) of a specific header, use `--get-header` with
+the name of the header to retrieve.
+
 #### Request Editing
 
-If you need to update a request, use the `edit` subcommand:
+If you need to update a request, pass the attribute to be updated and its new
+value using flags:
 
 ```shell
-morc reqs edit create-user -d '{"name": "Nepeta Leijon"}'
+morc reqs create-user -d '{"name": "Nepeta Leijon"}'
 ```
 
-You can use `show` to confirm that the update was applied:
+You can show the request again to confirm that the update was applied:
 
 ```shell
-morc reqs show create-user --body
+morc reqs create-user --get data
 ```
 
 Output:
@@ -255,11 +264,11 @@ Output:
 
 #### Request Deletion
 
-If you're totally done with a request and want to permanently remove it from the
-project, use the `delete` subcommand:
+If you're completely done with a request and want to permanently remove it from
+the project, use the `--delete`/`-D` flag with the name of the request:
 
 ```shell
-morc reqs delete get-token
+morc reqs --delete get-token
 ```
 
 It will be cleared from the project, which you can confirm by listing the
@@ -287,7 +296,7 @@ could do that by declaring a variable called `${SCHEME}` in the URL of the
 request:
 
 ```shell
-morc reqs edit get-user --url '${SCHEME}://localhost:8080/users'
+morc reqs get-user --url '${SCHEME}://localhost:8080/users'
 
 # MAKE SURE to put text with a dollar-leading ${variable} in it in single quotes
 # or your shell may mess with the variable
@@ -361,7 +370,7 @@ With nothing defined, it will give output indicating that:
 (none)
 ```
 
-With variables set, it will them out:
+With variables set, it will list them out:
 
 ```
 ${SCHEME} = "https"

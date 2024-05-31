@@ -100,7 +100,7 @@ func init() {
 	reqsCmd.PersistentFlags().StringArrayVarP(&flagReqsHeaders, "header", "H", []string{}, "Add a header to the request. Format is `KEY:VALUE`. Multiple headers may be set by providing multiple -H flags. If multiple headers with the same key are set, they will be set in the order they were given.")
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsMethod, "method", "X", "GET", "Set the request method to `METHOD`.")
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsURL, "url", "u", "http://example.com", "Specify the `URL` for the request.")
-	reqsCmd.PersistentFlags().BoolVarP(&flagReqsRemoveBody, "remove-body", "", false, "Delete all existing body data from the request")
+	reqsCmd.PersistentFlags().BoolVarP(&flagReqsRemoveBody, "remove-body", "R", false, "Delete all existing body data from the request")
 	reqsCmd.PersistentFlags().BoolVarP(&flagReqsDeleteForce, "force", "f", false, "Force deletion of the request template even if it is used in flows. Only valid with --delete/-D.")
 
 	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "get-header", "name")
@@ -196,35 +196,35 @@ func invokeReqsEdit(io cmdio.IO, projFile, reqName string, attrs reqAttrValues) 
 
 	// header removals
 	if attrs.removeHeaders.set {
-		if req.Headers == nil {
-			req.Headers = make(http.Header)
-		}
-
 		for _, key := range attrs.removeHeaders.v {
-			vals := req.Headers.Values(key)
-
 			modKey := reqKey{header: key, uniqueInt: nonPredefinedAttrCount}
 			nonPredefinedAttrCount++
 
-			if len(vals) < 1 {
+			if req.Headers == nil {
 				noChangeVals[modKey] = "not exist"
 			} else {
-				// delete the most recently added header with this key.
-				req.Headers.Del(key)
+				vals := req.Headers.Values(key)
 
-				oldVal := vals[len(vals)-1]
-				// if there's more than one value, put the other ones back to honor
-				// deleting only the most recent one
-				if len(vals) > 1 {
-					modifiedVals[modKey] = fmt.Sprintf("no longer have value %s", oldVal)
-					for _, v := range vals[:len(vals)-1] {
-						req.Headers.Add(key, v)
-					}
+				if len(vals) < 1 {
+					noChangeVals[modKey] = "not exist"
 				} else {
-					modifiedVals[modKey] = fmt.Sprintf("no longer exist %s", oldVal)
+					// delete the most recently added header with this key.
+					req.Headers.Del(key)
+
+					oldVal := vals[len(vals)-1]
+					// if there's more than one value, put the other ones back to honor
+					// deleting only the most recent one
+					if len(vals) > 1 {
+						modifiedVals[modKey] = fmt.Sprintf("no longer have value %s", oldVal)
+						for _, v := range vals[:len(vals)-1] {
+							req.Headers.Add(key, v)
+						}
+					} else {
+						modifiedVals[modKey] = "no longer exist"
+					}
 				}
-				attrOrdering = append(attrOrdering, modKey)
 			}
+			attrOrdering = append(attrOrdering, modKey)
 		}
 	}
 
@@ -234,13 +234,22 @@ func invokeReqsEdit(io cmdio.IO, projFile, reqName string, attrs reqAttrValues) 
 			req.Headers = make(http.Header)
 		}
 
-		for key, vals := range attrs.headers.v {
+		// to make reproducible, sort the header keys first
+		sortedKeys := make([]string, 0, len(attrs.headers.v))
+		for key := range attrs.headers.v {
+			sortedKeys = append(sortedKeys, key)
+		}
+		sort.Strings(sortedKeys)
+
+		for _, key := range sortedKeys {
+			vals := attrs.headers.v[key]
 			for _, v := range vals {
 				modKey := reqKey{header: key, uniqueInt: nonPredefinedAttrCount}
 				nonPredefinedAttrCount++
 
 				modifiedVals[modKey] = fmt.Sprintf("have new value %s", v)
 				req.Headers.Add(key, v)
+				attrOrdering = append(attrOrdering, modKey)
 			}
 		}
 	}
@@ -299,6 +308,10 @@ func invokeReqsNew(io cmdio.IO, projFile, reqName string, attrs reqAttrValues) e
 		Headers: attrs.headers.v,
 		Body:    attrs.body.v,
 	}
+
+	if p.Templates == nil {
+		p.Templates = make(map[string]morc.RequestTemplate)
+	}
 	p.Templates[reqLower] = req
 
 	// save the project file
@@ -307,7 +320,7 @@ func invokeReqsNew(io cmdio.IO, projFile, reqName string, attrs reqAttrValues) e
 		return err
 	}
 
-	io.PrintLoudf("Created request %s\n", reqLower)
+	io.PrintLoudf("Created new request %s\n", reqLower)
 
 	return nil
 }
@@ -409,7 +422,16 @@ func invokeReqsShow(io cmdio.IO, projFile, reqName string) error {
 
 	if len(req.Captures) > 0 {
 		io.Printf("VAR CAPTURES:\n")
-		for _, cap := range req.Captures {
+
+		// alphabetize captures
+		var sortedNames []string
+		for name := range req.Captures {
+			sortedNames = append(sortedNames, name)
+		}
+		sort.Strings(sortedNames)
+
+		for _, capName := range sortedNames {
+			cap := req.Captures[capName]
 			io.Printf("%s\n", cap.String())
 		}
 	} else {
@@ -530,7 +552,15 @@ func invokeReqsGet(io cmdio.IO, projFile, reqName string, item reqKey) error {
 		if len(req.Captures) == 0 {
 			io.PrintLoudf("(none)\n")
 		} else {
-			for _, cap := range req.Captures {
+			// alphabetize captures
+			var sortedNames []string
+			for name := range req.Captures {
+				sortedNames = append(sortedNames, name)
+			}
+			sort.Strings(sortedNames)
+
+			for _, capName := range sortedNames {
+				cap := req.Captures[capName]
 				io.Printf("%s\n", cap.String())
 			}
 		}
@@ -768,6 +798,7 @@ func reqsSetFlagIsPresent(cmd *cobra.Command) bool {
 		f.Changed("header") ||
 		f.Changed("name") ||
 		f.Changed("header") ||
+		f.Changed("data") ||
 		f.Changed("remove-header") ||
 		f.Changed("remove-body")
 }
@@ -815,7 +846,7 @@ func (rk reqKey) Human() string {
 	case reqKeyURL.name:
 		return "request URL"
 	case reqKeyData.name:
-		return "request body data"
+		return "request body"
 	case reqKeyHeaders.name:
 		return "request headers"
 	case reqKeyAuthFlow.name:

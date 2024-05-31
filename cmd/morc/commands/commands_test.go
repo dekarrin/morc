@@ -123,11 +123,27 @@ func testProject_singleReqWillAllPropertiesSet() morc.Project {
 	}
 }
 
+func testProject_withRequests(reqs ...morc.RequestTemplate) morc.Project {
+	tmpls := make(map[string]morc.RequestTemplate, len(reqs))
+	for _, r := range reqs {
+		tmpls[strings.ToLower(r.Name)] = r
+	}
+
+	return morc.Project{
+		Templates: tmpls,
+	}
+}
+
+func testRequest_withName(req morc.RequestTemplate, name string) morc.RequestTemplate {
+	req.Name = name
+	return req
+}
+
 func testRequest_withAllPropertiesSet() morc.RequestTemplate {
 	return morc.RequestTemplate{
 		Name:   "req1",
 		Method: "GET",
-		URL:    "https://example.com",
+		URL:    "http://example.com",
 		Headers: map[string][]string{
 			"Content-Type": {"application/json"},
 			"User-Agent":   {"morc/0.0.0", "test/0.0.0"},

@@ -2,6 +2,8 @@ package commands
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -9,6 +11,322 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 )
+
+func Test_Reqs_Edit(t *testing.T) {
+	testCases := []struct {
+		name               string
+		args               []string // DO NOT INCLUDE -F; it is automatically set to a project file
+		p                  morc.Project
+		expectP            morc.Project
+		expectErr          string // set if command.Execute expected to fail, with a string that would be in the error message
+		expectStderrOutput string // set with expected output to stderr
+		expectStdoutOutput string // set with expected output to stdout
+	}{
+		{
+			name:               "set name",
+			args:               []string{"reqs", "req1", "-n", "nepeta"},
+			p:                  testProject_withRequests(morc.RequestTemplate{Name: "req1"}),
+			expectP:            testProject_withRequests(morc.RequestTemplate{Name: "nepeta"}),
+			expectStdoutOutput: "Set request name to nepeta\n",
+		},
+		{
+			name:               "set method",
+			args:               []string{"reqs", "req1", "-X", "GET"},
+			p:                  testProject_withRequests(morc.RequestTemplate{Name: "req1", Method: "POST"}),
+			expectP:            testProject_withRequests(morc.RequestTemplate{Name: "req1", Method: "GET"}),
+			expectStdoutOutput: "Set request method to GET\n",
+		},
+		{
+			name:               "set url",
+			args:               []string{"reqs", "req1", "-u", "https://test.example.com/"},
+			p:                  testProject_withRequests(morc.RequestTemplate{Name: "req1", URL: "https://www.example.com/"}),
+			expectP:            testProject_withRequests(morc.RequestTemplate{Name: "req1", URL: "https://test.example.com/"}),
+			expectStdoutOutput: "Set request URL to https://test.example.com/\n",
+		},
+		{
+			name:               "set body",
+			args:               []string{"reqs", "req1", "-d", `{"name":"JACK NOIR"}`},
+			p:                  testProject_withRequests(morc.RequestTemplate{Name: "req1"}),
+			expectP:            testProject_withRequests(morc.RequestTemplate{Name: "req1", Body: []byte(`{"name":"JACK NOIR"}`)}),
+			expectStdoutOutput: "Set request body to data with length 20\n",
+		},
+		{
+			name:               "remove body",
+			args:               []string{"reqs", "req1", "--remove-body"},
+			p:                  testProject_withRequests(morc.RequestTemplate{Name: "req1", Body: []byte(`{"name":"JACK NOIR"}`)}),
+			expectP:            testProject_withRequests(morc.RequestTemplate{Name: "req1"}),
+			expectStdoutOutput: "Set request body to (none)\n",
+		},
+		{
+			name: "add header (none present)",
+			args: []string{"reqs", "req1", "-H", "User-Agent: morc/0.0.0"},
+			p:    testProject_withRequests(morc.RequestTemplate{Name: "req1"}),
+			expectP: testProject_withRequests(morc.RequestTemplate{
+				Name: "req1",
+				Headers: http.Header(map[string][]string{
+					"User-Agent": {"morc/0.0.0"},
+				}),
+			}),
+			expectStdoutOutput: "Set header User-Agent to have new value morc/0.0.0\n",
+		},
+		{
+			name: "add header (one present)",
+			args: []string{"reqs", "req1", "-H", "User-Agent: morc/0.0.0"},
+			p: testProject_withRequests(morc.RequestTemplate{
+				Name: "req1",
+				Headers: http.Header(map[string][]string{
+					"Content-Type": {"application/json"},
+				}),
+			}),
+			expectP: testProject_withRequests(morc.RequestTemplate{
+				Name: "req1",
+				Headers: http.Header(map[string][]string{
+					"Content-Type": {"application/json"},
+					"User-Agent":   {"morc/0.0.0"},
+				}),
+			}),
+			expectStdoutOutput: "Set header User-Agent to have new value morc/0.0.0\n",
+		},
+		{
+			name: "add header (key already present)",
+			args: []string{"reqs", "req1", "-H", "User-Agent: morc/0.0.0"},
+			p: testProject_withRequests(morc.RequestTemplate{
+				Name: "req1",
+				Headers: http.Header(map[string][]string{
+					"User-Agent": {"test/0.0.0"},
+				}),
+			}),
+			expectP: testProject_withRequests(morc.RequestTemplate{
+				Name: "req1",
+				Headers: http.Header(map[string][]string{
+					"User-Agent": {"test/0.0.0", "morc/0.0.0"},
+				}),
+			}),
+			expectStdoutOutput: "Set header User-Agent to have new value morc/0.0.0\n",
+		},
+		{
+			name: "remove header (one present)",
+			args: []string{"reqs", "req1", "-r", "User-Agent"},
+			p: testProject_withRequests(morc.RequestTemplate{
+				Name: "req1",
+				Headers: http.Header(map[string][]string{
+					"User-Agent": {"morc/0.0.0"},
+				}),
+			}),
+			expectP: testProject_withRequests(morc.RequestTemplate{
+				Name:    "req1",
+				Headers: http.Header{},
+			}),
+			expectStdoutOutput: "Set header User-Agent to no longer exist\n",
+		},
+		{
+			name: "remove header (multi present)",
+			args: []string{"reqs", "req1", "-r", "User-Agent"},
+			p: testProject_withRequests(morc.RequestTemplate{
+				Name: "req1",
+				Headers: http.Header(map[string][]string{
+					"User-Agent": {"test/0.0.0", "morc/0.0.0"},
+				}),
+			}),
+			expectP: testProject_withRequests(morc.RequestTemplate{
+				Name: "req1",
+				Headers: http.Header{
+					"User-Agent": {"test/0.0.0"},
+				},
+			}),
+			expectStdoutOutput: "Set header User-Agent to no longer have value morc/0.0.0\n",
+		},
+		{
+			name:               "remove header (not present)",
+			args:               []string{"reqs", "req1", "-r", "User-Agent"},
+			p:                  testProject_nRequests(1),
+			expectP:            testProject_nRequests(1),
+			expectStderrOutput: "No change to header User-Agent; already set to not exist\n",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+			resetReqsFlags()
+
+			// create project and dump config to a temp dir
+			projFilePath := createTestProjectFiles(t, tc.p)
+			// set up the root command and run
+			output, outputErr, err := runTestCommand(reqsCmd, projFilePath, tc.args)
+
+			// assert and check stdout and stderr
+			if err != nil {
+				if tc.expectErr == "" {
+					t.Fatalf("unexpected returned error: %v", err)
+					return
+				}
+				if !strings.Contains(err.Error(), tc.expectErr) {
+					t.Fatalf("expected returned error to contain %q, got %q", tc.expectErr, err)
+				}
+				return
+			}
+
+			// assertions
+
+			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
+			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
+
+			assert_projectInFileMatches(assert, tc.expectP, projFilePath)
+		})
+	}
+
+	t.Run("set body from file", func(t *testing.T) {
+		assert := assert.New(t)
+		resetReqsFlags()
+
+		p := testProject_withRequests(morc.RequestTemplate{Name: "req1"})
+		expectP := testProject_withRequests(morc.RequestTemplate{Name: "req1", Body: []byte(`{"name":"JACK NOIR"}`)})
+		expectStdoutOutput := "Set request body to data with length 20\n"
+
+		// create project and dump config to a temp dir
+		projFilePath := createTestProjectFiles(t, p)
+		projDir := filepath.Dir(projFilePath)
+		bodyFilePath := filepath.Join(projDir, "body.json")
+		err := os.WriteFile(bodyFilePath, []byte(`{"name":"JACK NOIR"}`), 0644)
+		if err != nil {
+			t.Fatalf("failed to write body file: %v", err)
+		}
+
+		args := []string{"reqs", "req1", "-d", "@" + bodyFilePath}
+
+		// set up the root command and run
+		output, outputErr, err := runTestCommand(reqsCmd, projFilePath, args)
+
+		// assert and check stdout and stderr
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assertions
+
+		assert.Equal(expectStdoutOutput, output)
+		assert.Equal("", outputErr)
+
+		assert_projectInFileMatches(assert, expectP, projFilePath)
+	})
+
+}
+
+func Test_Reqs_New(t *testing.T) {
+	testCases := []struct {
+		name               string
+		args               []string // DO NOT INCLUDE -F; it is automatically set to a project file
+		p                  morc.Project
+		expectP            morc.Project
+		expectErr          string // set if command.Execute expected to fail, with a string that would be in the error message
+		expectStderrOutput string // set with expected output to stderr
+		expectStdoutOutput string // set with expected output to stdout
+	}{
+		{
+			name:               "method and url defaulted",
+			args:               []string{"reqs", "--new", "req1"},
+			p:                  morc.Project{},
+			expectP:            testProject_withRequests(morc.RequestTemplate{Name: "req1", Method: "GET", URL: "http://example.com"}),
+			expectStdoutOutput: "Created new request req1\n",
+		},
+		{
+			name:               "method and url explicitly blank",
+			args:               []string{"reqs", "--new", "req1", "-X", "", "-u", ""},
+			p:                  morc.Project{},
+			expectP:            testProject_withRequests(morc.RequestTemplate{Name: "req1"}),
+			expectStdoutOutput: "Created new request req1\n",
+		},
+		{
+			name:               "body initially set",
+			args:               []string{"reqs", "--new", "req1", "-d", `{"name":"JACK NOIR"}`},
+			p:                  morc.Project{},
+			expectP:            testProject_withRequests(morc.RequestTemplate{Name: "req1", Method: "GET", URL: "http://example.com", Body: []byte(`{"name":"JACK NOIR"}`)}),
+			expectStdoutOutput: "Created new request req1\n",
+		},
+		{
+			name: "headers initially set",
+			args: []string{"reqs", "--new", "req1", "-H", "Content-Type: application/json", "-H", "User-Agent: morc/0.0.0", "-H", "User-Agent: test/0.0.0"},
+			p:    morc.Project{},
+			expectP: testProject_withRequests(morc.RequestTemplate{
+				Name:   "req1",
+				Method: "GET",
+				URL:    "http://example.com",
+				Headers: http.Header(map[string][]string{
+					"Content-Type": {"application/json"},
+					"User-Agent":   {"morc/0.0.0", "test/0.0.0"},
+				}),
+			}),
+			expectStdoutOutput: "Created new request req1\n",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+			resetReqsFlags()
+
+			// create project and dump config to a temp dir
+			projFilePath := createTestProjectFiles(t, tc.p)
+			// set up the root command and run
+			output, outputErr, err := runTestCommand(reqsCmd, projFilePath, tc.args)
+
+			// assert and check stdout and stderr
+			if err != nil {
+				if tc.expectErr == "" {
+					t.Fatalf("unexpected returned error: %v", err)
+					return
+				}
+				if !strings.Contains(err.Error(), tc.expectErr) {
+					t.Fatalf("expected returned error to contain %q, got %q", tc.expectErr, err)
+				}
+				return
+			}
+
+			// assertions
+
+			assert.Equal(tc.expectStdoutOutput, output)
+			assert.Equal(tc.expectStderrOutput, outputErr)
+
+			assert_projectInFileMatches(assert, tc.expectP, projFilePath)
+		})
+	}
+
+	t.Run("body initially set from file", func(t *testing.T) {
+		assert := assert.New(t)
+		resetReqsFlags()
+
+		p := morc.Project{}
+		expectP := testProject_withRequests(morc.RequestTemplate{Name: "req1", Method: "GET", URL: "http://example.com", Body: []byte(`{"name":"JACK NOIR"}`)})
+		expectStdoutOutput := "Created new request req1\n"
+
+		// create project and dump config to a temp dir
+		projFilePath := createTestProjectFiles(t, p)
+		projDir := filepath.Dir(projFilePath)
+		bodyFilePath := filepath.Join(projDir, "body.json")
+		err := os.WriteFile(bodyFilePath, []byte(`{"name":"JACK NOIR"}`), 0644)
+		if err != nil {
+			t.Fatalf("failed to write body file: %v", err)
+		}
+
+		args := []string{"reqs", "--new", "req1", "-d", "@" + bodyFilePath}
+
+		// set up the root command and run
+		output, outputErr, err := runTestCommand(reqsCmd, projFilePath, args)
+
+		// assert and check stdout and stderr
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assertions
+
+		assert.Equal(expectStdoutOutput, output)
+		assert.Equal("", outputErr)
+
+		assert_projectInFileMatches(assert, expectP, projFilePath)
+	})
+}
 
 func Test_Reqs_Get(t *testing.T) {
 	testCases := []struct {
@@ -41,7 +359,7 @@ func Test_Reqs_Get(t *testing.T) {
 			name:               "get URL",
 			args:               []string{"reqs", "req1", "--get", "UrL"},
 			p:                  testProject_singleReqWillAllPropertiesSet(),
-			expectStdoutOutput: "https://example.com\n",
+			expectStdoutOutput: "http://example.com\n",
 		},
 		{
 			name:               "get headers (all)",
@@ -63,22 +381,22 @@ func Test_Reqs_Get(t *testing.T) {
 		},
 		{
 			name:               "get auth flow",
-			args:               []string{"reqs", "req1", "--get-header", "user-agent"},
+			args:               []string{"reqs", "req1", "--get", "auth"},
 			p:                  testProject_singleReqWillAllPropertiesSet(),
-			expectStdoutOutput: "morc/0.0.0\ntest/0.0.0\n",
+			expectStdoutOutput: "auth1\n",
 		},
-		// {
-		// 	name:      "error: get 0th step",
-		// 	args:      []string{"flows", "test", "--get", "0"},
-		// 	p:         testProject_singleFlowWithNSteps(2),
-		// 	expectErr: "does not exist",
-		// },
-		// {
-		// 	name:      "get too big errors",
-		// 	args:      []string{"flows", "test", "--get", "3"},
-		// 	p:         testProject_singleFlowWithNSteps(2),
-		// 	expectErr: "does not exist",
-		// },
+		{
+			name:               "get data",
+			args:               []string{"reqs", "req1", "--get", "data"},
+			p:                  testProject_singleReqWillAllPropertiesSet(),
+			expectStdoutOutput: "{\n    \"username\": \"grimAuxiliatrix\"\n}\n",
+		},
+		{
+			name:               "get captures",
+			args:               []string{"reqs", "req1", "--get", "captures"},
+			p:                  testProject_singleReqWillAllPropertiesSet(),
+			expectStdoutOutput: "$VAR1 from offset 1,3\n$VAR2 from .key1\n",
+		},
 	}
 
 	for _, tc := range testCases {

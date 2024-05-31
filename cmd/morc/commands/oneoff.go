@@ -30,6 +30,7 @@ func addRequestFlags(id string, cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVarP(&flagVarSymbol, "var-symbol", "", "$", "The symbol to use for variable substitution")
 	cmd.PersistentFlags().StringArrayVarP(&flagGetVars, "capture-var", "C", []string{}, "Get a variable's value from the response. Format is name::start,end for byte offset or name:path[0].to.value (jq-ish syntax)")
 	cmd.PersistentFlags().StringArrayVarP(&flagVars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Format is name=value")
+	cmd.PersistentFlags().BoolVarP(&flagSendInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
 
 	setupRequestOutputFlags(id, cmd)
 }
@@ -42,6 +43,7 @@ type oneoffOptions struct {
 	oneTimeVars  map[string]string
 	scrapers     []morc.VarScraper
 	outputCtrl   morc.OutputControl
+	skipVerify   bool
 }
 
 var oneoffCmd = &cobra.Command{
@@ -109,6 +111,7 @@ func oneoffFlagsToOptions(cmdID string) (oneoffOptions, error) {
 	opts := oneoffOptions{
 		stateFileIn:  flagReadStateFile,
 		stateFileOut: flagWriteStateFile,
+		skipVerify:   flagSendInsecure,
 	}
 
 	if flagVarSymbol == "" {
@@ -194,13 +197,14 @@ func invokeRequest(io cmdio.IO, method, url, varSymbol string, opts oneoffOption
 	opts.outputCtrl.Writer = io.Out
 
 	sendOpts := morc.SendOptions{
-		LoadStateFile: opts.stateFileIn,
-		SaveStateFile: opts.stateFileOut,
-		Headers:       opts.headers,
-		Body:          opts.bodyData,
-		Captures:      opts.scrapers,
-		Output:        opts.outputCtrl,
-		Vars:          opts.oneTimeVars,
+		LoadStateFile:      opts.stateFileIn,
+		SaveStateFile:      opts.stateFileOut,
+		Headers:            opts.headers,
+		Body:               opts.bodyData,
+		Captures:           opts.scrapers,
+		Output:             opts.outputCtrl,
+		Vars:               opts.oneTimeVars,
+		InsecureSkipVerify: opts.skipVerify,
 	}
 
 	// inject the http client, in case we are to use a specific one

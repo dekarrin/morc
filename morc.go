@@ -3,6 +3,7 @@ package morc
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -909,8 +910,20 @@ type SendOptions struct {
 	// Client is a user-provided HTTP client that will be used to make external
 	// HTTP calls. If left nil, a default one is used. If provided, note that
 	// its cookie jar will be replaced with an internal variant of a cookie jar
-	// that allows for cookie record keeping.
+	// that allows for cookie record keeping. Also note that TLS configuration
+	// provided in this struct will override any in the given client.
+	//
+	// TODO: this is almost entirely used for testing and should probably not
+	// be exposed to callers. Perhaps via setting a global? Or even giving as
+	// a ctor.
 	Client *http.Client
+
+	// InsecureSkipVerify is a flag that, if set, will cause the client to skip
+	// verification of TLS certificates when making HTTPS requests. This is
+	// useful for testing against self-signed certificates, but note that this
+	// should generally NOT be used in production code. THIS IS INSECURE AND
+	// SHOULD BE USED WITH CAUTION.
+	InsecureSkipVerify bool
 }
 
 type SendResult struct {
@@ -955,6 +968,23 @@ func Send(method, URL, varSymbol string, opts SendOptions) (SendResult, error) {
 	client.VarOverrides = opts.Vars
 	client.VarPrefix = varSymbol
 	client.Scrapers = opts.Captures
+
+	if opts.InsecureSkipVerify {
+		// pick up the old client and assume it's a Transport (because if it's DefaultTransport, it will be)
+		transport, ok := client.http.Transport.(*http.Transport)
+		if !ok {
+			panic("client transport is not an http.Transport")
+		}
+
+		oldTLS := transport.TLSClientConfig
+
+		if oldTLS == nil {
+			oldTLS = &tls.Config{}
+		}
+		oldTLS.InsecureSkipVerify = true
+		transport.TLSClientConfig = oldTLS
+		client.http.Transport = transport
+	}
 
 	// if we have been asked to load state, do that now
 	if opts.LoadStateFile != "" {

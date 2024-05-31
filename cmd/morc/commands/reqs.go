@@ -347,7 +347,7 @@ func invokeReqsDelete(io cmdio.IO, projFile, reqName string, force bool) error {
 			if len(inFlows) == 1 {
 				flowS = ""
 			}
-			return fmt.Errorf("%s is used in flow%s %s\nUse -f to force the deletion", reqLower, flowS, strings.Join(inFlows, ", "))
+			return fmt.Errorf("%s is used in flow%s %s\nUse -f to force-delete", reqLower, flowS, strings.Join(inFlows, ", "))
 		}
 	}
 

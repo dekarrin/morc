@@ -12,6 +12,120 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func Test_Reqs_Delete(t *testing.T) {
+	testCases := []struct {
+		name               string
+		args               []string // DO NOT INCLUDE -F; it is automatically set to a project file
+		p                  morc.Project
+		expectP            morc.Project
+		expectErr          string // set if command.Execute expected to fail, with a string that would be in the error message
+		expectStderrOutput string // set with expected output to stderr
+		expectStdoutOutput string // set with expected output to stdout
+	}{
+		{
+			name:      "no reqs present - empty project",
+			args:      []string{"reqs", "-D", "req1"},
+			p:         morc.Project{},
+			expectErr: "no request named req1 exists",
+		},
+		{
+			name:      "no reqs present - empty RequestTemplates",
+			args:      []string{"reqs", "-D", "req1"},
+			p:         morc.Project{Templates: map[string]morc.RequestTemplate{}},
+			expectErr: "no request named req1 exists",
+		},
+		{
+			name:      "delete needs value",
+			args:      []string{"reqs", "-D"},
+			p:         testProject_singleReqWillAllPropertiesSet(),
+			expectErr: "flag needs an argument: 'D'",
+		},
+		{
+			name: "normal delete",
+			args: []string{"reqs", "-D", "req1"},
+			p:    testProject_singleReqWillAllPropertiesSet(),
+			expectP: morc.Project{
+				Templates: map[string]morc.RequestTemplate{},
+			},
+			expectStdoutOutput: "Deleted request req1\n",
+		},
+		{
+			name: "in a flow - can't delete",
+			args: []string{"reqs", "-D", "req1"},
+			p: morc.Project{
+				Templates: map[string]morc.RequestTemplate{"req1": testRequest_withAllPropertiesSet()},
+				Flows: map[string]morc.Flow{
+					"testflow": {
+						Name: "testflow",
+						Steps: []morc.FlowStep{
+							{Template: "req1"},
+						},
+					},
+				},
+			},
+			expectErr: "req1 is used in flow testflow\nUse -f to force-delete",
+		},
+		{
+			name: "in a flow - delete with force",
+			args: []string{"reqs", "-D", "req1", "-f"},
+			p: morc.Project{
+				Templates: map[string]morc.RequestTemplate{"req1": testRequest_withAllPropertiesSet()},
+				Flows: map[string]morc.Flow{
+					"testflow": {
+						Name: "testflow",
+						Steps: []morc.FlowStep{
+							{Template: "req1"},
+						},
+					},
+				},
+			},
+			expectP: morc.Project{
+				Templates: map[string]morc.RequestTemplate{},
+				Flows: map[string]morc.Flow{
+					"testflow": {
+						Name: "testflow",
+						Steps: []morc.FlowStep{
+							{Template: "req1"},
+						},
+					},
+				},
+			},
+			expectStdoutOutput: "Deleted request req1\n",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+			resetReqsFlags()
+
+			// create project and dump config to a temp dir
+			projFilePath := createTestProjectFiles(t, tc.p)
+			// set up the root command and run
+			output, outputErr, err := runTestCommand(reqsCmd, projFilePath, tc.args)
+
+			// assert and check stdout and stderr
+			if err != nil {
+				if tc.expectErr == "" {
+					t.Fatalf("unexpected returned error: %v", err)
+					return
+				}
+				if !strings.Contains(err.Error(), tc.expectErr) {
+					t.Fatalf("expected returned error to contain %q, got %q", tc.expectErr, err)
+				}
+				return
+			}
+
+			// assertions
+
+			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
+			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
+
+			assert_projectInFileMatches(assert, tc.expectP, projFilePath)
+		})
+	}
+}
+
 func Test_Reqs_Edit(t *testing.T) {
 	testCases := []struct {
 		name               string

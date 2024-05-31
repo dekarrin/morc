@@ -27,7 +27,7 @@ Send a request using a project:
 
 ```shell
 morc init   # create the project, if it doesn't yet exist
-morc reqs new get-google --url http://google.com/ -X GET
+morc reqs --new get-google --url http://google.com/ -X GET
 morc send get-google  # actually fire it off
 ```
 
@@ -100,16 +100,16 @@ History tracking is ON
 Using default var environment
 ```
 
-If you want to change things about the project, you can do that with the edit
-subcommand:
+If you want to change things about the project, you can do that by passing flags
+to set project attributes:
 
 ```shell
-morc proj edit --name 'My Cool Project'
+morc proj --name 'My Cool Project'
 ```
 
 Or if you are looking for *very* fine-grained control over new project creation,
-you can use the `morc proj new` command. See `morc help proj new` for
-information on running it.
+you can instead use `morc proj` with the `--new` flag. See `morc help proj` for
+information on using it.
 
 ### Project Requests
 
@@ -124,10 +124,10 @@ If this is in a brand new project, there won't be anything there.
 
 #### Request Creation
 
-You can add a new request with the `new` subcommand:
+You can add a new request with the `--new` flag:
 
 ```shell
-morc reqs new create-user --url localhost:8080/users -X POST -d '{"name":"Vriska Serket"}' -H 'Content-Type: application/json'
+morc reqs --new create-user --url localhost:8080/users -X POST -d '{"name":"Vriska Serket"}' -H 'Content-Type: application/json'
 ```
 
 The URL, method, body payload, and headers can be specified with flags.
@@ -136,7 +136,7 @@ file name as the argument for `-d` and it will load the body data from that
 file and use that as the body of the newly-created request:
 
 ```shell
-morc reqs new update-user --url localhost:8080/users -X PATCH -d '@vriska.json' -H 'Content-Type: application/json'
+morc reqs --new update-user --url localhost:8080/users -X PATCH -d '@vriska.json' -H 'Content-Type: application/json'
 ```
 
 After adding several requests, `morc reqs` will have much more interesting
@@ -195,10 +195,10 @@ Variables below for more information on using variables within requests.
 
 #### Request Viewing
 
-You can examine a request in detail with the `show` subcommand:
+You can examine a request in detail by passing it as an argument to `reqs`:
 
 ```shell
-morc reqs show create-user
+morc reqs create-user
 ```
 
 Output:
@@ -221,10 +221,11 @@ The request method and URL are shown first, along with any headers, body, and
 variable captures. Auth flow is for an upcoming feature and is not currently
 used.
 
-To see only one of the items in a request, you can specify it as a CLI flag:
+To see only one of the items in a request, you can specify the item to get with
+the `--get` CLI flag:
 
 ```shell
-morc reqs show create-user --body
+morc reqs create-user --get data
 ```
 
 Ouput:
@@ -233,18 +234,26 @@ Ouput:
 {"name": "Vriska Serket"}
 ```
 
+The `--get` flag can be used to retrieve any of the following attributes:
+`name`, `data`, `method`, `url`, `headers`, `captures`, and `auth`.
+
+The `headers` attribute will print all headers set on the request. If you want
+to get only the value (or values) of a specific header, use `--get-header` with
+the name of the header to retrieve.
+
 #### Request Editing
 
-If you need to update a request, use the `edit` subcommand:
+If you need to update a request, pass the attribute to be updated and its new
+value using flags:
 
 ```shell
-morc reqs edit create-user -d '{"name": "Nepeta Leijon"}'
+morc reqs create-user -d '{"name": "Nepeta Leijon"}'
 ```
 
-You can use `show` to confirm that the update was applied:
+You can show the request again to confirm that the update was applied:
 
 ```shell
-morc reqs show create-user --body
+morc reqs create-user --get data
 ```
 
 Output:
@@ -255,11 +264,11 @@ Output:
 
 #### Request Deletion
 
-If you're totally done with a request and want to permanently remove it from the
-project, use the `delete` subcommand:
+If you're completely done with a request and want to permanently remove it from
+the project, use the `--delete`/`-D` flag with the name of the request:
 
 ```shell
-morc reqs delete get-token
+morc reqs --delete get-token
 ```
 
 It will be cleared from the project, which you can confirm by listing the
@@ -287,7 +296,7 @@ could do that by declaring a variable called `${SCHEME}` in the URL of the
 request:
 
 ```shell
-morc reqs edit get-user --url '${SCHEME}://localhost:8080/users'
+morc reqs get-user --url '${SCHEME}://localhost:8080/users'
 
 # MAKE SURE to put text with a dollar-leading ${variable} in it in single quotes
 # or your shell may mess with the variable
@@ -361,7 +370,7 @@ With nothing defined, it will give output indicating that:
 (none)
 ```
 
-With variables set, it will them out:
+With variables set, it will list them out:
 
 ```
 ${SCHEME} = "https"
@@ -422,10 +431,10 @@ morc vars USER_ID ""
 ```
 
 If you want to actually remove (undefine) a variable from the project var store,
-use the `-d` option with the name of a variable:
+use the `-D` option with the name of a variable:
 
 ```shell
-morc vars USER_ID -d
+morc vars -D USER_ID
 ```
 
 Then the variable will be completely undefined:
@@ -462,7 +471,7 @@ server that allows basic CRUD operations on its resources.
 First, we will make a creation request:
 
 ```shell
-morc reqs new create-user             \
+morc reqs --new create-user           \
   --url http://localhost:8080/users   \
   -X POST                             \
   -d '{"name": "Vriska Serket"}'      \
@@ -473,7 +482,7 @@ And a deletion request that uses a variable in the URL to indicate
 which user to delete:
 
 ```shell
-morc reqs new delete-user                          \
+morc reqs --new delete-user                        \
   --url 'http://localhost:8080/users/${USER_ID}'   \
   -X DELETE                                        \
   -H 'Content-Type: application/json'
@@ -481,7 +490,7 @@ morc reqs new delete-user                          \
 # note that the URL is in single-quotes because it contains a variable
 ```
 
-Now, with those requests, we certainly manually run the first:
+Now, with those requests, we could manually run the first:
 
 ```shell
 morc send create-user
@@ -514,12 +523,12 @@ HTTP/1.1 204 No Content
 But we could also do the same thing automatically by adding a var capture to
 the first request.
 
-Captures on a request are accessed by using the `caps` subcommand of `reqs`. By
-itself, it will list out all defined captures on the request, which will be
-none so far:
+Captures on a request are accessed by using the `caps` subcommand with the name
+of the request whose captures are to be examined. When given no other arguments,
+it will list out all defined captures on the request, which will be none so far:
 
 ```shell
-morc reqs caps create-user
+morc caps create-user
 ```
 
 Output:
@@ -528,25 +537,25 @@ Output:
 (none)
 ```
 
-To add a new capture, use `caps new` followed by the name of the request, the
-name of a variable to save the data to, and a *capture spec*. The capture spec
-gives where in the response to retrieve the value from, and supports byte
-offsets in format `:START,END` where START and END are byte offsets, or in
-format of a JSON path specified by giving keys and array slices needed to
-navigate from the top level of a JSON body in the response to the desired value,
-such as `.top-level-key.next-level-key.some_array[3].item`.
+To add a new capture, use the `--new` flag with the name of the variable to save
+the data to and give the flag `-s` with a *capture spec*. The capture spec gives
+where in the response to retrieve the value from, and supports byte offsets in
+format `:START,END` where START and END are byte offsets, or in format of a JSON
+path specified by giving keys and array slices needed to navigate from the top
+level of a JSON body in the response to the desired value, such as
+`.top-level-key.next-level-key.some_array[3].item`.
 
 In this example, we will add a new cap that gets its value from the 'id' field
 of the JSON object in the response:
 
 ```shell
-morc reqs caps new create-user USER_ID .id   # or just id with no period; the leading period is not required
+morc caps create-user --new USER_ID -s .id   # or just id with no period; the leading period is not required
 ```
 
 Then, it will be created:
 
 ```shell
-morc reqs caps create-user
+morc caps create-user
 ```
 
 Output:
@@ -598,17 +607,19 @@ HTTP/1.1 204 No Content
 (no response body)
 ```
 
-If you ever need to update a capture, you can do so with `caps delete`:
+If you ever need to update a capture, you can do so by passing the name of the
+capture to delete to the `-D` flag:
 
 ```shell
-morc reqs caps delete create-user USER_ID
+morc caps create-user -D USER_ID
 ```
 
-And if you want to update one without deleting it, you can use `caps edit`:
+And if you want to update one without deleting it, you can specify the property
+to update and the new value with flags:
 
 ```shell
-morc reqs caps edit create-user USER_ID --spec :3,8       # capture data from the 3rd to 8th byte instead of the JSON path
-morc reqs caps edit create-user USER_ID --var USER_UUID   # save it to USER_UUID instead
+morc caps create-user USER_ID --spec :3,8       # capture data from the 3rd to 8th byte instead of the JSON path
+morc caps create-user USER_ID --var USER_UUID   # save it to USER_UUID instead
 ```
 
 #### Variable Environments
@@ -618,7 +629,7 @@ easily switch between. Each of these sets is called an *environment*; they might
 be set up to, say, change the requests to be applicable for testing different
 deploy scenarios.
 
-For instance, one might two sets of variables such as the following:
+For instance, one might have two sets of variables such as the following:
 
 ```
 # set 1:
@@ -790,7 +801,7 @@ morc vars PASSWORD grimAuxiliatrix
 morc env --default
 
 # attempt to delete PASSWORD from the default env:
-morc vars PASSWORD -d
+morc vars -D PASSWORD
 ```
 
 Output:
@@ -804,7 +815,7 @@ If you're absolutely sure that you want to clear it from all environments, give
 the --all flag as well:
 
 ```shell
-morc vars PASSWORD -d --all
+morc vars -D PASSWORD --all
 ```
 
 ### Creating Sequences Of Requests With Flows
@@ -813,9 +824,10 @@ Flows are sequences of requests that will be fired one after another. It can be
 useful to use with variable captures to perform a full sequence of communication
 with a server.
 
-Use `morc flows new` to create a new one. Once created, `morc exec FLOW` will
-actually send off each request. Any variable captures from request sends are
-used to set the values of subsequent requests.
+Use `morc flows` and pass the name of the new flow to the `--new` flag to create
+a new one. Once created, `morc exec FLOW` will actually send off each request.
+Any variable captures from request sends are used to set the values of
+subsequent requests.
 
 ### Request History
 

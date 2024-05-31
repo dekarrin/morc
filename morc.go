@@ -261,7 +261,48 @@ type VarScraper struct {
 }
 
 func (v VarScraper) String() string {
-	s := fmt.Sprintf("%s from ", v.Name)
+	s := fmt.Sprintf("$%s from ", strings.ToUpper(v.Name))
+	s += v.Spec()
+	return s
+}
+
+func (v VarScraper) IsOffsetSpec() bool {
+	return len(v.Steps) == 0
+}
+
+func (v VarScraper) IsJSONSpec() bool {
+	return len(v.Steps) > 0
+}
+
+func (v VarScraper) EqualSpec(other VarScraper) bool {
+	if v.IsJSONSpec() {
+		if !other.IsJSONSpec() {
+			return false
+		}
+
+		for i := range v.Steps {
+			if v.Steps[i] != other.Steps[i] {
+				return false
+			}
+		}
+	} else if v.IsOffsetSpec() {
+		if !other.IsOffsetSpec() {
+			return false
+		}
+
+		if v.OffsetStart != other.OffsetStart || v.OffsetEnd != other.OffsetEnd {
+			return false
+		}
+	} else {
+		// not comprable
+		return false
+	}
+
+	return true
+}
+
+func (v VarScraper) Spec() string {
+	s := ""
 	if len(v.Steps) > 0 {
 		for _, step := range v.Steps {
 			s += step.String()

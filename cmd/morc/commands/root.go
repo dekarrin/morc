@@ -5,9 +5,6 @@ import (
 	"os"
 
 	"github.com/dekarrin/morc"
-	"github.com/dekarrin/morc/cmd/morc/commands/flows"
-	"github.com/dekarrin/morc/cmd/morc/commands/proj"
-	"github.com/dekarrin/morc/cmd/morc/commands/reqs"
 	"github.com/spf13/cobra"
 )
 
@@ -30,9 +27,6 @@ func init() {
 	rootCmd.AddGroup(projMetaCommands)
 	rootCmd.AddGroup(sendingCommands)
 	rootCmd.AddGroup(quickreqCommands)
-	rootCmd.AddCommand(proj.RootCmd)
-	rootCmd.AddCommand(reqs.RootCmd)
-	rootCmd.AddCommand(flows.RootCmd)
 }
 
 var rootCmd = &cobra.Command{

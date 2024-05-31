@@ -16,7 +16,7 @@ const (
 
 var (
 	flagVarsProjectFile string
-	flagVarsDelete      bool
+	flagVarsDelete      string
 	flagVarsEnv         string
 	flagVarsDefaultEnv  bool
 	flagVarsAll         bool
@@ -34,7 +34,7 @@ const (
 
 func init() {
 	varsCmd.PersistentFlags().StringVarP(&flagVarsProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
-	varsCmd.PersistentFlags().BoolVarP(&flagVarsDelete, "delete", "d", false, "Delete the specified variable. Only valid when giving a NAME and no VALUE")
+	varsCmd.PersistentFlags().StringVarP(&flagVarsDelete, "delete", "D", "", "Delete the variable `VAR`")
 	varsCmd.PersistentFlags().StringVarP(&flagVarsEnv, "env", "e", "", "Run the command against the given environment instead of the current one. Use --default instead to specify the default environment.")
 	varsCmd.PersistentFlags().BoolVarP(&flagVarsDefaultEnv, "default", "", false, "Run the command against the default environment instead of the current one.")
 	varsCmd.PersistentFlags().BoolVarP(&flagVarsCurrent, "current", "", false, "Apply only to current environment. This is the same as typing --env followed by the name of the current environment.")
@@ -47,10 +47,13 @@ func init() {
 }
 
 var varsCmd = &cobra.Command{
-	Use:     "vars [NAME [VALUE]] [-F project_file] [-d [--all]] [-e ENV]|[--default]",
+	Use: "vars [-F FILE] [-e ENV]|[--default]|[--current]\n" +
+		"vars [-F FILE] -D VAR [-e ENV]|[--all]|[--default]\n" +
+		"vars [-F FILE] VAR [-e ENV]|[--default]|[--current]\n" +
+		"vars [-F FILE] VAR VALUE [-e ENV]|[--default]|[--current]",
 	GroupID: "project",
 	Short:   "Show or manipulate request variables",
-	Long:    "Prints out a listing of the variables accessible from the current variable environment (which includes any from default environment, not specifically set in current, unless --current or --env or --default is given) if given no other arguments. If given the NAME of a variable only, that variable's value will be printed out. If given the NAME and a VALUE, sets the variable to that value. To delete a variable, -d can be used with the NAME-only form.\n\nIf --env or --default is used, a listing will exclusively show variables defined in that environment, whereas typically it would show values in the current environment, supplemented with those from the default environment for vars that are not defined in the specific one. If the current environment *is* the default environment, there is no distinction.",
+	Long:    "Prints out a listing of the variables accessible from the current variable environment (which includes any from default environment, not specifically set in current, unless --current or --env or --default is given) if given no other arguments. If given the name VAR of a variable, that variable's value will be printed out. If given VAR and a VALUE, sets the variable to that value. To delete a variable, pass -D with the name VAR of the variable to delete.\n\nIf --env or --default is used, a listing will exclusively show variables defined in that environment, whereas typically it would show values in the current environment, supplemented with those from the default environment for vars that are not defined in the specific one. If the current environment *is* the default environment, there is no distinction.",
 	Args:    cobra.MaximumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := varOptions{
@@ -58,86 +61,34 @@ var varsCmd = &cobra.Command{
 			envOverride:        flagVarsEnv,
 			envDefaultOverride: flagVarsDefaultEnv,
 			envCurrentOverride: flagVarsCurrent,
-			deleteVar:          flagVarsDelete,
+			deleteVar:          flagVarsDelete != "",
 			envAll:             flagVarsAll,
 		}
 		if opts.projFile == "" {
 			return fmt.Errorf("project file is set to empty string")
 		}
 
+		// TODO: refactor to follow same pattern as reqs, proj, flows, caps, etc.
+
 		var varName string
 		var varValue string
 		var err error
-		action := varsActionList
+		action, err := parseVarsActionFromFlags(cmd, args)
+		if err != nil {
+			return err
+		}
 
-		// what mode are we in? listing, reading, or writing? infer by arg count
-		if len(args) == 0 {
-			// listing mode
-
-			if opts.deleteVar {
-				return fmt.Errorf("must specify name of variable to delete")
-			}
-			if opts.envAll {
-				return fmt.Errorf("--all is only valid when deleting a var")
-			}
-			if opts.envOverride == reservedDefaultEnvName {
-				return fmt.Errorf("cannot use reserved environment name %q; use --default to list vars in default env", reservedDefaultEnvName)
-			}
-
-			// otherwise, go ahead and call list
-			action = varsActionList
-		} else if len(args) == 1 {
-			// value get mode, or a delete
-
+		// pick up args
+		switch action {
+		case varsActionList:
+			// nothing to do here
+		case varsActionGet:
 			varName = args[0]
-
-			// don't check varName; deletion and getting should always be
-			// allowed in case the project got into a weird state, say due to
-			// direct editing of the project file.
-
-			if opts.deleteVar {
-				if opts.envDefaultOverride {
-					return fmt.Errorf("cannot specify --default with --delete/-d; use --all to delete from all envs")
-				}
-				if opts.envOverride == reservedDefaultEnvName {
-					return fmt.Errorf("cannot use reserved environment name %q; use --all to delete from all envs (including default)", reservedDefaultEnvName)
-				}
-
-				action = varsActionDelete
-			} else {
-				// don't check varName; getting should always be allowed in
-				// case the project got into a weird state, say due to direct
-				// editing of the project file.
-
-				if err != nil {
-					return err
-				}
-
-				if opts.envOverride == reservedDefaultEnvName {
-					return fmt.Errorf("cannot use reserved environment name %q; use --default to get the default env's value", reservedDefaultEnvName)
-				}
-
-				if opts.envAll {
-					return fmt.Errorf("--all is only valid when deleting a var; use --default to get from default env")
-				}
-
-				action = varsActionGet
-			}
-		} else if len(args) == 2 {
-			// value set mode
+		case varsActionSet:
 			varName = args[0]
 			varValue = args[1]
-
-			if opts.deleteVar {
-				return fmt.Errorf("cannot specify value when using --delete/-d flag")
-			}
-			if opts.envAll {
-				return fmt.Errorf("--all is only valid when deleting; use --default to set var in the default environment")
-			}
-			if opts.envOverride == reservedDefaultEnvName {
-				return fmt.Errorf("cannot use reserved environment name %q; use --default to set in default env", reservedDefaultEnvName)
-			}
-			action = varsActionSet
+		case varsActionDelete:
+			varName = flagVarsDelete
 		}
 
 		// done checking args, don't show usage on error
@@ -328,4 +279,53 @@ func invokeVarList(io cmdio.IO, opts varOptions) error {
 	}
 
 	return nil
+}
+
+func parseVarsActionFromFlags(cmd *cobra.Command, posArgs []string) (varsAction, error) {
+	f := cmd.Flags()
+
+	if f.Changed("delete") {
+		if len(posArgs) > 1 {
+			return varsActionDelete, fmt.Errorf("unknown positional argument %q", posArgs[1])
+		}
+
+		if f.Changed("default") {
+			return varsActionDelete, fmt.Errorf("cannot specify --default with --delete/-D; use --all to delete from all envs")
+		}
+		if flagVarsEnv == reservedDefaultEnvName {
+			return varsActionDelete, fmt.Errorf("cannot use reserved environment name %q; use --all to delete from all envs (including default)", reservedDefaultEnvName)
+		}
+		return varsActionDelete, nil
+	}
+
+	if len(posArgs) == 0 {
+		// listing mode
+		if flagVarsAll {
+			return varsActionList, fmt.Errorf("--all is only valid when deleting a var; use --default to list vars in default env")
+		}
+		if flagVarsEnv == reservedDefaultEnvName {
+			return varsActionList, fmt.Errorf("cannot use reserved environment name %q; use --default to list vars in default env", reservedDefaultEnvName)
+		}
+		return varsActionList, nil
+	} else if len(posArgs) == 1 {
+		// setting mode
+		if flagVarsAll {
+			return varsActionGet, fmt.Errorf("--all is only valid when deleting a var; use --default to get from default env")
+		}
+		if flagVarsEnv == reservedDefaultEnvName {
+			return varsActionList, fmt.Errorf("cannot use reserved environment name %q; use --default to get from default env", reservedDefaultEnvName)
+		}
+		return varsActionGet, nil
+	} else if len(posArgs) == 2 {
+		// setting mode
+		if flagVarsAll {
+			return varsActionSet, fmt.Errorf("--all is only valid when deleting; use --default to set var in the default environment")
+		}
+		if flagVarsEnv == reservedDefaultEnvName {
+			return varsActionList, fmt.Errorf("cannot use reserved environment name %q; use --default to set in default env", reservedDefaultEnvName)
+		}
+		return varsActionSet, nil
+	}
+
+	return varsActionList, fmt.Errorf("unknown positional argument %q", posArgs[2])
 }

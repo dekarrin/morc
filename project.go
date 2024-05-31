@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dekarrin/morc/internal/sliceops"
 	"github.com/dekarrin/rezi/v2"
 )
 
@@ -929,6 +930,24 @@ func (v *VarStore) Remove(key string) {
 type Flow struct {
 	Name  string     `json:"name"`
 	Steps []FlowStep `json:"steps"`
+}
+
+func (flow *Flow) InsertStep(idx int, step FlowStep) error {
+	var err error
+	flow.Steps, err = sliceops.Insert(flow.Steps, idx, step)
+	return err
+}
+
+func (flow *Flow) RemoveStep(idx int) error {
+	var err error
+	flow.Steps, err = sliceops.Remove(flow.Steps, idx)
+	return err
+}
+
+func (flow *Flow) MoveStep(from, to int) error {
+	var err error
+	flow.Steps, err = sliceops.Move(flow.Steps, from, to)
+	return err
 }
 
 type FlowStep struct {

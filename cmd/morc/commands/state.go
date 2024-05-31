@@ -15,7 +15,7 @@ func init() {
 }
 
 var stateCmd = &cobra.Command{
-	Use:   "state",
+	Use:   "state FILE",
 	Short: "Read state data",
 	Long:  "Load a file containing state data into memory and print out what it contains in human readable format.",
 	Args:  cobra.ExactArgs(1),

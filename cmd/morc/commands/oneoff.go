@@ -45,7 +45,7 @@ type oneoffOptions struct {
 }
 
 var oneoffCmd = &cobra.Command{
-	Use:     "oneoff",
+	Use:     "oneoff [HdCVbc]... [output-flags]... METHOD URL",
 	GroupID: "sending",
 	Short:   "Make an arbitrary HTTP request",
 	Long:    "Creates a new request and sends it using the specified method. The method may be non-standard.",
@@ -82,7 +82,7 @@ func addQuickMethodCommand(method string) {
 	lowerMeth := strings.ToLower(method)
 
 	var quickCmd = &cobra.Command{
-		Use:     lowerMeth,
+		Use:     lowerMeth + " URL [HdCVbc]... [output-flags]...",
 		GroupID: "quickreqs",
 		Short:   "Make a one-off " + upperMeth + " request",
 		Long:    "Creates a new one-off" + upperMeth + " request and immediately sends it. No project file is consulted, but state files may be read and written. Same as 'morc oneoff -X " + upperMeth,

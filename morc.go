@@ -3,6 +3,7 @@ package morc
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -967,6 +968,23 @@ func Send(method, URL, varSymbol string, opts SendOptions) (SendResult, error) {
 	client.VarOverrides = opts.Vars
 	client.VarPrefix = varSymbol
 	client.Scrapers = opts.Captures
+
+	if opts.InsecureSkipVerify {
+		// pick up the old client and assume it's a Transport (because if it's DefaultTransport, it will be)
+		transport, ok := client.http.Transport.(*http.Transport)
+		if !ok {
+			panic("client transport is not an http.Transport")
+		}
+
+		oldTLS := transport.TLSClientConfig
+
+		if oldTLS == nil {
+			oldTLS = &tls.Config{}
+		}
+		oldTLS.InsecureSkipVerify = true
+		transport.TLSClientConfig = oldTLS
+		client.http.Transport = transport
+	}
 
 	// if we have been asked to load state, do that now
 	if opts.LoadStateFile != "" {

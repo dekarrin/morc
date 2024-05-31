@@ -12,6 +12,7 @@ import (
 func init() {
 	execCmd.PersistentFlags().StringVarP(&flagProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
 	execCmd.PersistentFlags().StringArrayVarP(&flagVars, "var", "V", []string{}, "Temporarily set a variable's value at the start of the flow. Format is name:value")
+	execCmd.PersistentFlags().BoolVarP(&flagSendInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
 
 	setupRequestOutputFlags("morc exec", execCmd)
 
@@ -22,6 +23,7 @@ type execOptions struct {
 	projFile    string
 	oneTimeVars map[string]string
 	outputCtrl  morc.OutputControl
+	skipVerify  bool
 }
 
 var execCmd = &cobra.Command{
@@ -45,7 +47,9 @@ var execCmd = &cobra.Command{
 }
 
 func execFlagsToOptions() (execOptions, error) {
-	opts := execOptions{}
+	opts := execOptions{
+		skipVerify: flagSendInsecure,
+	}
 
 	opts.projFile = flagProjectFile
 	if opts.projFile == "" {
@@ -113,7 +117,7 @@ func invokeExec(io cmdio.IO, flowName string, opts execOptions) error {
 
 	opts.outputCtrl.Writer = io.Out
 	for i, tmpl := range templates {
-		result, err := sendTemplate(&p, tmpl, p.Vars.MergedSet(varOverrides), false, opts.outputCtrl)
+		result, err := sendTemplate(&p, tmpl, p.Vars.MergedSet(varOverrides), opts.skipVerify, opts.outputCtrl)
 		if err != nil {
 			return fmt.Errorf("step #%d: %w", i, err)
 		}

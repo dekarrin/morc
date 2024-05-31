@@ -134,11 +134,6 @@ func testProject_withRequests(reqs ...morc.RequestTemplate) morc.Project {
 	}
 }
 
-func testRequest_withName(req morc.RequestTemplate, name string) morc.RequestTemplate {
-	req.Name = name
-	return req
-}
-
 func testRequest_withAllPropertiesSet() morc.RequestTemplate {
 	return morc.RequestTemplate{
 		Name:   "req1",

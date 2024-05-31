@@ -26,7 +26,6 @@ type CAttrKey interface {
 }
 
 var (
-
 	// If HTTPClient is set, it will be used for all requests made by the
 	// commands that go through morc.Send. Otherwise, the default client will be
 	// used. Generally, this is useful for testing; if it starts getting used

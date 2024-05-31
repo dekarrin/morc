@@ -431,10 +431,10 @@ morc vars USER_ID ""
 ```
 
 If you want to actually remove (undefine) a variable from the project var store,
-use the `-d` option with the name of a variable:
+use the `-D` option with the name of a variable:
 
 ```shell
-morc vars USER_ID -d
+morc vars -D USER_ID
 ```
 
 Then the variable will be completely undefined:
@@ -471,7 +471,7 @@ server that allows basic CRUD operations on its resources.
 First, we will make a creation request:
 
 ```shell
-morc reqs new create-user             \
+morc reqs --new create-user           \
   --url http://localhost:8080/users   \
   -X POST                             \
   -d '{"name": "Vriska Serket"}'      \
@@ -482,7 +482,7 @@ And a deletion request that uses a variable in the URL to indicate
 which user to delete:
 
 ```shell
-morc reqs new delete-user                          \
+morc reqs --new delete-user                        \
   --url 'http://localhost:8080/users/${USER_ID}'   \
   -X DELETE                                        \
   -H 'Content-Type: application/json'
@@ -490,7 +490,7 @@ morc reqs new delete-user                          \
 # note that the URL is in single-quotes because it contains a variable
 ```
 
-Now, with those requests, we certainly manually run the first:
+Now, with those requests, we could manually run the first:
 
 ```shell
 morc send create-user
@@ -523,12 +523,12 @@ HTTP/1.1 204 No Content
 But we could also do the same thing automatically by adding a var capture to
 the first request.
 
-Captures on a request are accessed by using the `caps` subcommand of `reqs`. By
-itself, it will list out all defined captures on the request, which will be
-none so far:
+Captures on a request are accessed by using the `caps` subcommand with the name
+of the request whose captures are to be examined. When given no other arguments,
+it will list out all defined captures on the request, which will be none so far:
 
 ```shell
-morc reqs caps create-user
+morc caps create-user
 ```
 
 Output:
@@ -537,25 +537,25 @@ Output:
 (none)
 ```
 
-To add a new capture, use `caps new` followed by the name of the request, the
-name of a variable to save the data to, and a *capture spec*. The capture spec
-gives where in the response to retrieve the value from, and supports byte
-offsets in format `:START,END` where START and END are byte offsets, or in
-format of a JSON path specified by giving keys and array slices needed to
-navigate from the top level of a JSON body in the response to the desired value,
-such as `.top-level-key.next-level-key.some_array[3].item`.
+To add a new capture, use the `--new` flag with the name of the variable to save
+the data to and give the flag `-s` with a *capture spec*. The capture spec gives
+where in the response to retrieve the value from, and supports byte offsets in
+format `:START,END` where START and END are byte offsets, or in format of a JSON
+path specified by giving keys and array slices needed to navigate from the top
+level of a JSON body in the response to the desired value, such as
+`.top-level-key.next-level-key.some_array[3].item`.
 
 In this example, we will add a new cap that gets its value from the 'id' field
 of the JSON object in the response:
 
 ```shell
-morc reqs caps new create-user USER_ID .id   # or just id with no period; the leading period is not required
+morc caps create-user --new USER_ID -s .id   # or just id with no period; the leading period is not required
 ```
 
 Then, it will be created:
 
 ```shell
-morc reqs caps create-user
+morc caps create-user
 ```
 
 Output:
@@ -607,17 +607,19 @@ HTTP/1.1 204 No Content
 (no response body)
 ```
 
-If you ever need to update a capture, you can do so with `caps delete`:
+If you ever need to update a capture, you can do so by passing the name of the
+capture to delete to the `-D` flag:
 
 ```shell
-morc reqs caps delete create-user USER_ID
+morc caps create-user -D USER_ID
 ```
 
-And if you want to update one without deleting it, you can use `caps edit`:
+And if you want to update one without deleting it, you can specify the property
+to update and the new value with flags:
 
 ```shell
-morc reqs caps edit create-user USER_ID --spec :3,8       # capture data from the 3rd to 8th byte instead of the JSON path
-morc reqs caps edit create-user USER_ID --var USER_UUID   # save it to USER_UUID instead
+morc caps create-user USER_ID --spec :3,8       # capture data from the 3rd to 8th byte instead of the JSON path
+morc caps create-user USER_ID --var USER_UUID   # save it to USER_UUID instead
 ```
 
 #### Variable Environments
@@ -627,7 +629,7 @@ easily switch between. Each of these sets is called an *environment*; they might
 be set up to, say, change the requests to be applicable for testing different
 deploy scenarios.
 
-For instance, one might two sets of variables such as the following:
+For instance, one might have two sets of variables such as the following:
 
 ```
 # set 1:
@@ -799,7 +801,7 @@ morc vars PASSWORD grimAuxiliatrix
 morc env --default
 
 # attempt to delete PASSWORD from the default env:
-morc vars PASSWORD -d
+morc vars -D PASSWORD
 ```
 
 Output:
@@ -813,7 +815,7 @@ If you're absolutely sure that you want to clear it from all environments, give
 the --all flag as well:
 
 ```shell
-morc vars PASSWORD -d --all
+morc vars -D PASSWORD --all
 ```
 
 ### Creating Sequences Of Requests With Flows
@@ -822,9 +824,10 @@ Flows are sequences of requests that will be fired one after another. It can be
 useful to use with variable captures to perform a full sequence of communication
 with a server.
 
-Use `morc flows new` to create a new one. Once created, `morc exec FLOW` will
-actually send off each request. Any variable captures from request sends are
-used to set the values of subsequent requests.
+Use `morc flows` and pass the name of the new flow to the `--new` flag to create
+a new one. Once created, `morc exec FLOW` will actually send off each request.
+Any variable captures from request sends are used to set the values of
+subsequent requests.
 
 ### Request History
 

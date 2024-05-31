@@ -11,12 +11,14 @@ import (
 )
 
 var (
-	flagProjectFile string
+	flagProjectFile  string
+	flagSendInsecure bool
 )
 
 func init() {
 	sendCmd.PersistentFlags().StringVarP(&flagProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
 	sendCmd.PersistentFlags().StringArrayVarP(&flagVars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Format is name=value")
+	sendCmd.PersistentFlags().BoolVarP(&flagSendInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
 
 	setupRequestOutputFlags("morc send", sendCmd)
 
@@ -27,6 +29,7 @@ type sendOptions struct {
 	projFile    string
 	oneTimeVars map[string]string
 	outputCtrl  morc.OutputControl
+	skipVerify  bool
 }
 
 var sendCmd = &cobra.Command{
@@ -81,6 +84,10 @@ func sendFlagsToOptions() (sendOptions, error) {
 		opts.oneTimeVars = oneTimeVars
 	}
 
+	if flagSendInsecure {
+		opts.skipVerify = true
+	}
+
 	return opts, nil
 }
 
@@ -102,11 +109,11 @@ func invokeSend(io cmdio.IO, reqName string, opts sendOptions) error {
 	}
 
 	opts.outputCtrl.Writer = io.Out
-	_, err = sendTemplate(&p, tmpl, p.Vars.MergedSet(opts.oneTimeVars), opts.outputCtrl)
+	_, err = sendTemplate(&p, tmpl, p.Vars.MergedSet(opts.oneTimeVars), opts.skipVerify, opts.outputCtrl)
 	return err
 }
 
-func sendTemplate(p *morc.Project, tmpl morc.RequestTemplate, vars map[string]string, oc morc.OutputControl) (morc.SendResult, error) {
+func sendTemplate(p *morc.Project, tmpl morc.RequestTemplate, vars map[string]string, skipVerify bool, oc morc.OutputControl) (morc.SendResult, error) {
 	// TODO: flows will call this and persist on EVERY request which is probably not needed.
 
 	if tmpl.Method == "" {
@@ -120,11 +127,12 @@ func sendTemplate(p *morc.Project, tmpl morc.RequestTemplate, vars map[string]st
 	varSymbol := "$"
 
 	sendOpts := morc.SendOptions{
-		Vars:           vars,
-		Body:           tmpl.Body,
-		Headers:        tmpl.Headers,
-		Output:         oc,
-		CookieLifetime: p.Config.CookieLifetime,
+		Vars:               vars,
+		Body:               tmpl.Body,
+		Headers:            tmpl.Headers,
+		Output:             oc,
+		CookieLifetime:     p.Config.CookieLifetime,
+		InsecureSkipVerify: skipVerify,
 	}
 
 	capVarNames := []string{}

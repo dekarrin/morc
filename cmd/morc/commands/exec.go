@@ -113,7 +113,7 @@ func invokeExec(io cmdio.IO, flowName string, opts execOptions) error {
 
 	opts.outputCtrl.Writer = io.Out
 	for i, tmpl := range templates {
-		result, err := sendTemplate(&p, tmpl, p.Vars.MergedSet(varOverrides), opts.outputCtrl)
+		result, err := sendTemplate(&p, tmpl, p.Vars.MergedSet(varOverrides), false, opts.outputCtrl)
 		if err != nil {
 			return fmt.Errorf("step #%d: %w", i, err)
 		}

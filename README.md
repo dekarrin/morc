@@ -20,7 +20,7 @@ Quickstart
 Send a one-off request:
 
 ```shell
-morc request www.example.com -X PUT -u www.example.com -d @datafile.json -H 'Content-Type: application/json'
+morc oneoff www.example.com -X PUT -u www.example.com -d @datafile.json -H 'Content-Type: application/json'
 ```
 
 Send a request using a project:
@@ -855,7 +855,7 @@ Output:
 
 Each history entry begins with an entry index. A particular entry can be played
 back by giving an entry index number, along with any other output formatting
-options as would be accepted by `morc send` or `morc request`:
+options as would be accepted by `morc send` or `morc oneoff`:
 
 ```shell
 morc hist 0
@@ -989,22 +989,22 @@ morc cookies --clear
 
 ## Standalone Use
 
-MORC can send one-off requests by using `morc request`:
+MORC can send one-off requests by using `morc oneoff`:
 
 ```shell
-morc request -X GET http://localhost/cool
+morc oneoff -X GET http://localhost/cool
 ```
 
 Data and headers are specified with curl-like syntax:
 
 ```shell
-morc request -X POST https://localhost/cool -H 'Content-Type: application/json' -d '@./datafile'
+morc oneoff -X POST https://localhost/cool -H 'Content-Type: application/json' -d '@./datafile'
 ```
 
 For convenience, top-level subcommands for each of the common eight HTTP methods
 are defined. Calling one is exactly the same as calling
-`morc request -X METHOD` and support all args except for '-X'.
+`morc oneoff -X METHOD` and support all args except for '-X'.
 
 ```shell
-morc get http://localhost:8080/cool  # same as morc request -X GET http://localhost:8080/cool
+morc get http://localhost:8080/cool  # same as morc oneoff -X GET http://localhost:8080/cool
 ```

@@ -34,7 +34,7 @@ func addRequestFlags(id string, cmd *cobra.Command) {
 	setupRequestOutputFlags(id, cmd)
 }
 
-type requestOptions struct {
+type oneoffOptions struct {
 	stateFileOut string
 	stateFileIn  string
 	headers      http.Header
@@ -44,14 +44,14 @@ type requestOptions struct {
 	outputCtrl   morc.OutputControl
 }
 
-var requestCmd = &cobra.Command{
-	Use:     "request",
+var oneoffCmd = &cobra.Command{
+	Use:     "oneoff",
 	GroupID: "sending",
 	Short:   "Make an arbitrary HTTP request",
 	Long:    "Creates a new request and sends it using the specified method. The method may be non-standard.",
 	Args:    cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		opts, err := requestFlagsToOptions("morc request")
+		opts, err := oneoffFlagsToOptions("morc oneoff")
 		if err != nil {
 			return err
 		}
@@ -68,8 +68,8 @@ var requestCmd = &cobra.Command{
 }
 
 func init() {
-	addRequestFlags("morc request", requestCmd)
-	rootCmd.AddCommand(requestCmd)
+	addRequestFlags("morc oneoff", oneoffCmd)
+	rootCmd.AddCommand(oneoffCmd)
 
 	quickMethods := []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE"}
 	for _, meth := range quickMethods {
@@ -85,10 +85,10 @@ func addQuickMethodCommand(method string) {
 		Use:     lowerMeth,
 		GroupID: "quickreqs",
 		Short:   "Make a one-off " + upperMeth + " request",
-		Long:    "Creates a new one-off" + upperMeth + " request and immediately sends it. No project file is consulted, but state files may be read and written.",
+		Long:    "Creates a new one-off" + upperMeth + " request and immediately sends it. No project file is consulted, but state files may be read and written. Same as 'morc oneoff -X " + upperMeth,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts, err := requestFlagsToOptions("morc " + lowerMeth)
+			opts, err := oneoffFlagsToOptions("morc " + lowerMeth)
 			if err != nil {
 				return err
 			}
@@ -105,8 +105,8 @@ func addQuickMethodCommand(method string) {
 	rootCmd.AddCommand(quickCmd)
 }
 
-func requestFlagsToOptions(cmdID string) (requestOptions, error) {
-	opts := requestOptions{
+func oneoffFlagsToOptions(cmdID string) (oneoffOptions, error) {
+	opts := oneoffOptions{
 		stateFileIn:  flagReadStateFile,
 		stateFileOut: flagWriteStateFile,
 	}
@@ -190,7 +190,7 @@ func requestFlagsToOptions(cmdID string) (requestOptions, error) {
 }
 
 // invokeRequest receives named vars and checked/defaulted requestOptions.
-func invokeRequest(io cmdio.IO, method, url, varSymbol string, opts requestOptions) error {
+func invokeRequest(io cmdio.IO, method, url, varSymbol string, opts oneoffOptions) error {
 	opts.outputCtrl.Writer = io.Out
 
 	sendOpts := morc.SendOptions{

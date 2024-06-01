@@ -401,9 +401,9 @@ func invokeFlowsShow(io cmdio.IO, projFile, flowName string) error {
 				reqURL = "http://???"
 			}
 
-			io.Printf("%d:%s %s (%s %s)\n", i+1, notSendableBang, step.Template, meth, reqURL)
+			io.Printf("%d:%s %s (%s %s)\n", i, notSendableBang, step.Template, meth, reqURL)
 		} else {
-			io.Printf("%d:! %s (!non-existent req)\n", i+1, step.Template)
+			io.Printf("%d:! %s (!non-existent req)\n", i, step.Template)
 		}
 	}
 
@@ -720,7 +720,7 @@ var (
 // Human prints the human-readable description of the key.
 func (fk flowKey) Human() string {
 	if fk.isStepIndex() {
-		return fmt.Sprintf("step #%d", fk.stepIndex)
+		return fmt.Sprintf("step[%d]", fk.stepIndex)
 	}
 
 	switch fk.name {
@@ -774,19 +774,21 @@ func parseFlowAttrKey(s string) (flowKey, error) {
 }
 
 func flowStepIndexFromOrdinal(steps []morc.FlowStep, idx int, autoClampMax bool) (int, error) {
+	// TODO: replace all uses of this func w the below func
+	return sliceops.RealIndex(steps, idx, autoClampMax)
 	// basically, we will decrement (unless the sigil value -1) and then feed to
 	// sliceops func that will translate -1's. If the index cannot be translated
 	// to a valid index, we will return an error.
 
 	// TODO: horribly messy to refer to steps by number but actually store them by index. this tool is for engineers; we know it's 0-based.
 
-	if idx == 0 {
-		// never valid; no 0th value for ordinals
-		return 0, fmt.Errorf("does not exist")
-	}
+	// if idx == 0 {
+	// 	// never valid; no 0th value for ordinals
+	// 	return 0, fmt.Errorf("does not exist")
+	// }
 
-	if idx != -1 {
-		return sliceops.RealIndex(steps, idx-1, autoClampMax)
-	}
-	return sliceops.RealIndex(steps, idx, autoClampMax)
+	// if idx != -1 {
+	// 	return sliceops.RealIndex(steps, idx-1, autoClampMax)
+	// }
+	// return sliceops.RealIndex(steps, idx, autoClampMax)
 }

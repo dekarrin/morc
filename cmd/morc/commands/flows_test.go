@@ -252,7 +252,7 @@ func Test_Flows_Get(t *testing.T) {
 			name:      "error: get -1st step",
 			args:      []string{"flows", "test", "--get", "-1"},
 			p:         testProject_singleFlowWithNSteps(2),
-			expectErr: "does not exist",
+			expectErr: "must be a step index or one of",
 		},
 		{
 			name:      "get too big errors",

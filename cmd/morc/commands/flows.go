@@ -177,7 +177,7 @@ func invokeFlowsEdit(io cmdio.IO, projFile, flowName string, attrs flowAttrValue
 
 		// no need for bounds check, already done in flowStepIndexFromOrdinal
 		oldVal := strings.ToLower(flow.Steps[idx].Template)
-		modKey := flowKey{stepIndex: idx + 1, uniqueInt: stepOpCount}
+		modKey := flowKey{stepIndex: idx, uniqueInt: stepOpCount}
 		stepOpCount++
 
 		if oldVal != newVal {
@@ -204,7 +204,7 @@ func invokeFlowsEdit(io cmdio.IO, projFile, flowName string, attrs flowAttrValue
 		if removedTemplateName == "" {
 			removedTemplateName = `""`
 		}
-		modKey := flowKey{stepIndex: actualIdx + 1, uniqueInt: stepOpCount}
+		modKey := flowKey{stepIndex: actualIdx, uniqueInt: stepOpCount}
 		stepOpCount++
 		modifiedVals[modKey] = fmt.Sprintf("no longer exist; was %s (removed)", removedTemplateName)
 		attrOrdering = append(attrOrdering, modKey)
@@ -238,7 +238,7 @@ func invokeFlowsEdit(io cmdio.IO, projFile, flowName string, attrs flowAttrValue
 		if tmplName == "" {
 			tmplName = `""`
 		}
-		modKey := flowKey{stepIndex: actualIdx + 1, uniqueInt: stepOpCount}
+		modKey := flowKey{stepIndex: actualIdx, uniqueInt: stepOpCount}
 		stepOpCount++
 		modifiedVals[modKey] = fmt.Sprintf("%s (added)", tmplName)
 		attrOrdering = append(attrOrdering, modKey)
@@ -254,7 +254,7 @@ func invokeFlowsEdit(io cmdio.IO, projFile, flowName string, attrs flowAttrValue
 			return fmt.Errorf("cannot move step #%d to #%d: destination %w", actualFrom+1, actualTo, err)
 		}
 
-		modKey := flowKey{stepIndex: actualFrom + 1, uniqueInt: stepOpCount}
+		modKey := flowKey{stepIndex: actualFrom, uniqueInt: stepOpCount}
 		stepOpCount++
 
 		if actualFrom != actualTo {
@@ -263,9 +263,9 @@ func invokeFlowsEdit(io cmdio.IO, projFile, flowName string, attrs flowAttrValue
 			}
 
 			// always assume that the move is valid
-			modifiedVals[modKey] = fmt.Sprintf("position #%d", actualTo+1)
+			modifiedVals[modKey] = fmt.Sprintf("index %d", actualTo)
 		} else {
-			noChangeVals[modKey] = fmt.Sprintf("position #%d", actualFrom+1)
+			noChangeVals[modKey] = fmt.Sprintf("index %d", actualFrom)
 		}
 		attrOrdering = append(attrOrdering, modKey)
 	}

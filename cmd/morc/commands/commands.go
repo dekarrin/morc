@@ -2,11 +2,124 @@ package commands
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/rosed"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	"golang.org/x/term"
 )
+
+// CUSTOM HELP AND WRAPPING:
+//
+// - Replace all calls to cmd.Long in help template with call to func that gets
+// Long help by first word in Usage. (func getLongHelp(cmd *cobra) which just calls
+// a pre-reg func in a global map of func).
+// - For all existing Long help, move to new func in global map.
+// - Add getLongHelp binding to cobra Template funcs.
+// - Ensure getLongHelp calls wrap if func doesn't do it itself (include whether
+// pre-wrapped in func registration).
+
+func init() {
+	cobra.AddTemplateFunc("wrapFlags", wrappedFlagUsages)
+	cobra.AddTemplateFunc("longHelp", getLongHelp)
+}
+
+type longHelp struct {
+	fn              func() string
+	resultIsWrapped bool
+}
+
+var (
+	commandHelpDescriptions = map[string]longHelp{}
+)
+
+func getLongHelp(cmd *cobra.Command) string {
+	if long, ok := commandHelpDescriptions[cmd.Name()]; ok {
+		res := long.fn()
+		if !long.resultIsWrapped {
+			return wrapTerminalText(res)
+		}
+		return res
+	}
+
+	return cmd.Long
+}
+
+func wrapTerminalText(s string) string {
+	w := getWrapWidth()
+	return rosed.
+		Edit(s).
+		WrapOpts(w, rosed.Options{
+			PreserveParagraphs: true,
+		}).
+		String()
+}
+
+// getWrapWidth returns the amount to wrap things to. It will attempt to
+// retrieve the current terminal width in characters and return that. If it
+// cannot retrieve it, it will return a default width of 80 characters.
+func getWrapWidth() int {
+	const defaultWidth = 80
+
+	actualWidth, _, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		actualWidth = defaultWidth
+	}
+
+	return actualWidth
+}
+
+func wrappedFlagUsages(flagset *pflag.FlagSet) string {
+	w := getWrapWidth()
+	return flagset.FlagUsagesWrapped(w)
+}
+
+// usageTemplate is identical to the one used by default (as of cobra@v1.8.0),
+// but with the flag usage explicitly set to wrap using the custom
+// wrappedFlagUsages func above. This implements the same pattern in code
+// suggested by and authored by @jpmcb on GitHub issue #1805 of the cobra
+// library. This implementation is adapted from
+// https://github.com/vmware-tanzu/community-edition as linked in that issue by
+// @jpmcb.
+const usageTemplate = `Usage:{{if .Runnable}}
+  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
+  {{.CommandPath}} [command]{{end}}{{if gt (len .Aliases) 0}}
+
+Aliases:
+  {{.NameAndAliases}}{{end}}{{if .HasExample}}
+
+Examples:
+{{.Example}}{{end}}{{if .HasAvailableSubCommands}}{{$cmds := .Commands}}{{if eq (len .Groups) 0}}
+
+Available Commands:{{range $cmds}}{{if (or .IsAvailableCommand (eq .Name "help"))}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{else}}{{range $group := .Groups}}
+
+{{.Title}}{{range $cmds}}{{if (and (eq .GroupID $group.ID) (or .IsAvailableCommand (eq .Name "help")))}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{if not .AllChildCommandsHaveGroup}}
+
+Additional Commands:{{range $cmds}}{{if (and (eq .GroupID "") (or .IsAvailableCommand (eq .Name "help")))}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
+
+Flags:
+{{wrapFlags .LocalFlags | trimTrailingWhitespaces}}{{end}}{{if .HasAvailableInheritedFlags}}
+
+Global Flags:
+{{wrapFlags .InheritedFlags | trimTrailingWhitespaces}}{{end}}{{if .HasHelpSubCommands}}
+
+Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
+  {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableSubCommands}}
+
+Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
+`
+
+// helpTemplate is identical to the one used by default (as of cobra@v1.8.0),
+// but with wrapping applied to the short and long descriptions.
+const helpTemplate = `{{with (or (longHelp .) .Short)}}{{. | trimTrailingWhitespaces}}
+
+{{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}`
 
 type requestOutputFlagSet struct {
 	Request              bool

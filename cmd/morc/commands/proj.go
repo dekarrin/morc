@@ -30,7 +30,6 @@ var projCmd = &cobra.Command{
 		"proj [-F FILE] [-nHSCcR]",
 	GroupID: "project",
 	Short:   "Show or manipulate project attributes and config",
-	Long:    projCmdHelp,
 	Args:    cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var opts projArgs
@@ -75,6 +74,8 @@ func init() {
 	projCmd.MarkFlagsMutuallyExclusive("history-file", "get")
 	projCmd.MarkFlagsMutuallyExclusive("cookies-file", "get")
 
+	commandHelpDescriptions[projCmd.Name()] = longHelp{fn: projCmdHelp, resultIsWrapped: true}
+
 	rootCmd.AddCommand(projCmd)
 }
 
@@ -108,17 +109,18 @@ var (
 			{projKeyCookieLifetime.Name(), "The lifetime of recorded Set-Cookie calls. When setting, the value must be a duration such as '24h' or '1h30m'. If set to 0 or less, it will be interpreted as 24h. Altering this will immediately apply an eviction check to all current cookies; this may result in some being purged."},
 		}
 
-		// plop it in the rosed Editor and start formatting
+		// format all with roseditor.
+		width := getWrapWidth()
 		return rosed.
 			Edit(s).
 			WithOptions(rosed.Options{
 				PreserveParagraphs: true,
 			}).
-			Wrap(80).
-			Insert(rosed.End, "\n"). // wrap clobbers above newline for some reason
-			InsertDefinitionsTable(rosed.End, attributes, 80).
+			Wrap(width).
+			Insert(rosed.End, "\n"). // above wrap clobbers newline for some reason
+			InsertDefinitionsTable(rosed.End, attributes, width).
 			String()
-	}()
+	}
 )
 
 func invokeProjEdit(io cmdio.IO, projFile string, attrs projAttrValues) error {

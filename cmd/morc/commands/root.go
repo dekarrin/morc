@@ -24,6 +24,9 @@ var (
 )
 
 func init() {
+	rootCmd.SetUsageTemplate(usageTemplate)
+	rootCmd.SetHelpTemplate(helpTemplate)
+
 	rootCmd.AddGroup(projMetaCommands)
 	rootCmd.AddGroup(sendingCommands)
 	rootCmd.AddGroup(quickreqCommands)

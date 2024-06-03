@@ -27,9 +27,13 @@ type execOptions struct {
 }
 
 var execCmd = &cobra.Command{
-	Use:     "exec [-F FILE] FLOW [output-flags] [-V var:value]...",
+	Use: "exec FLOW",
+	Annotations: map[string]string{
+		annotationKeyHelpUsages: "" +
+			"exec [-F FILE] FLOW [-k] [-V VAR=VALUE]... [output-flags]",
+	},
 	Short:   "Execute a flow of requests",
-	Long:    "Execute a sequence of requests defined in a flow stored in the project. Initial variables can be set with -V.",
+	Long:    "Execute a sequence of requests defined in a flow stored in the project. Initial variable values can be set with -V and will override any in the store before the first request in the flow is executed.",
 	Args:    cobra.ExactArgs(1),
 	GroupID: "sending",
 	RunE: func(cmd *cobra.Command, args []string) error {

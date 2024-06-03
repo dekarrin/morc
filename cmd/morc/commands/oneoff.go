@@ -47,11 +47,16 @@ type oneoffOptions struct {
 }
 
 var oneoffCmd = &cobra.Command{
-	Use:     "oneoff [HdCVbc]... [output-flags]... METHOD URL",
+	Use: "oneoff METHOD URL",
+	Annotations: map[string]string{
+		annotationKeyHelpUsages: "" +
+			"oneoff METHOD URL [-HdCVkbc] [output-flags]",
+	},
 	GroupID: "sending",
-	Short:   "Make an arbitrary HTTP request",
-	Long:    "Creates a new request and sends it using the specified method. The method may be non-standard.",
-	Args:    cobra.ExactArgs(2),
+	Short:   "Make an arbitrary one-off HTTP request",
+	Long: "Creates a new request and sends it using the specified method. The method may be non-standard. No " +
+		"project file is consulted, but state files may be read and written.",
+	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts, err := oneoffFlagsToOptions("morc oneoff")
 		if err != nil {
@@ -84,11 +89,16 @@ func addQuickMethodCommand(method string) {
 	lowerMeth := strings.ToLower(method)
 
 	var quickCmd = &cobra.Command{
-		Use:     lowerMeth + " URL [HdCVbc]... [output-flags]...",
+		Use: lowerMeth + " URL",
+		Annotations: map[string]string{
+			annotationKeyHelpUsages: "" +
+				lowerMeth + " URL [-HdCVkbc] [output-flags]",
+		},
 		GroupID: "quickreqs",
 		Short:   "Make a one-off " + upperMeth + " request",
-		Long:    "Creates a new one-off" + upperMeth + " request and immediately sends it. No project file is consulted, but state files may be read and written. Same as 'morc oneoff -X " + upperMeth,
-		Args:    cobra.ExactArgs(1),
+		Long: "Creates a new one-off" + upperMeth + " request and immediately sends it. No project file is " +
+			"consulted, but state files may be read and written. Same as 'morc oneoff -X " + upperMeth + "'",
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts, err := oneoffFlagsToOptions("morc " + lowerMeth)
 			if err != nil {

@@ -19,24 +19,31 @@ var (
 )
 
 var capsCmd = &cobra.Command{
-	Use: "caps [-F FILE] REQ\n" +
-		"caps [-F FILE] REQ --delete VAR\n" +
-		"caps [-F FILE] REQ --new VAR -s SPEC\n" +
-		"caps [-F FILE] REQ VAR\n" +
-		"caps [-F FILE] REQ VAR --get ATTR\n" +
-		"caps [-F FILE] REQ VAR [-sV]",
+	Use: "caps REQ [VAR]",
+	Annotations: map[string]string{
+		annotationKeyHelpUsages: "" +
+			"caps [-F FILE] REQ\n" +
+			"caps [-F FILE] REQ --delete VAR\n" +
+			"caps [-F FILE] REQ --new VAR -s SPEC\n" +
+			"caps [-F FILE] REQ VAR\n" +
+			"caps [-F FILE] REQ VAR --get ATTR\n" +
+			"caps [-F FILE] REQ VAR [-sV]",
+	},
 	GroupID: projMetaCommands.ID,
 	Short:   "Get or modify variable captures on a request template.",
 	Long: "Perform operations on variable captures defined on a request template. With only the name REQ of the request " +
 		"template given, prints out a listing of all the captures defined on the request.\n\n" +
-		"To create a new capture, provide --new with the name of the variable to capture to as its argument. Additionally, the " +
-		"-s/--spec flag must be given to provide the location within responses that the variable's value is to be taken from.\n\n" +
-		"A capture can be viewed by providing VAR, the name of the variable that the capture saves to. To view only a single attribute " +
-		"of a capture, give VAR as an argument and provide --get along with the name of the attribute to view. The available names are: " + strings.Join(capAttrKeyNames(), ",") + "\n\n" +
-		"To modify a capture, use one of the -s or -V flags when giving the VAR of the capture; -s will alter the spec, and -V " +
-		"will change the captured-to variable.\n\n" +
+		"To create a new capture, provide --new with the name of the variable to capture to as its argument. " +
+		"Additionally, the -s/--spec flag must be given to provide the location within responses that the variable's " +
+		"value is to be taken from.\n\n" +
+		"A capture can be viewed by providing VAR, the name of the variable that the capture saves to. To view only a " +
+		"single attribute of a capture, give VAR as an argument and provide --get along with the name of the " +
+		"attribute to view. The available names are: " + strings.Join(capAttrKeyNames(), ", ") + ".\n\n" +
+		"To modify a capture, use one of the -s or -V flags when giving the VAR of the capture; -s will alter the spec, " +
+		"and -V will change the captured-to variable.\n\n" +
 		"A capture is removed from a request by providing --delete and the VAR of the capture to be deleted.\n\n" +
-		"Capture specifications can be given in one of two formats. They can be in format ':START,END' for a byte offset (ex: \":4,20\") or a jq-ish path with only keys and array indexes (ex: \"records[1].auth.token\")",
+		"Capture specifications can be given in one of two formats. They can be in format ':START,END' for a byte " +
+		"offset (ex: \":4,20\") or a jq-ish path with only keys and array indexes (ex: \"records[1].auth.token\")",
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, posArgs []string) error {
 		var args capsArgs

@@ -25,12 +25,16 @@ var (
 )
 
 var flowsCmd = &cobra.Command{
-	Use: "flows [-F FILE]\n" +
-		"flows [-F FILE] --delete FLOW\n" +
-		"flows [-F FILE] --new FLOW REQ1 REQ2 [REQN]...\n" +
-		"flows [-F FILE] FLOW\n" +
-		"flows [-F FILE] FLOW --get ATTR\n" +
-		"flows [-F FILE] FLOW [-nuram]...",
+	Use: "flows [FLOW]",
+	Annotations: map[string]string{
+		annotationKeyHelpUsages: "" +
+			"flows [-F FILE]\n" +
+			"flows [-F FILE] --delete FLOW\n" +
+			"flows [-F FILE] --new FLOW REQ1 REQ2 [REQN]...\n" +
+			"flows [-F FILE] FLOW\n" +
+			"flows [-F FILE] FLOW --get ATTR\n" +
+			"flows [-F FILE] FLOW [-nuram]...",
+	},
 	GroupID: "project",
 	Short:   "Get or modify request flows",
 	Long: "Performs operations on the flows defined in the project. With no other arguments, a listing of all flows is shown.\n\n" +

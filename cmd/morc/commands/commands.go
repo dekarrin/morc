@@ -39,11 +39,11 @@ type longHelp struct {
 }
 
 var (
-	commandHelpDescriptions = map[string]longHelp{}
+	customFormattedCommandDescriptions = map[string]longHelp{}
 )
 
 func getLongHelp(cmd *cobra.Command) string {
-	if long, ok := commandHelpDescriptions[cmd.Name()]; ok {
+	if long, ok := customFormattedCommandDescriptions[cmd.Name()]; ok {
 		res := long.fn()
 		if !long.resultIsWrapped {
 			return wrapTerminalText(res)
@@ -51,7 +51,8 @@ func getLongHelp(cmd *cobra.Command) string {
 		return res
 	}
 
-	return cmd.Long
+	// otherwise,
+	return wrapTerminalText(cmd.Long)
 }
 
 func wrappedFlagUsages(flagset *pflag.FlagSet) string {
@@ -145,13 +146,13 @@ Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
 Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
 `
 
-// helpTemplate is identical to the one used by default (as of cobra@v1.8.0),
-// but with wrapping applied to the short and long descriptions.
+// helpTemplate is a custom template used for outputting program help.
 const helpTemplate = `{{.Short}}
 
-{{if longUsages .}}Usage:
+Usage:
 {{range longUsages .}}  {{.}}
-{{end}}{{end}}{{with (or (longHelp .) .Short)}}{{. | trimTrailingWhitespaces}}
+{{end}}
+{{with longHelp .}}{{. | trimTrailingWhitespaces}}
 
 {{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}`
 

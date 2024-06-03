@@ -78,7 +78,7 @@ func init() {
 	projCmd.MarkFlagsMutuallyExclusive("history-file", "get")
 	projCmd.MarkFlagsMutuallyExclusive("cookies-file", "get")
 
-	commandHelpDescriptions[projCmd.Name()] = longHelp{fn: projCmdHelp, resultIsWrapped: true}
+	customFormattedCommandDescriptions[projCmd.Name()] = longHelp{fn: projCmdHelp, resultIsWrapped: true}
 
 	rootCmd.AddCommand(projCmd)
 }

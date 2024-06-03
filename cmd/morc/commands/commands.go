@@ -12,6 +12,11 @@ import (
 	"golang.org/x/term"
 )
 
+const (
+	// multi-line uses
+	annotationKeyHelpUsages = "morc_help_usages"
+)
+
 // CUSTOM HELP AND WRAPPING:
 //
 // - Replace all calls to cmd.Long in help template with call to func that gets
@@ -25,6 +30,7 @@ import (
 func init() {
 	cobra.AddTemplateFunc("wrapFlags", wrappedFlagUsages)
 	cobra.AddTemplateFunc("longHelp", getLongHelp)
+	cobra.AddTemplateFunc("longUsages", longHelpUsageLines)
 }
 
 type longHelp struct {
@@ -46,6 +52,35 @@ func getLongHelp(cmd *cobra.Command) string {
 	}
 
 	return cmd.Long
+}
+
+func wrappedFlagUsages(flagset *pflag.FlagSet) string {
+	w := getWrapWidth()
+	return flagset.FlagUsagesWrapped(w)
+}
+
+func longHelpUsageLines(cmd *cobra.Command) []string {
+	usages, ok := cmd.Annotations[annotationKeyHelpUsages]
+	if !ok {
+		return []string{cmd.UseLine()}
+	}
+
+	prefix := ""
+	if cmd.HasParent() {
+		prefix = cmd.Parent().CommandPath() + " "
+	}
+
+	lines := []string{}
+	for _, usage := range strings.Split(usages, "\n") {
+		usage = strings.TrimSpace(usage)
+		if usage != "" {
+			usage = prefix + usage
+		}
+
+		lines = append(lines, usage)
+	}
+
+	return lines
 }
 
 func wrapTerminalText(s string) string {
@@ -70,11 +105,6 @@ func getWrapWidth() int {
 	}
 
 	return actualWidth
-}
-
-func wrappedFlagUsages(flagset *pflag.FlagSet) string {
-	w := getWrapWidth()
-	return flagset.FlagUsagesWrapped(w)
 }
 
 // usageTemplate is identical to the one used by default (as of cobra@v1.8.0),
@@ -117,7 +147,11 @@ Use "{{.CommandPath}} [command] --help" for more information about a command.{{e
 
 // helpTemplate is identical to the one used by default (as of cobra@v1.8.0),
 // but with wrapping applied to the short and long descriptions.
-const helpTemplate = `{{with (or (longHelp .) .Short)}}{{. | trimTrailingWhitespaces}}
+const helpTemplate = `{{.Short}}
+
+{{if longUsages .}}Usage:
+{{range longUsages .}}  {{.}}
+{{end}}{{end}}{{with (or (longHelp .) .Short)}}{{. | trimTrailingWhitespaces}}
 
 {{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}`
 

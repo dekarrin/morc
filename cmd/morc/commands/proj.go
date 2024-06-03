@@ -24,10 +24,14 @@ var (
 )
 
 var projCmd = &cobra.Command{
-	Use: "proj [-F FILE]\n" +
-		"proj [-F FILE] --new [-nHSCcR]\n" +
-		"proj [-F FILE] --get ATTR\n" +
-		"proj [-F FILE] [-nHSCcR]",
+	Use: "proj [-F FILE] [-nHCcR] [--new | --get ATTR]",
+	Annotations: map[string]string{
+		annotationKeyHelpUsages: "" +
+			"proj [-F FILE]\n" +
+			"proj [-F FILE] --new [-nHSCcR]\n" +
+			"proj [-F FILE] --get ATTR\n" +
+			"proj [-F FILE] [-nHSCcR]",
+	},
 	GroupID: "project",
 	Short:   "Show or manipulate project attributes and config",
 	Args:    cobra.NoArgs,

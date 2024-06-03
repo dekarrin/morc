@@ -28,7 +28,7 @@ const (
 )
 
 func init() {
-	envCmd.PersistentFlags().StringVarP(&flagEnvProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+	envCmd.PersistentFlags().StringVarP(&flagEnvProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	envCmd.PersistentFlags().StringVarP(&flagEnvDelete, "delete", "D", "", "Delete environment `ENV`")
 	envCmd.PersistentFlags().BoolVarP(&flagEnvDeleteAll, "delete-all", "", false, "Delete all environments and variables")
 	envCmd.PersistentFlags().BoolVarP(&flagEnvAll, "all", "a", false, "List all environments instead of only the current one")
@@ -44,9 +44,9 @@ var envCmd = &cobra.Command{
 	Use: "env [ENV]",
 	Annotations: map[string]string{
 		annotationKeyHelpUsages: "" +
-			"env [-F FILE] [--all]\n" +
-			"env [-F FILE] [ENV | --default]\n" +
-			"env [-F FILE] [--delete ENV | --delete-all]",
+			"env [--all]\n" +
+			"env [ENV | --default]\n" +
+			"env [--delete ENV | --delete-all]",
 	},
 	GroupID: "project",
 	Short:   "Show or manipulate request variable environments",

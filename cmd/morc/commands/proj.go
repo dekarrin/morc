@@ -27,10 +27,10 @@ var projCmd = &cobra.Command{
 	Use: "proj",
 	Annotations: map[string]string{
 		annotationKeyHelpUsages: "" +
-			"proj [-F FILE]\n" +
-			"proj [-F FILE] --new [-nHSCcR]\n" +
-			"proj [-F FILE] --get ATTR\n" +
-			"proj [-F FILE] [-nHSCcR]",
+			"proj\n" +
+			"proj --new [-nHSCcR]\n" +
+			"proj --get ATTR\n" +
+			"proj [-nHSCcR]",
 	},
 	GroupID: "project",
 	Short:   "Show or manipulate project attributes and config",
@@ -61,7 +61,7 @@ var projCmd = &cobra.Command{
 }
 
 func init() {
-	projCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+	projCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	projCmd.PersistentFlags().BoolVarP(&flagProjNew, "new", "N", false, "Create a new project instead of reading/editing one. Combine with other arguments to specify values for the new project.")
 	projCmd.PersistentFlags().StringVarP(&flagProjGet, "get", "G", "", "Get the value of a specific attribute of the project. `ATTR` is the name of an attribute to retrieve and must be one of the following: "+strings.Join(projAttrKeyNames(), ", "))
 	projCmd.PersistentFlags().StringVarP(&flagProjName, "name", "n", "", "Set the name of the project to `NAME`")

@@ -28,12 +28,12 @@ var flowsCmd = &cobra.Command{
 	Use: "flows [FLOW]",
 	Annotations: map[string]string{
 		annotationKeyHelpUsages: "" +
-			"flows [-F FILE]\n" +
-			"flows [-F FILE] --delete FLOW\n" +
-			"flows [-F FILE] --new FLOW REQ1 REQ2 [REQN]...\n" +
-			"flows [-F FILE] FLOW\n" +
-			"flows [-F FILE] FLOW --get ATTR\n" +
-			"flows [-F FILE] FLOW [-nuram]...",
+			"flows\n" +
+			"flows --delete FLOW\n" +
+			"flows --new FLOW REQ1 REQ2 [REQN]...\n" +
+			"flows FLOW\n" +
+			"flows FLOW --get ATTR\n" +
+			"flows FLOW [-nuram]...",
 	},
 	GroupID: "project",
 	Short:   "Get or modify request flows",
@@ -83,7 +83,7 @@ var flowsCmd = &cobra.Command{
 }
 
 func init() {
-	flowsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+	flowsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	flowsCmd.PersistentFlags().StringVarP(&flagFlowDelete, "delete", "D", "", "Delete the flow with the name `FLOW`.")
 	flowsCmd.PersistentFlags().StringVarP(&flagFlowNew, "new", "N", "", "Create a new flow with the name `FLOW`. When given, positional arguments are interpreted as ordered names of requests that make up the new flow's steps. At least two requests must be present.")
 	flowsCmd.PersistentFlags().StringVarP(&flagFlowGet, "get", "G", "", "Get the value of an attribute of the flow. `ATTR` can either be 'name', to get the flow name, or the index of a specific step in the flow.")

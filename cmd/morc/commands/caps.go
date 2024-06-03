@@ -22,12 +22,12 @@ var capsCmd = &cobra.Command{
 	Use: "caps REQ [VAR]",
 	Annotations: map[string]string{
 		annotationKeyHelpUsages: "" +
-			"caps [-F FILE] REQ\n" +
-			"caps [-F FILE] REQ --delete VAR\n" +
-			"caps [-F FILE] REQ --new VAR -s SPEC\n" +
-			"caps [-F FILE] REQ VAR\n" +
-			"caps [-F FILE] REQ VAR --get ATTR\n" +
-			"caps [-F FILE] REQ VAR [-sV]",
+			"caps REQ\n" +
+			"caps REQ --delete VAR\n" +
+			"caps REQ --new VAR -s SPEC\n" +
+			"caps REQ VAR\n" +
+			"caps REQ VAR --get ATTR\n" +
+			"caps REQ VAR [-sV]",
 	},
 	GroupID: projMetaCommands.ID,
 	Short:   "Get or modify variable captures on a request template.",
@@ -75,7 +75,7 @@ var capsCmd = &cobra.Command{
 }
 
 func init() {
-	capsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+	capsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	capsCmd.PersistentFlags().StringVarP(&flagCapsNew, "new", "N", "", "Create a new capture on REQ that saves captured data to `VAR`. If given, the specification of the new capture must also be given with --spec/-s.")
 	capsCmd.PersistentFlags().StringVarP(&flagCapsDelete, "delete", "D", "", "Delete the given variable capture `VAR` from the request.")
 	capsCmd.PersistentFlags().StringVarP(&flagCapsGet, "get", "G", "", "Get the value of a specific attribute `ATTR` of the capture. Can only be used if giving REQ and CAP and no other arguments.")

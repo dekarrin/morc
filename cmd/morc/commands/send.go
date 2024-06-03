@@ -16,7 +16,7 @@ var (
 )
 
 func init() {
-	sendCmd.PersistentFlags().StringVarP(&flagProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+	sendCmd.PersistentFlags().StringVarP(&flagProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	sendCmd.PersistentFlags().StringArrayVarP(&flagVars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Overrides any value currently in the store. The argument to this flag must be in `VAR=VALUE` format.")
 	sendCmd.PersistentFlags().BoolVarP(&flagSendInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
 
@@ -36,7 +36,7 @@ var sendCmd = &cobra.Command{
 	Use: "send REQ",
 	Annotations: map[string]string{
 		annotationKeyHelpUsages: "" +
-			"send [-F FILE] REQ [-k] [-V VAR=VALUE]... [output-flags]",
+			"send REQ [-k] [-V VAR=VALUE]... [output-flags]",
 	},
 	Short: "Send a request defined in a template (REQ)",
 	Long: "Send a request by building it from a request template (REQ) stored in the project. All variables are " +

@@ -22,7 +22,7 @@ var (
 )
 
 func init() {
-	cookiesCmd.PersistentFlags().StringVarP(&flagCookiesProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+	cookiesCmd.PersistentFlags().StringVarP(&flagCookiesProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	cookiesCmd.PersistentFlags().BoolVarP(&flagCookiesInfo, "info", "", false, "Print summarizing information about stored cookies")
 	cookiesCmd.PersistentFlags().BoolVarP(&flagCookiesClear, "clear", "", false, "Delete all cookies")
 	cookiesCmd.PersistentFlags().BoolVarP(&flagCookiesEnable, "on", "", false, "Enable cookie recording for future requests")
@@ -39,8 +39,8 @@ var cookiesCmd = &cobra.Command{
 	Use: "cookies",
 	Annotations: map[string]string{
 		annotationKeyHelpUsages: "" +
-			"cookies [-F FILE] [--url URL]\n" +
-			"cookies [-F FILE] [--on | --off | --clear | --info]",
+			"cookies [--url URL]\n" +
+			"cookies [--on | --off | --clear | --info]",
 	},
 	GroupID: "project",
 	Short:   "View and perform operations on stored cookies",

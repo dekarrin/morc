@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	execCmd.PersistentFlags().StringVarP(&flagProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+	execCmd.PersistentFlags().StringVarP(&flagProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	execCmd.PersistentFlags().StringArrayVarP(&flagVars, "var", "V", []string{}, "Temporarily set a variable's value at the start of the flow. Format is name:value")
 	execCmd.PersistentFlags().BoolVarP(&flagSendInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
 
@@ -30,7 +30,7 @@ var execCmd = &cobra.Command{
 	Use: "exec FLOW",
 	Annotations: map[string]string{
 		annotationKeyHelpUsages: "" +
-			"exec [-F FILE] FLOW [-k] [-V VAR=VALUE]... [output-flags]",
+			"exec FLOW [-k] [-V VAR=VALUE]... [output-flags]",
 	},
 	Short:   "Execute a flow of requests",
 	Long:    "Execute a sequence of requests defined in a flow stored in the project. Initial variable values can be set with -V and will override any in the store before the first request in the flow is executed.",

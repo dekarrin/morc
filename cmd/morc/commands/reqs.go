@@ -30,12 +30,16 @@ var (
 )
 
 var reqsCmd = &cobra.Command{
-	Use: "reqs [-F FILE]\n" +
-		"reqs [-F FILE] --delete REQ [-f]\n" +
-		"reqs [-F FILE] --new REQ [-H HDR]... [-d DATA | -d @FILE] [-X METHOD] [-u URL] [-F FILE]\n" +
-		"reqs [-F FILE] REQ\n" +
-		"reqs [-F FILE] REQ --get ATTR\n" +
-		"reqs [-F FILE] REQ [-ndXuHr]... [--remove-body]",
+	Use: "reqs [REQ]",
+	Annotations: map[string]string{
+		annotationKeyHelpUsages: "" +
+			"reqs [-F FILE]\n" +
+			"reqs [-F FILE] --delete REQ [-f]\n" +
+			"reqs [-F FILE] --new REQ [-d DATA | -d @FILE] [-XuH]...\n" +
+			"reqs [-F FILE] REQ\n" +
+			"reqs [-F FILE] REQ --get ATTR\n" +
+			"reqs [-F FILE] REQ [-ndXuHrR]...",
+	},
 	GroupID: "project",
 	Short:   "Show or modify request templates",
 	Long: "Manipulate project request templates. By itself, prints out a listing of the names and methods of the request templates " +

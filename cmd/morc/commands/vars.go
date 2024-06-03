@@ -38,7 +38,7 @@ func init() {
 	varsCmd.PersistentFlags().StringVarP(&flagVarsEnv, "env", "e", "", "Run the command against the given environment instead of the current one. Use --default instead to specify the default environment.")
 	varsCmd.PersistentFlags().BoolVarP(&flagVarsDefaultEnv, "default", "", false, "Run the command against the default environment instead of the current one.")
 	varsCmd.PersistentFlags().BoolVarP(&flagVarsCurrent, "current", "", false, "Apply only to current environment. This is the same as typing --env followed by the name of the current environment.")
-	varsCmd.PersistentFlags().BoolVarP(&flagVarsAll, "all", "", false, "Used with -d. Delete the variable from all environments. This is the only way to effectively specify '--default' while also calling -d; it is a separate flag to indicate that the variable will indeed be erased everywhere, not just in the default environment.")
+	varsCmd.PersistentFlags().BoolVarP(&flagVarsAll, "all", "", false, "Used with -D. Delete the variable from all environments. This is the only way to effectively specify '--default' while deleting; it is a separate flag to indicate that the variable will indeed be erased everywhere, not just in the default environment.")
 
 	// mark the env and default flags as mutually exclusive
 	varsCmd.MarkFlagsMutuallyExclusive("env", "default", "all", "current")
@@ -47,14 +47,26 @@ func init() {
 }
 
 var varsCmd = &cobra.Command{
-	Use: "vars [-F FILE] [-e ENV]|[--default]|[--current]\n" +
-		"vars [-F FILE] -D VAR [-e ENV]|[--all]|[--default]\n" +
-		"vars [-F FILE] VAR [-e ENV]|[--default]|[--current]\n" +
-		"vars [-F FILE] VAR VALUE [-e ENV]|[--default]|[--current]",
+	Use: "vars [VAR [VALUE]]",
+	Annotations: map[string]string{
+		annotationKeyHelpUsages: "" +
+			"vars [-F FILE] [-e ENV | --current | --default]\n" +
+			"vars [-F FILE] -D VAR [-e ENV | --current | --all]\n" +
+			"vars [-F FILE] VAR [-e ENV | --current | --default]\n" +
+			"vars [-F FILE] VAR VALUE [-e ENV | --current | --default]",
+	},
 	GroupID: "project",
 	Short:   "Show or manipulate request variables",
-	Long:    "Prints out a listing of the variables accessible from the current variable environment (which includes any from default environment, not specifically set in current, unless --current or --env or --default is given) if given no other arguments. If given the name VAR of a variable, that variable's value will be printed out. If given VAR and a VALUE, sets the variable to that value. To delete a variable, pass -D with the name VAR of the variable to delete.\n\nIf --env or --default is used, a listing will exclusively show variables defined in that environment, whereas typically it would show values in the current environment, supplemented with those from the default environment for vars that are not defined in the specific one. If the current environment *is* the default environment, there is no distinction.",
-	Args:    cobra.MaximumNArgs(2),
+	Long: "Prints out a listing of the variables accessible from the current variable environment (which includes " +
+		"any from default environment, not specifically set in current, unless --current or --env or --default is " +
+		"given) if given no other arguments. If given the name VAR of a variable, that variable's value will be " +
+		"printed out. If given VAR and a VALUE, sets the variable to that value. To delete a variable, pass -D with " +
+		"the name VAR of the variable to delete.\n\n" +
+		"If --env or --default is used, a listing will exclusively show " +
+		"variables defined in that environment, whereas typically it would show values in the current environment, " +
+		"supplemented with those from the default environment for vars that are not defined in the specific one. If " +
+		"the current environment *is* the default environment, there is no distinction.",
+	Args: cobra.MaximumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := varOptions{
 			projFile:           flagVarsProjectFile,

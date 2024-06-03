@@ -24,7 +24,7 @@ var (
 )
 
 var projCmd = &cobra.Command{
-	Use: "proj [-F FILE] [-nHCcR] [--new | --get ATTR]",
+	Use: "proj",
 	Annotations: map[string]string{
 		annotationKeyHelpUsages: "" +
 			"proj [-F FILE]\n" +

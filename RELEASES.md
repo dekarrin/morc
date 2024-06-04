@@ -1,3 +1,47 @@
+v0.3.0 - June 4, 2024
+---------------------
+* Added new `--insecure`/`-k` flag to disable TLS certificate validation on
+request-sending commands.
+* Flow step indexes are now always 0-based in both printed output and
+specification of steps in flags.
+* Updated online help to be accurate, somewhat complete, and to wrap correctly
+in console output.
+* Started automatically creating a build for Apple-Silicon based Macs (darwin/arm64).
+* The flag `--delete-all` was added to `morc env`. `--all` can no longer be used
+during environment deletion, and exclusively lists all environments.
+* Several flags have been added to many commands to allow editing via flags.
+* Renamed `morc request` to `morc oneoff` to better distinguish from `reqs`.
+* Altered command interface to make all subcommands go only one level deep:
+  * `morc reqs delete REQ` was removed in favor of `morc reqs --delete REQ`.
+  * `morc reqs edit REQ` was removed in favor of `morc reqs REQ [mutation-flags]`. 
+  * `morc reqs new REQ` was removed in favor of `morc reqs --new REQ`.
+  * `morc reqs show REQ` was removed in favor of `morc reqs REQ`.
+  * `morc reqs caps REQ` was removed in favor of `morc caps REQ`.
+  * `morc reqs caps delete REQ VAR` was removed in favor of `morc caps REQ --delete VAR`.
+  * `morc reqs caps edit REQ VAR` was removed in favor of `morc caps REQ VAR [mutation-flags]`.
+  * `morc reqs caps new REQ VAR SPEC` was removed in favor of `morc caps REQ --new VAR -s SPEC`.
+  * `morc proj edit` was removed in favor of `morc proj [mutation-flags]`.
+  * `morc proj new` was removed in favor of `morc proj --new`.
+  * `morc flows delete FLOW` was removed in favor of `morc flows --delete FLOW`.
+  * `morc flows edit FLOW` was removed in favor of `morc flows FLOW [mutation-flags]`. 
+  * `morc flows new FLOW` was removed in favor of `morc flows --new FLOW`.
+  * `morc flows show FLOW` was removed in favor of `morc flows FLOW`.
+  * Deletion of project resources was standardized as flag `--delete`/`-D` that
+  takes the name of the resource to be deleted as an argument.
+  * Creation of project resources was standardized as flag `--new`/`-N` that
+  takes the name of the resource to be created as an argument (except for
+  `proj --new`, which does not take an argument).
+  * Retrieval of specific attributes of project resources was standardized as
+  flag `--get`/`-G` that takes the name of the attribute as an argument. The
+  attributes that are possible to retrieve is different for each resources, and
+  subcommand help as well as error output inform what the proper options are. 
+* Some automated functional tests were added to cover at least key parts of project-oriented use:
+  * `morc send` is covered under happy path only.
+  * `morc flows` is covered.
+  * `morc proj` is covered.
+  * `morc reqs` is covered.
+
+
 v0.2.0 - May 16, 2024
 ---------------------
 * Added `--url` flag to `morc cookies` to see only cookies for that URL.
@@ -9,6 +53,7 @@ v0.2.0 - May 16, 2024
   * `morc proj edit` to edit a project.
   * `morc reqs edit` to edit a request template.
   * `morc reqs caps edit` to edit a var capture.
+
 
 v0.1.0 - May 10, 2024
 ----------------------

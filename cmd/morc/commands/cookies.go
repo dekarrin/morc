@@ -22,7 +22,7 @@ var (
 )
 
 func init() {
-	cookiesCmd.PersistentFlags().StringVarP(&flagCookiesProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+	cookiesCmd.PersistentFlags().StringVarP(&flagCookiesProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	cookiesCmd.PersistentFlags().BoolVarP(&flagCookiesInfo, "info", "", false, "Print summarizing information about stored cookies")
 	cookiesCmd.PersistentFlags().BoolVarP(&flagCookiesClear, "clear", "", false, "Delete all cookies")
 	cookiesCmd.PersistentFlags().BoolVarP(&flagCookiesEnable, "on", "", false, "Enable cookie recording for future requests")
@@ -36,12 +36,24 @@ func init() {
 }
 
 var cookiesCmd = &cobra.Command{
-	Use: "cookies [-F FILE] [--url URL]\n" +
-		"cookies [-F FILE] [--on]|[--off]|[--clear]|[--info]",
+	Use: "cookies",
+	Annotations: map[string]string{
+		annotationKeyHelpUsages: "" +
+			"cookies [--url URL]\n" +
+			"cookies [--on | --off | --clear | --info]",
+	},
 	GroupID: "project",
 	Short:   "View and perform operations on stored cookies",
-	Long:    "With no other arguments, prints out a listing of all cookies recorded from Set-Cookie headers. If --url is given, only cookies that would be set on requests that that URL are printed. If --on is given, cookie recording is enabled for future requests made by calling morc send or morc exec. If --off is given, cookie recording is instead disabled, although existing cookies are kept until they expire. If --info is given, basic info about the cookie store as a whole is output. If --clear is given, existing cookies are immediately deleted.\n\nCookie recording only applies to requests created from request templates in a project; one-off requests such as those sent by morc request or any of the method shorthand versions will not have their cookies associated with the project.",
-	Args:    cobra.NoArgs,
+	Long: "With no other arguments, prints out a listing of all cookies recorded from Set-Cookie headers. If " +
+		"--url is given, only cookies that would be set on requests that that URL are printed. If --on is given, " +
+		"cookie recording is enabled for future requests made by calling morc send or morc exec. If --off is given, " +
+		"cookie recording is instead disabled, although existing cookies are kept until they expire. If --info is " +
+		"given, basic info about the cookie store as a whole is output. If --clear is given, existing cookies are " +
+		"immediately deleted.\n\n" +
+		"Cookie recording only applies to requests created from request templates in a project; one-off requests " +
+		"such as those sent by 'morc oneoff' or any of the method shorthand versions will not have their cookies " +
+		"associated with the project.",
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := cookiesOptions{
 			projFile: flagEnvProjectFile,

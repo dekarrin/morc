@@ -16,8 +16,8 @@ func init() {
 
 var stateCmd = &cobra.Command{
 	Use:   "state FILE",
-	Short: "Read state data",
-	Long:  "Load a file containing state data into memory and print out what it contains in human readable format.",
+	Short: "Read oneshot state data",
+	Long:  "Load a file containing oneshot state data into memory and print out what it contains in human readable format.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		filename := args[0]

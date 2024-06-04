@@ -28,7 +28,7 @@ const (
 )
 
 func init() {
-	envCmd.PersistentFlags().StringVarP(&flagEnvProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+	envCmd.PersistentFlags().StringVarP(&flagEnvProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	envCmd.PersistentFlags().StringVarP(&flagEnvDelete, "delete", "D", "", "Delete environment `ENV`")
 	envCmd.PersistentFlags().BoolVarP(&flagEnvDeleteAll, "delete-all", "", false, "Delete all environments and variables")
 	envCmd.PersistentFlags().BoolVarP(&flagEnvAll, "all", "a", false, "List all environments instead of only the current one")
@@ -40,22 +40,26 @@ func init() {
 	rootCmd.AddCommand(envCmd)
 }
 
-// env --all - LIST envs -- allows flags
-// env NAME|--default - SWITCH env - allows NO flags
-// env - SHOW
-// env [-D NAME]|[--delete-all] - delete env NAME or all.
-
 var envCmd = &cobra.Command{
-	Use: "env [-F FILE]\n" +
-		"env [-F FILE] --all\n" +
-		"env [-F FILE] ENV\n" +
-		"env [-F FILE] --default\n" +
-		"env [-F FILE] -D ENV\n" +
-		"env [-F FILE] --delete-all",
+	Use: "env [ENV]",
+	Annotations: map[string]string{
+		annotationKeyHelpUsages: "" +
+			"env [--all]\n" +
+			"env [ENV | --default]\n" +
+			"env [--delete ENV | --delete-all]",
+	},
 	GroupID: "project",
 	Short:   "Show or manipulate request variable environments",
-	Long:    "With no other arguments, prints out the current variable environment's name. If in the default environment, this will be \"" + reservedDefaultEnvName + "\". If given --all, lists all environments. If NAME is given, the environment is switched to that one. The default env cannot be selected this way; to specify a swap to the default one, use the --default flag instead of giving a name.\n\nIf -D is given with the name of an environment, the environment is deleted, which clears all variables in that environment. Since doing so in the default environment has the effect of clearning every single variable across all environments, this operation cannot be done by specifying --default or --all to avoid accidental erasure. Instead, to clear all variables across all environments, use --delete-all",
-	Args:    cobra.MaximumNArgs(1),
+	Long: "With no other arguments, prints out the current variable environment's name. If in the default " +
+		"environment, this will be \"" + reservedDefaultEnvName + "\". If given --all, lists all environments. If ENV " +
+		"is given, the environment is switched to that one. The default env cannot be selected this way; to specify a " +
+		"swap to the default one, use the --default flag instead of giving a name.\n\n" +
+		"If -D is given with the name of an environment, the environment is deleted, which clears all variables in " +
+		"that environment. Doing so in the default environment would have the effect of clearning every single " +
+		"variable across all environments, so to avoid accidental erasure this operation cannot be done by specifying " +
+		"--default or --all. Instead, to clear all environments (and therefore all variables across all " +
+		"environments), use --delete-all.",
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := envOptions{
 			projFile:      flagEnvProjectFile,

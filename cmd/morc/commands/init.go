@@ -15,11 +15,16 @@ func init() {
 }
 
 var initCmd = &cobra.Command{
-	Use:     "init [PROJECT_NAME]",
+	Use: "init [PROJECT_NAME]",
+	Annotations: map[string]string{
+		annotationKeyHelpUsages: "init [PROJECT_NAME]",
+	},
 	GroupID: "project",
 	Short:   "Initialize a new MORC project in the current directory.",
-	Long:    "Initialize a new MORC project with a project file, session file, and history file located in .morc in the current directory. For control over file locations and other initial settings, use 'morc proj new' instead.",
-	Args:    cobra.MaximumNArgs(1),
+	Long: "Initialize a new MORC project with a project file, session file, and history file located in .morc in " +
+		"the current directory. For control over file locations and other initial settings, use 'morc proj new' " +
+		"instead.",
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		projName := "Unnamed Project"
 		if len(args) > 0 {

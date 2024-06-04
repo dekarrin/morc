@@ -30,34 +30,42 @@ var (
 )
 
 var reqsCmd = &cobra.Command{
-	Use: "reqs [-F FILE]\n" +
-		"reqs [-F FILE] --delete REQ [-f]\n" +
-		"reqs [-F FILE] --new REQ [-H HDR]... [-d DATA | -d @FILE] [-X METHOD] [-u URL] [-F FILE]\n" +
-		"reqs [-F FILE] REQ\n" +
-		"reqs [-F FILE] REQ --get ATTR\n" +
-		"reqs [-F FILE] REQ [-ndXuHr]... [--remove-body]",
+	Use: "reqs [REQ]",
+	Annotations: map[string]string{
+		annotationKeyHelpUsages: "" +
+			"reqs\n" +
+			"reqs --delete REQ [-f]\n" +
+			"reqs --new REQ [-d DATA | -d @FILE] [-XuH]...\n" +
+			"reqs REQ\n" +
+			"reqs REQ --get ATTR\n" +
+			"reqs REQ [-ndXuHrR]...",
+	},
 	GroupID: "project",
 	Short:   "Show or modify request templates",
-	Long: "Manipulate project request templates. By itself, prints out a listing of the names and methods of the request templates " +
-		"in the project.\n\nA new request template can be created by providing the name of it to the --new flag and using flags to " +
-		"specify attributes to set on the new request. The method of the request is set with the --method/-X flag. The payload in the " +
-		"request body is set with the -d/--data flag, either directly by providing the body as the argument or indirectly by loading from " +
-		"a filename given after a leading '@'. Headers are set with the -H/--header flag. Multiple headers may be specified by providing " +
-		"multiple -H flags. The URL of the request is set with the the -u/--url flag.\n\nA particular request can be viewed by providing " +
-		"the name of the request, REQ, as a positional argument to the flows command. This will show all details of a request template. " +
-		"To see only a specific attribute of a request, provide --get along with the name of the attribute of the request to show. " +
-		"The attribute, ATTR, must be one of the following: " +
-		strings.Join(reqAttrKeyNames(), ", ") + ". If 'HEADERS' is selected, all headers on the request are printed. To see the value(s) of " +
-		"only a particular header, use --get-header with the name of the header to see instead.\n\n" +
-		"Modifications to existing request templates are performed by giving REQ as a positional argument followed by one or more flag " +
-		"that sets a property of the request. For example, to change the method of a request, provide the -X flag followed by the new " +
-		"method. All flags that are supported during request creation are also supported when modifying a request (-X, -d, -u, -H), in " +
-		"addition to a few others. The name of the request is updated with -n/--name. Since -H only *adds* new header values, " +
-		"--remove-header/-r can be used to remove all values of an existing header from the request. Removing only a single value of " +
-		"a multi-valued header is not supported at this time; it is all or nothing. Finally, calling --remove-body will remove the " +
-		"body payload entirely, which may differ from simply setting it to the empty string.\n\n" +
-		"Requests are deleted by passing the --delete flag with a request name as its argument. This will irreversibly remove the request " +
-		"from the project entirely.",
+	Long: "Manipulate project request templates. By itself, prints out a listing of the names and methods of the " +
+		"request templates in the project.\n\n" +
+		"A new request template can be created by providing the name of it to the --new flag and using flags to " +
+		"specify attributes to set on the new request. The method of the request is set with the --method/-X flag. " +
+		"The payload in the request body is set with the -d/--data flag, either directly by providing the body as the " +
+		"argument or indirectly by loading from a filename given after a leading '@'. Headers are set with the " +
+		"-H/--header flag. Multiple headers may be specified by providing multiple -H flags. The URL of the request " +
+		"is set with the the -u/--url flag.\n\n" +
+		"A particular request can be viewed by providing the name of the request, REQ, as a positional argument to " +
+		"the flows command. This will show all details of a request template. To see only a specific attribute of a " +
+		"request, provide --get along with the name of the attribute of the request to show. The attribute, ATTR, " +
+		"must be one of the following: " + strings.Join(reqAttrKeyNames(), ", ") + ". If 'HEADERS' is selected, all " +
+		"headers on the request are printed. To see the value(s) of only a particular header, use --get-header with " +
+		"the name of the header to see instead.\n\n" +
+		"Modifications to existing request templates are performed by giving REQ as a positional argument followed by " +
+		"one or more flag that sets a property of the request. For example, to change the method of a request, " +
+		"provide the -X flag followed by the new method. All flags that are supported during request creation are " +
+		"also supported when modifying a request (-X, -d, -u, -H), in addition to a few others. The name of the " +
+		"request is updated with -n/--name. Since -H only *adds* new header values, --remove-header/-r can be used to " +
+		"remove an existing header from the request. If it is a multi-valued header, only the last value added is " +
+		"removed. Finally, calling --remove-body/-R will remove the body payload entirely, which may differ from " +
+		"simply setting it to the empty string.\n\n" +
+		"Requests are deleted by passing the --delete flag with a request name as its argument. This will " +
+		"irreversibly remove the request from the project entirely.",
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, posArgs []string) error {
 		var args reqsArgs
@@ -89,14 +97,14 @@ var reqsCmd = &cobra.Command{
 }
 
 func init() {
-	reqsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+	reqsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsNew, "new", "N", "", "Create a new request template named `REQ`.")
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsDelete, "delete", "D", "", "Delete the request template named `REQ`.")
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsGet, "get", "G", "", "Get the value of the given attribute `ATTR` from the request. To get a particular header's value, use --get-header instead. ATTR must be one of: "+strings.Join(reqAttrKeyNames(), ", "))
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsGetHeader, "get-header", "", "", "Get the value(s) of the given header `KEY` that is currently set on the request.")
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsName, "name", "n", "", "Change the name of a request template to `NAME`.")
 	reqsCmd.PersistentFlags().StringArrayVarP(&flagReqsRemoveHeaders, "remove-header", "r", []string{}, "Remove header with key `KEY` from the request. If multiple headers with the same key exist, only the most recently added one will be deleted.")
-	reqsCmd.PersistentFlags().StringVarP(&flagReqsBodyData, "data", "d", "", "Add the given `DATA` as a body to the request; prefix with @ to read data from a file")
+	reqsCmd.PersistentFlags().StringVarP(&flagReqsBodyData, "data", "d", "", "Add the given `DATA` as a body to the request; prefix with '@' to instead interperet DATA as a filename that body data is to be read from.")
 	reqsCmd.PersistentFlags().StringArrayVarP(&flagReqsHeaders, "header", "H", []string{}, "Add a header to the request. Format is `KEY:VALUE`. Multiple headers may be set by providing multiple -H flags. If multiple headers with the same key are set, they will be set in the order they were given.")
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsMethod, "method", "X", "GET", "Set the request method to `METHOD`.")
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsURL, "url", "u", "http://example.com", "Specify the `URL` for the request.")

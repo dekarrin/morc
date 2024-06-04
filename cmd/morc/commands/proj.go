@@ -24,13 +24,16 @@ var (
 )
 
 var projCmd = &cobra.Command{
-	Use: "proj [-F FILE]\n" +
-		"proj [-F FILE] --new [-nHSCcR]\n" +
-		"proj [-F FILE] --get ATTR\n" +
-		"proj [-F FILE] [-nHSCcR]",
+	Use: "proj",
+	Annotations: map[string]string{
+		annotationKeyHelpUsages: "" +
+			"proj\n" +
+			"proj --new [-nHSCcR]\n" +
+			"proj --get ATTR\n" +
+			"proj [-nHSCcR]",
+	},
 	GroupID: "project",
 	Short:   "Show or manipulate project attributes and config",
-	Long:    projCmdHelp,
 	Args:    cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var opts projArgs
@@ -58,13 +61,13 @@ var projCmd = &cobra.Command{
 }
 
 func init() {
-	projCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+	projCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	projCmd.PersistentFlags().BoolVarP(&flagProjNew, "new", "N", false, "Create a new project instead of reading/editing one. Combine with other arguments to specify values for the new project.")
 	projCmd.PersistentFlags().StringVarP(&flagProjGet, "get", "G", "", "Get the value of a specific attribute of the project. `ATTR` is the name of an attribute to retrieve and must be one of the following: "+strings.Join(projAttrKeyNames(), ", "))
 	projCmd.PersistentFlags().StringVarP(&flagProjName, "name", "n", "", "Set the name of the project to `NAME`")
 	projCmd.PersistentFlags().StringVarP(&flagProjHistoryFile, "history-file", "H", "", "Set the history file to `FILE`. If the special string '"+morc.ProjDirVar+"' is in the path, it is replaced with the directory containing the project file whenever morc is executed, allowing the history file path to still function even if the containing directory is moved.")
 	projCmd.PersistentFlags().StringVarP(&flagProjSessionFile, "cookies-file", "C", "", "Set the session (cookies) storage file to `FILE`. If the special string '"+morc.ProjDirVar+"' is in the path, it is replaced with the directory containing the project file whenever morc is executed, allowing the session file path to still function even if the containing directory is moved.")
-	projCmd.PersistentFlags().StringVarP(&flagProjCookieLifetime, "cookie-lifetime", "L", "", "Set the lifetime of recorded cookies to `DURATION`. If set to 0 or less, it will be interpreted as 24h. Altering this on an existing project will immediately apply an eviction check to all current cookies; this may result in some being purged.")
+	projCmd.PersistentFlags().StringVarP(&flagProjCookieLifetime, "cookie-lifetime", "L", "", "Set the lifetime of recorded cookies to `DUR`. DUR must be a duration string such as 8m2s or similar. If set to 0 or less, it will be interpreted as '24h'. Altering this on an existing project will immediately apply an eviction check to all current cookies; this may result in some being purged.")
 	projCmd.PersistentFlags().StringVarP(&flagProjRecordCookies, "cookies", "c", "", "Set whether cookie recording is enabled. `ON|OFF` must be one of 'ON' or 'OFF'. Setting this is equivalent to calling 'morc cookies --on' or 'morc cookies --off'")
 	projCmd.PersistentFlags().StringVarP(&flagProjRecordHistory, "history", "R", "", "Set whether history recording is enabled. `ON|OFF` must be one of 'ON' or 'OFF'. Setting this is equivalent to calling 'morc history --on' or 'morc history --off'")
 
@@ -74,6 +77,8 @@ func init() {
 	projCmd.MarkFlagsMutuallyExclusive("history", "get")
 	projCmd.MarkFlagsMutuallyExclusive("history-file", "get")
 	projCmd.MarkFlagsMutuallyExclusive("cookies-file", "get")
+
+	customFormattedCommandDescriptions[projCmd.Name()] = longHelp{fn: projCmdHelp, resultIsWrapped: true}
 
 	rootCmd.AddCommand(projCmd)
 }
@@ -108,17 +113,18 @@ var (
 			{projKeyCookieLifetime.Name(), "The lifetime of recorded Set-Cookie calls. When setting, the value must be a duration such as '24h' or '1h30m'. If set to 0 or less, it will be interpreted as 24h. Altering this will immediately apply an eviction check to all current cookies; this may result in some being purged."},
 		}
 
-		// plop it in the rosed Editor and start formatting
+		// format all with roseditor.
+		width := getWrapWidth()
 		return rosed.
 			Edit(s).
 			WithOptions(rosed.Options{
 				PreserveParagraphs: true,
 			}).
-			Wrap(80).
-			Insert(rosed.End, "\n"). // wrap clobbers above newline for some reason
-			InsertDefinitionsTable(rosed.End, attributes, 80).
+			Wrap(width).
+			Insert(rosed.End, "\n"). // above wrap clobbers newline for some reason
+			InsertDefinitionsTable(rosed.End, attributes, width).
 			String()
-	}()
+	}
 )
 
 func invokeProjEdit(io cmdio.IO, projFile string, attrs projAttrValues) error {

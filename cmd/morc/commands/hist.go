@@ -21,7 +21,7 @@ var (
 )
 
 func init() {
-	histCmd.PersistentFlags().StringVarP(&flagHistProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use the specified file for project data instead of "+morc.DefaultProjectPath)
+	histCmd.PersistentFlags().StringVarP(&flagHistProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	histCmd.PersistentFlags().BoolVarP(&flagHistInfo, "info", "", false, "Print summarizing information about the history")
 	histCmd.PersistentFlags().BoolVarP(&flagHistClear, "clear", "", false, "Delete all history entries")
 	histCmd.PersistentFlags().BoolVarP(&flagHistEnable, "on", "", false, "Enable history for future requests")
@@ -38,13 +38,24 @@ func init() {
 }
 
 var histCmd = &cobra.Command{
-	Use: "hist [-F FILE]\n" +
-		"hist [-F FILE] ENTRY [output-flags]\n" +
-		"hist [-F FILE] [--on]|[--off]|[--clear]|[--info]",
+	Use: "hist [ENTRY]",
+	Annotations: map[string]string{
+		annotationKeyHelpUsages: "" +
+			"hist\n" +
+			"hist ENTRY [output-flags]\n" +
+			"hist [--on | --off | --clear | --info]",
+	},
 	GroupID: "project",
 	Short:   "View and perform operations on request template sending history",
-	Long:    "With no other arguments, prints out a listing of all summarized entries in the history. If an ENTRY is given by index number from the listing, the exact response as received from the initial send of the template is output. If --on is given, request history is enabled for future requests made by calling morc send or morc exec. If --off is given, history is instead disabled, although existing entries are kept. If --info is given, basic info about the history as a whole is output. If --clear is given, all existing history entries are immediately deleted.\n\nHistory only applies to requests created from request templates in a project; one-off requests such as those sent by morc request or any of the method shorthand versions are not saved in history.",
-	Args:    cobra.MaximumNArgs(1),
+	Long: "With no other arguments, prints out a listing of all summarized entries in the history. If an ENTRY is " +
+		"given by index number from the listing, the exact response as received from the original send of the " +
+		"template is printed. If --on is given, request history is enabled for future requests made by calling morc " +
+		"send or morc exec. If --off is given, history is instead disabled, although existing entries are kept. If " +
+		"--info is given, basic info about the history as a whole is output. If --clear is given, all existing " +
+		"history entries are immediately deleted.\n\n" +
+		"History only applies to requests created from request templates in a project; one-off requests such as those " +
+		"sent by 'morc oneoff' or any of the method shorthand versions are not saved in history.",
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := histOptions{
 			projFile: flagEnvProjectFile,

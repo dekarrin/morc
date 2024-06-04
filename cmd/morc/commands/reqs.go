@@ -15,14 +15,11 @@ import (
 )
 
 var (
-	flagReqsRemoveHeaders []string
-	flagReqsRemoveBody    bool
-	flagReqsBodyData      string
-	flagReqsHeaders       []string
-	flagReqsMethod        string
-	flagReqsURL           string
-	flagReqsName          string
-	flagReqsDeleteForce   bool
+	flagReqsBodyData string
+	flagReqsHeaders  []string
+	flagReqsMethod   string
+	flagReqsURL      string
+	flagReqsName     string
 )
 
 var reqsCmd = &cobra.Command{
@@ -99,13 +96,13 @@ func init() {
 	reqsCmd.PersistentFlags().StringVarP(&cliflags.Get, "get", "G", "", "Get the value of the given attribute `ATTR` from the request. To get a particular header's value, use --get-header instead. ATTR must be one of: "+strings.Join(reqAttrKeyNames(), ", "))
 	reqsCmd.PersistentFlags().StringVarP(&cliflags.GetHeader, "get-header", "", "", "Get the value(s) of the given header `KEY` that is currently set on the request.")
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsName, "name", "n", "", "Change the name of a request template to `NAME`.")
-	reqsCmd.PersistentFlags().StringArrayVarP(&flagReqsRemoveHeaders, "remove-header", "r", []string{}, "Remove header with key `KEY` from the request. If multiple headers with the same key exist, only the most recently added one will be deleted.")
+	reqsCmd.PersistentFlags().StringArrayVarP(&cliflags.RemoveHeaders, "remove-header", "r", []string{}, "Remove header with key `KEY` from the request. If multiple headers with the same key exist, only the most recently added one will be deleted.")
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsBodyData, "data", "d", "", "Add the given `DATA` as a body to the request; prefix with '@' to instead interperet DATA as a filename that body data is to be read from.")
 	reqsCmd.PersistentFlags().StringArrayVarP(&flagReqsHeaders, "header", "H", []string{}, "Add a header to the request. Format is `KEY:VALUE`. Multiple headers may be set by providing multiple -H flags. If multiple headers with the same key are set, they will be set in the order they were given.")
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsMethod, "method", "X", "GET", "Set the request method to `METHOD`.")
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsURL, "url", "u", "http://example.com", "Specify the `URL` for the request.")
-	reqsCmd.PersistentFlags().BoolVarP(&flagReqsRemoveBody, "remove-body", "R", false, "Delete all existing body data from the request")
-	reqsCmd.PersistentFlags().BoolVarP(&flagReqsDeleteForce, "force", "f", false, "Force deletion of the request template even if it is used in flows. Only valid with --delete/-D.")
+	reqsCmd.PersistentFlags().BoolVarP(&cliflags.BRemoveBody, "remove-body", "R", false, "Delete all existing body data from the request")
+	reqsCmd.PersistentFlags().BoolVarP(&cliflags.BForce, "force", "f", false, "Force deletion of the request template even if it is used in flows. Only valid with --delete/-D.")
 
 	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "get-header", "name")
 	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "get-header", "remove-header")
@@ -630,7 +627,7 @@ func parseReqsArgs(cmd *cobra.Command, posArgs []string, args *reqsArgs) error {
 		// special case of req name set from a CLI flag rather than pos arg.
 		args.req = cliflags.Delete
 
-		args.force = flagReqsDeleteForce
+		args.force = cliflags.BForce
 	case reqsGet:
 		// use arg 1 as the req name
 		args.req = posArgs[0]
@@ -681,7 +678,7 @@ func parseReqsActionFromFlags(cmd *cobra.Command, posArgs []string) (reqsAction,
 	// * --force with --get, --get-header, and --new
 
 	// make sure user isn't invalidly using -f because cobra is not enforcing this
-	if flagReqsDeleteForce && cliflags.Delete == "" {
+	if cliflags.BForce && cliflags.Delete == "" {
 		return reqsEdit, fmt.Errorf("--force/-f can only be used with --delete/-D")
 	}
 
@@ -780,8 +777,8 @@ func parseReqsSetFlags(cmd *cobra.Command, attrs *reqAttrValues) error {
 	}
 
 	if f.Changed("remove-header") {
-		delHeaders := make([]string, len(flagReqsRemoveHeaders))
-		for idx, h := range flagReqsRemoveHeaders {
+		delHeaders := make([]string, len(cliflags.RemoveHeaders))
+		for idx, h := range cliflags.RemoveHeaders {
 			trimmed := strings.TrimSpace(h)
 			if strings.Contains(trimmed, " ") || strings.Contains(trimmed, ":") {
 				return fmt.Errorf("header delete #%d (%q) is not a valid header key", idx+1, h)

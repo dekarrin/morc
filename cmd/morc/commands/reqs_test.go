@@ -786,14 +786,14 @@ func resetReqsFlags() {
 	cliflags.Delete = ""
 	cliflags.Get = ""
 	cliflags.GetHeader = ""
-	flagReqsRemoveHeaders = nil
-	flagReqsRemoveBody = false
+	cliflags.RemoveHeaders = nil
+	cliflags.BRemoveBody = false
 	flagReqsBodyData = ""
 	flagReqsHeaders = nil
 	flagReqsMethod = ""
 	flagReqsURL = ""
 	flagReqsName = ""
-	flagReqsDeleteForce = false
+	cliflags.BForce = false
 
 	reqsCmd.Flags().VisitAll(func(fl *pflag.Flag) {
 		fl.Changed = false

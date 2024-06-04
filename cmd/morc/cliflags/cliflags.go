@@ -28,6 +28,18 @@ var (
 	// Vars is variables, in NAME=VALUE format. Can be specified more than once.
 	Vars []string
 
+	// RemoveHeaders is a list of headers to be removed.
+	RemoveHeaders []string
+
+	// BRemoveBody is a switch flag that when set, indicates that the body of
+	// the resource is to be removed.
+	BRemoveBody bool
+
+	// BForce is a switch flag that indicates that the requested operation
+	// should proceed even if it is destructive or leads to a non-pristine
+	// state.
+	BForce bool
+
 	// BDefault is a switch flag that, when set, indicates that the requested
 	// operation should be applied to the default environment.
 	BDefault bool

@@ -11,10 +11,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	flagEnvDeleteAll bool
-)
-
 type envAction int
 
 const (
@@ -27,7 +23,7 @@ const (
 func init() {
 	envCmd.PersistentFlags().StringVarP(&cliflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	envCmd.PersistentFlags().StringVarP(&cliflags.Delete, "delete", "D", "", "Delete environment `ENV`")
-	envCmd.PersistentFlags().BoolVarP(&flagEnvDeleteAll, "delete-all", "", false, "Delete all environments and variables")
+	envCmd.PersistentFlags().BoolVarP(&cliflags.BDeleteAll, "delete-all", "", false, "Delete all environments and variables")
 	envCmd.PersistentFlags().BoolVarP(&cliflags.BAll, "all", "a", false, "List all environments instead of only the current one")
 	envCmd.PersistentFlags().BoolVarP(&cliflags.BDefault, "default", "", false, "Change to the default environment")
 

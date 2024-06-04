@@ -14,13 +14,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	flagReqsBodyData string
-	flagReqsHeaders  []string
-	flagReqsMethod   string
-	flagReqsURL      string
-)
-
 var reqsCmd = &cobra.Command{
 	Use: "reqs [REQ]",
 	Annotations: map[string]string{
@@ -96,10 +89,10 @@ func init() {
 	reqsCmd.PersistentFlags().StringVarP(&cliflags.GetHeader, "get-header", "", "", "Get the value(s) of the given header `KEY` that is currently set on the request.")
 	reqsCmd.PersistentFlags().StringVarP(&cliflags.Name, "name", "n", "", "Change the name of a request template to `NAME`.")
 	reqsCmd.PersistentFlags().StringArrayVarP(&cliflags.RemoveHeaders, "remove-header", "r", []string{}, "Remove header with key `KEY` from the request. If multiple headers with the same key exist, only the most recently added one will be deleted.")
-	reqsCmd.PersistentFlags().StringVarP(&flagReqsBodyData, "data", "d", "", "Add the given `DATA` as a body to the request; prefix with '@' to instead interperet DATA as a filename that body data is to be read from.")
-	reqsCmd.PersistentFlags().StringArrayVarP(&flagReqsHeaders, "header", "H", []string{}, "Add a header to the request. Format is `KEY:VALUE`. Multiple headers may be set by providing multiple -H flags. If multiple headers with the same key are set, they will be set in the order they were given.")
-	reqsCmd.PersistentFlags().StringVarP(&flagReqsMethod, "method", "X", "GET", "Set the request method to `METHOD`.")
-	reqsCmd.PersistentFlags().StringVarP(&flagReqsURL, "url", "u", "http://example.com", "Specify the `URL` for the request.")
+	reqsCmd.PersistentFlags().StringVarP(&cliflags.BodyData, "data", "d", "", "Add the given `DATA` as a body to the request; prefix with '@' to instead interperet DATA as a filename that body data is to be read from.")
+	reqsCmd.PersistentFlags().StringArrayVarP(&cliflags.Headers, "header", "H", []string{}, "Add a header to the request. Format is `KEY:VALUE`. Multiple headers may be set by providing multiple -H flags. If multiple headers with the same key are set, they will be set in the order they were given.")
+	reqsCmd.PersistentFlags().StringVarP(&cliflags.Method, "method", "X", "GET", "Set the request method to `METHOD`.")
+	reqsCmd.PersistentFlags().StringVarP(&cliflags.URL, "url", "u", "http://example.com", "Specify the `URL` for the request.")
 	reqsCmd.PersistentFlags().BoolVarP(&cliflags.BRemoveBody, "remove-body", "R", false, "Delete all existing body data from the request")
 	reqsCmd.PersistentFlags().BoolVarP(&cliflags.BForce, "force", "f", false, "Force deletion of the request template even if it is used in flows. Only valid with --delete/-D.")
 
@@ -726,29 +719,29 @@ func parseReqsSetFlags(cmd *cobra.Command, attrs *reqAttrValues) error {
 	}
 
 	if f.Changed("method") {
-		attrs.method = optional[string]{set: true, v: strings.ToUpper(flagReqsMethod)}
+		attrs.method = optional[string]{set: true, v: strings.ToUpper(cliflags.Method)}
 	}
 
 	if f.Changed("url") {
 		// DO NOT PARSE UNTIL SEND TIME; parsing could clobber var uses.
-		attrs.url = optional[string]{set: true, v: flagReqsURL}
+		attrs.url = optional[string]{set: true, v: cliflags.URL}
 	}
 
 	if f.Changed("data") {
-		if strings.HasPrefix(flagReqsBodyData, "@") {
+		if strings.HasPrefix(cliflags.BodyData, "@") {
 			// read entire file now
-			fRaw, err := os.Open(flagReqsBodyData[1:])
+			fRaw, err := os.Open(cliflags.BodyData[1:])
 			if err != nil {
-				return fmt.Errorf("open %q: %w", flagReqsBodyData[1:], err)
+				return fmt.Errorf("open %q: %w", cliflags.BodyData[1:], err)
 			}
 			defer fRaw.Close()
 			bodyData, err := io.ReadAll(fRaw)
 			if err != nil {
-				return fmt.Errorf("read %q: %w", flagReqsBodyData[1:], err)
+				return fmt.Errorf("read %q: %w", cliflags.BodyData[1:], err)
 			}
 			attrs.body = optional[[]byte]{set: true, v: bodyData}
 		} else {
-			attrs.body = optional[[]byte]{set: true, v: []byte(flagReqsBodyData)}
+			attrs.body = optional[[]byte]{set: true, v: []byte(cliflags.BodyData)}
 		}
 	}
 
@@ -758,7 +751,7 @@ func parseReqsSetFlags(cmd *cobra.Command, attrs *reqAttrValues) error {
 
 	if f.Changed("header") {
 		headers := make(http.Header)
-		for idx, h := range flagReqsHeaders {
+		for idx, h := range cliflags.Headers {
 
 			// split the header into key and value
 			parts := strings.SplitN(h, ":", 2)

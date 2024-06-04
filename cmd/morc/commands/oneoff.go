@@ -16,8 +16,6 @@ import (
 var (
 	flagWriteStateFile string
 	flagReadStateFile  string
-	flagHeaders        []string
-	flagBodyData       string
 	flagVarSymbol      string
 	flagGetVars        []string
 )
@@ -25,8 +23,8 @@ var (
 func addRequestFlags(id string, cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVarP(&flagWriteStateFile, "write-state", "b", "", "Write collected cookies and captured vars to statefile `FILE`.")
 	cmd.PersistentFlags().StringVarP(&flagReadStateFile, "read-state", "c", "", "Read and use the cookies and vars saved in statefile `FILE`.")
-	cmd.PersistentFlags().StringArrayVarP(&flagHeaders, "header", "H", []string{}, "Add a header to the request. Argument is in form `KEY:VALUE` (spaces after the colon are allowed). May be set multiple times.")
-	cmd.PersistentFlags().StringVarP(&flagBodyData, "data", "d", "", "Add the given `DATA` as a body to the request; prefix with '@' to instead interperet DATA as a filename that body data is to be read from.")
+	cmd.PersistentFlags().StringArrayVarP(&cliflags.Headers, "header", "H", []string{}, "Add a header to the request. Argument is in form `KEY:VALUE` (spaces after the colon are allowed). May be set multiple times.")
+	cmd.PersistentFlags().StringVarP(&cliflags.BodyData, "data", "d", "", "Add the given `DATA` as a body to the request; prefix with '@' to instead interperet DATA as a filename that body data is to be read from.")
 	cmd.PersistentFlags().StringVarP(&flagVarSymbol, "var-symbol", "", "$", "Set the leading variable symbol used to indicate the start of a variable in the request to `SYM`.")
 	cmd.PersistentFlags().StringArrayVarP(&flagGetVars, "capture-var", "C", []string{}, "Get a variable's value from the response. Argument is in format `VAR:SPEC`. The SPEC part has format ':START,END' for byte offset (note the leading colon, resulting in 'VAR::START,END'), or 'path[0].to.value' (jq-ish syntax) for JSON body data.")
 	cmd.PersistentFlags().StringArrayVarP(&cliflags.Vars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Format is `VAR=VALUE`.")
@@ -163,9 +161,9 @@ func oneoffFlagsToOptions(cmdID string) (oneoffOptions, error) {
 	}
 
 	// check headers and load into an http.Header
-	if len(flagHeaders) > 0 {
+	if len(cliflags.Headers) > 0 {
 		headers := make(http.Header)
-		for idx, h := range flagHeaders {
+		for idx, h := range cliflags.Headers {
 
 			// split the header into key and value
 			parts := strings.SplitN(h, ":", 2)
@@ -183,20 +181,20 @@ func oneoffFlagsToOptions(cmdID string) (oneoffOptions, error) {
 	}
 
 	// check body data; load it immediately if it refers to a file
-	if strings.HasPrefix(flagBodyData, "@") {
+	if strings.HasPrefix(cliflags.BodyData, "@") {
 		// read entire file now
-		fRaw, err := os.Open(flagBodyData[1:])
+		fRaw, err := os.Open(cliflags.BodyData[1:])
 		if err != nil {
-			return opts, fmt.Errorf("open %q: %w", flagBodyData[1:], err)
+			return opts, fmt.Errorf("open %q: %w", cliflags.BodyData[1:], err)
 		}
 		defer fRaw.Close()
 		bodyData, err := io.ReadAll(fRaw)
 		if err != nil {
-			return opts, fmt.Errorf("read %q: %w", flagBodyData[1:], err)
+			return opts, fmt.Errorf("read %q: %w", cliflags.BodyData[1:], err)
 		}
 		opts.bodyData = bodyData
 	} else {
-		opts.bodyData = []byte(flagBodyData)
+		opts.bodyData = []byte(cliflags.BodyData)
 	}
 
 	return opts, nil

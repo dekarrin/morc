@@ -34,6 +34,22 @@ var (
 	// Name is the name of the resource in question.
 	Name string
 
+	// VarName is identical to Name but is named differently for readability.
+	VarName string
+
+	// BodyData is the bytes of the body of a request. This is either the bytes
+	// of the body directly or a filename prepended with an '@' character.
+	BodyData string
+
+	// Headers is a list of headers to be added to the request.
+	Headers []string
+
+	// Method is the HTTP method to use for the request.
+	Method string
+
+	// URL is the URL to send the request to.
+	URL string
+
 	// BRemoveBody is a switch flag that when set, indicates that the body of
 	// the resource is to be removed.
 	BRemoveBody bool

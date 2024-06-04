@@ -788,10 +788,10 @@ func resetReqsFlags() {
 	cliflags.GetHeader = ""
 	cliflags.RemoveHeaders = nil
 	cliflags.BRemoveBody = false
-	flagReqsBodyData = ""
-	flagReqsHeaders = nil
-	flagReqsMethod = ""
-	flagReqsURL = ""
+	cliflags.BodyData = ""
+	cliflags.Headers = nil
+	cliflags.Method = ""
+	cliflags.URL = ""
 	cliflags.Name = ""
 	cliflags.BForce = false
 

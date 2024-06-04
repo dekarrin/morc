@@ -19,7 +19,6 @@ var (
 	flagReqsHeaders  []string
 	flagReqsMethod   string
 	flagReqsURL      string
-	flagReqsName     string
 )
 
 var reqsCmd = &cobra.Command{
@@ -95,7 +94,7 @@ func init() {
 	reqsCmd.PersistentFlags().StringVarP(&cliflags.Delete, "delete", "D", "", "Delete the request template named `REQ`.")
 	reqsCmd.PersistentFlags().StringVarP(&cliflags.Get, "get", "G", "", "Get the value of the given attribute `ATTR` from the request. To get a particular header's value, use --get-header instead. ATTR must be one of: "+strings.Join(reqAttrKeyNames(), ", "))
 	reqsCmd.PersistentFlags().StringVarP(&cliflags.GetHeader, "get-header", "", "", "Get the value(s) of the given header `KEY` that is currently set on the request.")
-	reqsCmd.PersistentFlags().StringVarP(&flagReqsName, "name", "n", "", "Change the name of a request template to `NAME`.")
+	reqsCmd.PersistentFlags().StringVarP(&cliflags.Name, "name", "n", "", "Change the name of a request template to `NAME`.")
 	reqsCmd.PersistentFlags().StringArrayVarP(&cliflags.RemoveHeaders, "remove-header", "r", []string{}, "Remove header with key `KEY` from the request. If multiple headers with the same key exist, only the most recently added one will be deleted.")
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsBodyData, "data", "d", "", "Add the given `DATA` as a body to the request; prefix with '@' to instead interperet DATA as a filename that body data is to be read from.")
 	reqsCmd.PersistentFlags().StringArrayVarP(&flagReqsHeaders, "header", "H", []string{}, "Add a header to the request. Format is `KEY:VALUE`. Multiple headers may be set by providing multiple -H flags. If multiple headers with the same key are set, they will be set in the order they were given.")
@@ -723,7 +722,7 @@ func parseReqsSetFlags(cmd *cobra.Command, attrs *reqAttrValues) error {
 	f := cmd.Flags()
 
 	if f.Changed("name") {
-		attrs.name = optional[string]{set: true, v: flagReqsName}
+		attrs.name = optional[string]{set: true, v: cliflags.Name}
 	}
 
 	if f.Changed("method") {

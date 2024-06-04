@@ -547,7 +547,7 @@ func resetFlowsFlags() {
 	cliflags.New = ""
 	cliflags.Delete = ""
 	cliflags.Get = ""
-	flagFlowName = ""
+	cliflags.Name = ""
 	flagFlowStepRemovals = nil
 	flagFlowStepAdds = nil
 	flagFlowStepMoves = nil

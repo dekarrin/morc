@@ -14,7 +14,6 @@ import (
 )
 
 var (
-	flagFlowName         string
 	flagFlowStepRemovals []int
 	flagFlowStepAdds     []string
 	flagFlowStepMoves    []string
@@ -88,7 +87,7 @@ func init() {
 	flowsCmd.PersistentFlags().StringArrayVarP(&flagFlowStepAdds, "add", "a", nil, "Add a new step calling request REQ at index IDX, or at the end of current steps if index is omitted. Argument must be a string in form `[IDX]:REQ`. Can be given multiple times; if so, will be applied from lowest to highest index after all updates and removals are applied.")
 	flowsCmd.PersistentFlags().StringArrayVarP(&flagFlowStepMoves, "move", "m", nil, "Move the step at index FROM to index TO. Argument must be a string in form `FROM:[TO]`. Can be given multiple times; if so, will be applied in order given after all replacements, removals, and adds are applied. If TO is not given, the step is moved to the end of the flow.")
 	flowsCmd.PersistentFlags().StringArrayVarP(&flagFlowStepReplaces, "update", "u", nil, "Update the template called in step IDX to REQ. Argument must be a string in form `IDX:REQ`. Can be given multiple times; if so, will be applied in order given before any other step modifications.")
-	flowsCmd.PersistentFlags().StringVarP(&flagFlowName, "name", "n", "", "Change the name of the flow to `NAME`.")
+	flowsCmd.PersistentFlags().StringVarP(&cliflags.Name, "name", "n", "", "Change the name of the flow to `NAME`.")
 
 	flowsCmd.MarkFlagsMutuallyExclusive("delete", "new", "get", "remove")
 	flowsCmd.MarkFlagsMutuallyExclusive("delete", "new", "get", "add")
@@ -578,7 +577,7 @@ func parseFlowsSetFlags(cmd *cobra.Command, attrs *flowAttrValues) error {
 	f := cmd.Flags()
 
 	if f.Lookup("name").Changed {
-		attrs.name = optional[string]{set: true, v: flagFlowName}
+		attrs.name = optional[string]{set: true, v: cliflags.Name}
 	}
 
 	if f.Lookup("update").Changed {

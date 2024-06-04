@@ -792,7 +792,7 @@ func resetReqsFlags() {
 	flagReqsHeaders = nil
 	flagReqsMethod = ""
 	flagReqsURL = ""
-	flagReqsName = ""
+	cliflags.Name = ""
 	cliflags.BForce = false
 
 	reqsCmd.Flags().VisitAll(func(fl *pflag.Flag) {

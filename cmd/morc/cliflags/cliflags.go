@@ -31,6 +31,9 @@ var (
 	// RemoveHeaders is a list of headers to be removed.
 	RemoveHeaders []string
 
+	// Name is the name of the resource in question.
+	Name string
+
 	// BRemoveBody is a switch flag that when set, indicates that the body of
 	// the resource is to be removed.
 	BRemoveBody bool

@@ -149,7 +149,7 @@ func Test_Proj_Get(t *testing.T) {
 func resetProjFlags() {
 	cliflags.BNew = false
 	cliflags.Get = ""
-	flagProjName = ""
+	cliflags.Name = ""
 	flagProjCookieLifetime = ""
 	flagProjSessionFile = ""
 	flagProjHistoryFile = ""

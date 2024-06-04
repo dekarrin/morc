@@ -13,6 +13,7 @@ if [ -z "$PLATFORMS" ]
 then
   PLATFORMS="
 darwin/amd64
+darwin/arm64
 windows/amd64
 linux/amd64"
 fi

@@ -11,7 +11,6 @@ import (
 )
 
 var (
-	flagCapsNew    string
 	flagCapsDelete string
 	flagCapsGet    string
 	flagCapsSpec   string
@@ -76,7 +75,7 @@ var capsCmd = &cobra.Command{
 
 func init() {
 	capsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
-	capsCmd.PersistentFlags().StringVarP(&flagCapsNew, "new", "N", "", "Create a new capture on REQ that saves captured data to `VAR`. If given, the specification of the new capture must also be given with --spec/-s.")
+	capsCmd.PersistentFlags().StringVarP(&commonflags.New, "new", "N", "", "Create a new capture on REQ that saves captured data to `VAR`. If given, the specification of the new capture must also be given with --spec/-s.")
 	capsCmd.PersistentFlags().StringVarP(&flagCapsDelete, "delete", "D", "", "Delete the given variable capture `VAR` from the request.")
 	capsCmd.PersistentFlags().StringVarP(&flagCapsGet, "get", "G", "", "Get the value of a specific attribute `ATTR` of the capture. Can only be used if giving REQ and CAP and no other arguments.")
 	capsCmd.PersistentFlags().StringVarP(&flagCapsSpec, "spec", "s", "", "Specify where in responses that data should be captured from. `SPEC` is a specially-formatted string of form :FROM,TO to specify a byte-offset or a jq-ish syntax string to specify a path to a value within a JSON response body.")
@@ -453,7 +452,7 @@ func parseCapsActionFromFlags(cmd *cobra.Command, posArgs []string) (capsAction,
 			return capsDelete, fmt.Errorf("unknown 2nd positional argument: %q", posArgs[1])
 		}
 		return capsDelete, nil
-	} else if flagCapsNew != "" {
+	} else if commonflags.New != "" {
 		if len(posArgs) < 1 {
 			return capsNew, fmt.Errorf("missing request REQ to add new capture to")
 		}

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/commonflags"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 )
@@ -542,7 +543,8 @@ func Test_Flows_List(t *testing.T) {
 }
 
 func resetFlowsFlags() {
-	flagFlowNew = ""
+	commonflags.ProjectFile = ""
+	commonflags.New = ""
 	flagFlowDelete = ""
 	flagFlowGet = ""
 	flagFlowName = ""

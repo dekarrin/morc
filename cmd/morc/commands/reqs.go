@@ -15,7 +15,6 @@ import (
 )
 
 var (
-	flagReqsNew           string
 	flagReqsDelete        string
 	flagReqsGet           string
 	flagReqsGetHeader     string
@@ -98,7 +97,7 @@ var reqsCmd = &cobra.Command{
 
 func init() {
 	reqsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
-	reqsCmd.PersistentFlags().StringVarP(&flagReqsNew, "new", "N", "", "Create a new request template named `REQ`.")
+	reqsCmd.PersistentFlags().StringVarP(&commonflags.New, "new", "N", "", "Create a new request template named `REQ`.")
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsDelete, "delete", "D", "", "Delete the request template named `REQ`.")
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsGet, "get", "G", "", "Get the value of the given attribute `ATTR` from the request. To get a particular header's value, use --get-header instead. ATTR must be one of: "+strings.Join(reqAttrKeyNames(), ", "))
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsGetHeader, "get-header", "", "", "Get the value(s) of the given header `KEY` that is currently set on the request.")
@@ -658,8 +657,8 @@ func parseReqsArgs(cmd *cobra.Command, posArgs []string, args *reqsArgs) error {
 		}
 
 		// set req name from the flag
-		args.req = flagReqsNew
-		args.sets.name = optional[string]{set: true, v: flagReqsNew}
+		args.req = commonflags.New
+		args.sets.name = optional[string]{set: true, v: commonflags.New}
 	case reqsEdit:
 		// use arg 1 as the req name
 		args.req = posArgs[0]
@@ -694,7 +693,7 @@ func parseReqsActionFromFlags(cmd *cobra.Command, posArgs []string) (reqsAction,
 			return reqsAction(0), fmt.Errorf("unknown positional argument %q", posArgs[0])
 		}
 		return reqsDelete, nil
-	} else if flagReqsNew != "" {
+	} else if commonflags.New != "" {
 		if len(posArgs) > 0 {
 			return reqsAction(0), fmt.Errorf("unknown positional argument %q", posArgs[0])
 		}

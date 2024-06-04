@@ -14,7 +14,6 @@ import (
 )
 
 var (
-	flagFlowNew          string
 	flagFlowDelete       string
 	flagFlowGet          string
 	flagFlowName         string
@@ -85,7 +84,7 @@ var flowsCmd = &cobra.Command{
 func init() {
 	flowsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	flowsCmd.PersistentFlags().StringVarP(&flagFlowDelete, "delete", "D", "", "Delete the flow with the name `FLOW`.")
-	flowsCmd.PersistentFlags().StringVarP(&flagFlowNew, "new", "N", "", "Create a new flow with the name `FLOW`. When given, positional arguments are interpreted as ordered names of requests that make up the new flow's steps. At least two requests must be present.")
+	flowsCmd.PersistentFlags().StringVarP(&commonflags.New, "new", "N", "", "Create a new flow with the name `FLOW`. When given, positional arguments are interpreted as ordered names of requests that make up the new flow's steps. At least two requests must be present.")
 	flowsCmd.PersistentFlags().StringVarP(&flagFlowGet, "get", "G", "", "Get the value of an attribute of the flow. `ATTR` can either be 'name', to get the flow name, or the index of a specific step in the flow.")
 	flowsCmd.PersistentFlags().IntSliceVarP(&flagFlowStepRemovals, "remove", "r", nil, "Remove the step at index `IDX` from the flow. Can be given multiple times; if so, will be applied from highest to lowest index. Will be applied after all step updates from --update are applied.")
 	flowsCmd.PersistentFlags().StringArrayVarP(&flagFlowStepAdds, "add", "a", nil, "Add a new step calling request REQ at index IDX, or at the end of current steps if index is omitted. Argument must be a string in form `[IDX]:REQ`. Can be given multiple times; if so, will be applied from lowest to highest index after all updates and removals are applied.")
@@ -511,8 +510,8 @@ func parseFlowsArgs(cmd *cobra.Command, posArgs []string, args *flowsArgs) error
 		}
 	case flowsNew:
 		// pick up requests from args and set the flow name from the flag
-		args.flow = flagFlowNew
-		args.sets.name = optional[string]{set: true, v: flagFlowNew}
+		args.flow = commonflags.New
+		args.sets.name = optional[string]{set: true, v: commonflags.New}
 		args.reqs = posArgs
 	case flowsEdit:
 		// set arg 1 as the flow name

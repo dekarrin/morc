@@ -7,6 +7,7 @@ import (
 
 	"github.com/dekarrin/morc"
 	"github.com/dekarrin/morc/cmd/morc/cmdio"
+	"github.com/dekarrin/morc/cmd/morc/commonflags"
 	"github.com/spf13/cobra"
 )
 
@@ -15,12 +16,11 @@ const (
 )
 
 var (
-	flagVarsProjectFile string
-	flagVarsDelete      string
-	flagVarsEnv         string
-	flagVarsDefaultEnv  bool
-	flagVarsAll         bool
-	flagVarsCurrent     bool
+	flagVarsDelete     string
+	flagVarsEnv        string
+	flagVarsDefaultEnv bool
+	flagVarsAll        bool
+	flagVarsCurrent    bool
 )
 
 type varsAction int
@@ -33,7 +33,7 @@ const (
 )
 
 func init() {
-	varsCmd.PersistentFlags().StringVarP(&flagVarsProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath)
+	varsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath)
 	varsCmd.PersistentFlags().StringVarP(&flagVarsDelete, "delete", "D", "", "Delete the variable `VAR`")
 	varsCmd.PersistentFlags().StringVarP(&flagVarsEnv, "env", "e", "", "Run the command against the environment `ENV` instead of the current one. Use --default instead to specify the default environment.")
 	varsCmd.PersistentFlags().BoolVarP(&flagVarsDefaultEnv, "default", "", false, "Run the command against the default environment instead of the current one.")
@@ -69,7 +69,7 @@ var varsCmd = &cobra.Command{
 	Args: cobra.MaximumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := varOptions{
-			projFile:           flagVarsProjectFile,
+			projFile:           commonflags.ProjectFile,
 			envOverride:        flagVarsEnv,
 			envDefaultOverride: flagVarsDefaultEnv,
 			envCurrentOverride: flagVarsCurrent,

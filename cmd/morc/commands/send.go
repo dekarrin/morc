@@ -7,16 +7,16 @@ import (
 
 	"github.com/dekarrin/morc"
 	"github.com/dekarrin/morc/cmd/morc/cmdio"
+	"github.com/dekarrin/morc/cmd/morc/commonflags"
 	"github.com/spf13/cobra"
 )
 
 var (
-	flagProjectFile  string
 	flagSendInsecure bool
 )
 
 func init() {
-	sendCmd.PersistentFlags().StringVarP(&flagProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
+	sendCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	sendCmd.PersistentFlags().StringArrayVarP(&flagVars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Overrides any value currently in the store. The argument to this flag must be in `VAR=VALUE` format.")
 	sendCmd.PersistentFlags().BoolVarP(&flagSendInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
 
@@ -61,7 +61,7 @@ var sendCmd = &cobra.Command{
 func sendFlagsToOptions() (sendOptions, error) {
 	opts := sendOptions{}
 
-	opts.projFile = flagProjectFile
+	opts.projFile = commonflags.ProjectFile
 	if opts.projFile == "" {
 		return opts, fmt.Errorf("project file is set to empty string")
 	}

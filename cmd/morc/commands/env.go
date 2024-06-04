@@ -28,7 +28,7 @@ const (
 )
 
 func init() {
-	envCmd.PersistentFlags().StringVarP(&flagEnvProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
+	envCmd.PersistentFlags().StringVarP(&flagEnvProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	envCmd.PersistentFlags().StringVarP(&flagEnvDelete, "delete", "D", "", "Delete environment `ENV`")
 	envCmd.PersistentFlags().BoolVarP(&flagEnvDeleteAll, "delete-all", "", false, "Delete all environments and variables")
 	envCmd.PersistentFlags().BoolVarP(&flagEnvAll, "all", "a", false, "List all environments instead of only the current one")

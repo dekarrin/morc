@@ -11,14 +11,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	flagSendInsecure bool
-)
-
 func init() {
 	sendCmd.PersistentFlags().StringVarP(&cliflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	sendCmd.PersistentFlags().StringArrayVarP(&cliflags.Vars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Overrides any value currently in the store. The argument to this flag must be in `VAR=VALUE` format.")
-	sendCmd.PersistentFlags().BoolVarP(&flagSendInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
+	sendCmd.PersistentFlags().BoolVarP(&cliflags.BInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
 
 	setupRequestOutputFlags("morc send", sendCmd)
 
@@ -90,7 +86,7 @@ func sendFlagsToOptions() (sendOptions, error) {
 		opts.oneTimeVars = oneTimeVars
 	}
 
-	if flagSendInsecure {
+	if cliflags.BInsecure {
 		opts.skipVerify = true
 	}
 

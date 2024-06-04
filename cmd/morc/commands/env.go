@@ -12,8 +12,6 @@ import (
 )
 
 var (
-	flagEnvAll       bool
-	flagEnvDefault   bool
 	flagEnvDeleteAll bool
 )
 
@@ -30,8 +28,8 @@ func init() {
 	envCmd.PersistentFlags().StringVarP(&cliflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	envCmd.PersistentFlags().StringVarP(&cliflags.Delete, "delete", "D", "", "Delete environment `ENV`")
 	envCmd.PersistentFlags().BoolVarP(&flagEnvDeleteAll, "delete-all", "", false, "Delete all environments and variables")
-	envCmd.PersistentFlags().BoolVarP(&flagEnvAll, "all", "a", false, "List all environments instead of only the current one")
-	envCmd.PersistentFlags().BoolVarP(&flagEnvDefault, "default", "", false, "Change to the default environment")
+	envCmd.PersistentFlags().BoolVarP(&cliflags.BAll, "all", "a", false, "List all environments instead of only the current one")
+	envCmd.PersistentFlags().BoolVarP(&cliflags.BDefault, "default", "", false, "Change to the default environment")
 
 	// mark the delete and default flags as mutually exclusive
 	envCmd.MarkFlagsMutuallyExclusive("all", "default", "delete", "delete-all")
@@ -62,9 +60,9 @@ var envCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := envOptions{
 			projFile:      cliflags.ProjectFile,
-			doAll:         flagEnvAll, // TODO: during refactor, eliminate this. it's overloaded.
+			doAll:         cliflags.BAll, // TODO: during refactor, eliminate this. it's overloaded.
 			doDelete:      cliflags.Delete != "",
-			swapToDefault: flagEnvDefault,
+			swapToDefault: cliflags.BDefault,
 		}
 		if opts.projFile == "" {
 			return fmt.Errorf("project file is set to empty string")

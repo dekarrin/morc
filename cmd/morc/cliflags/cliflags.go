@@ -1,4 +1,5 @@
-// Package cliflags contains flags common to an entire hierarchy of commands.
+// Package cliflags contains CLI flags. They may be referenced by multiple
+// commands.
 package cliflags
 
 var (
@@ -15,4 +16,7 @@ var (
 
 	// Env specifies environment to apply to.
 	Env string
+
+	// Vars is variables.
+	Vars []string
 )

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/cliflags"
 	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/spf13/cobra"
 )
@@ -19,7 +20,6 @@ var (
 	flagBodyData       string
 	flagVarSymbol      string
 	flagGetVars        []string
-	flagVars           []string
 )
 
 func addRequestFlags(id string, cmd *cobra.Command) {
@@ -29,7 +29,7 @@ func addRequestFlags(id string, cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVarP(&flagBodyData, "data", "d", "", "Add the given `DATA` as a body to the request; prefix with '@' to instead interperet DATA as a filename that body data is to be read from.")
 	cmd.PersistentFlags().StringVarP(&flagVarSymbol, "var-symbol", "", "$", "Set the leading variable symbol used to indicate the start of a variable in the request to `SYM`.")
 	cmd.PersistentFlags().StringArrayVarP(&flagGetVars, "capture-var", "C", []string{}, "Get a variable's value from the response. Argument is in format `VAR:SPEC`. The SPEC part has format ':START,END' for byte offset (note the leading colon, resulting in 'VAR::START,END'), or 'path[0].to.value' (jq-ish syntax) for JSON body data.")
-	cmd.PersistentFlags().StringArrayVarP(&flagVars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Format is `VAR=VALUE`.")
+	cmd.PersistentFlags().StringArrayVarP(&cliflags.Vars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Format is `VAR=VALUE`.")
 	cmd.PersistentFlags().BoolVarP(&flagSendInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
 
 	setupRequestOutputFlags(id, cmd)
@@ -150,9 +150,9 @@ func oneoffFlagsToOptions(cmdID string) (oneoffOptions, error) {
 	}
 
 	// check vars
-	if len(flagVars) > 0 {
+	if len(cliflags.Vars) > 0 {
 		oneTimeVars := make(map[string]string)
-		for idx, v := range flagVars {
+		for idx, v := range cliflags.Vars {
 			parts := strings.SplitN(v, "=", 2)
 			if len(parts) != 2 {
 				return opts, fmt.Errorf("var #%d (%q) is not in format key=value", idx+1, v)

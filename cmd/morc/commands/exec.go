@@ -12,7 +12,7 @@ import (
 
 func init() {
 	execCmd.PersistentFlags().StringVarP(&cliflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
-	execCmd.PersistentFlags().StringArrayVarP(&flagVars, "var", "V", []string{}, "Temporarily set a variable's value at the start of the flow. The argument to this flag must be in `VAR=VALUE` format.")
+	execCmd.PersistentFlags().StringArrayVarP(&cliflags.Vars, "var", "V", []string{}, "Temporarily set a variable's value at the start of the flow. The argument to this flag must be in `VAR=VALUE` format.")
 	execCmd.PersistentFlags().BoolVarP(&flagSendInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
 
 	setupRequestOutputFlags("morc exec", execCmd)
@@ -68,9 +68,9 @@ func execFlagsToOptions() (execOptions, error) {
 	}
 
 	// check vars
-	if len(flagVars) > 0 {
+	if len(cliflags.Vars) > 0 {
 		oneTimeVars := make(map[string]string)
-		for idx, v := range flagVars {
+		for idx, v := range cliflags.Vars {
 			parts := strings.SplitN(v, ":", 2)
 			if len(parts) != 2 {
 				return opts, fmt.Errorf("var #%d (%q) is not in format key:value", idx+1, v)

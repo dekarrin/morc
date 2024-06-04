@@ -11,7 +11,6 @@ import (
 )
 
 var (
-	flagCapsGet  string
 	flagCapsSpec string
 	flagCapsVar  string
 )
@@ -76,7 +75,7 @@ func init() {
 	capsCmd.PersistentFlags().StringVarP(&cliflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	capsCmd.PersistentFlags().StringVarP(&cliflags.New, "new", "N", "", "Create a new capture on REQ that saves captured data to `VAR`. If given, the specification of the new capture must also be given with --spec/-s.")
 	capsCmd.PersistentFlags().StringVarP(&cliflags.Delete, "delete", "D", "", "Delete the given variable capture `VAR` from the request.")
-	capsCmd.PersistentFlags().StringVarP(&flagCapsGet, "get", "G", "", "Get the value of a specific attribute `ATTR` of the capture. Can only be used if giving REQ and CAP and no other arguments.")
+	capsCmd.PersistentFlags().StringVarP(&cliflags.Get, "get", "G", "", "Get the value of a specific attribute `ATTR` of the capture. Can only be used if giving REQ and CAP and no other arguments.")
 	capsCmd.PersistentFlags().StringVarP(&flagCapsSpec, "spec", "s", "", "Specify where in responses that data should be captured from. `SPEC` is a specially-formatted string of form :FROM,TO to specify a byte-offset or a jq-ish syntax string to specify a path to a value within a JSON response body.")
 	capsCmd.PersistentFlags().StringVarP(&flagCapsVar, "var", "V", "", "Set the variable that the capture saves to to `VAR`.")
 
@@ -396,7 +395,7 @@ func parseCapsArgs(cmd *cobra.Command, posArgs []string, args *capsArgs) error {
 		args.capture = posArgs[1]
 
 		// parse the get from the string
-		args.getItem, err = parseCapAttrKey(flagProjGet)
+		args.getItem, err = parseCapAttrKey(cliflags.Get)
 		if err != nil {
 			return err
 		}
@@ -465,7 +464,7 @@ func parseCapsActionFromFlags(cmd *cobra.Command, posArgs []string) (capsAction,
 			return capsNew, fmt.Errorf("--new/-N already gives var name; cannot be used with --var/-V")
 		}
 		return capsNew, nil
-	} else if flagCapsGet != "" {
+	} else if cliflags.Get != "" {
 		if len(posArgs) < 1 {
 			return capsGet, fmt.Errorf("missing request REQ and capture VAR to get attribute from")
 		}

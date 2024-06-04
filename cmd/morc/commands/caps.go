@@ -80,7 +80,7 @@ func init() {
 	capsCmd.PersistentFlags().StringVarP(&flagCapsDelete, "delete", "D", "", "Delete the given variable capture `VAR` from the request.")
 	capsCmd.PersistentFlags().StringVarP(&flagCapsGet, "get", "G", "", "Get the value of a specific attribute `ATTR` of the capture. Can only be used if giving REQ and CAP and no other arguments.")
 	capsCmd.PersistentFlags().StringVarP(&flagCapsSpec, "spec", "s", "", "Specify where in responses that data should be captured from. `SPEC` is a specially-formatted string of form :FROM,TO to specify a byte-offset or a jq-ish syntax string to specify a path to a value within a JSON response body.")
-	capsCmd.PersistentFlags().StringVarP(&flagCapsVar, "var", "V", "", "Set the variable that the capture saves to.")
+	capsCmd.PersistentFlags().StringVarP(&flagCapsVar, "var", "V", "", "Set the variable that the capture saves to to `VAR`.")
 
 	// cannot delete while doing new
 	capsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get")

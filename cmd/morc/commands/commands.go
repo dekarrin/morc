@@ -178,11 +178,11 @@ func setupRequestOutputFlags(id string, cmd *cobra.Command) {
 	flags := &requestOutputFlagSet{}
 	managedFlagSets[id] = flags
 
-	cmd.PersistentFlags().BoolVarP(&flags.Headers, "headers", "", false, "Output the headers of the response")
-	cmd.PersistentFlags().BoolVarP(&flags.Captures, "captures", "", false, "Output the captures from the response")
-	cmd.PersistentFlags().BoolVarP(&flags.SuppressResponseBody, "no-body", "", false, "Suppress the output of the response body")
-	cmd.PersistentFlags().BoolVarP(&flags.Request, "request", "", false, "Output the filled request prior to sending it")
-	cmd.PersistentFlags().StringVarP(&flags.Format, "format", "f", "pretty", "Output format (pretty, line, sr)")
+	cmd.PersistentFlags().BoolVarP(&flags.Headers, "headers", "", false, "(Output flag) Output the headers of the response")
+	cmd.PersistentFlags().BoolVarP(&flags.Captures, "captures", "", false, "(Output flag) Output the captures from the response")
+	cmd.PersistentFlags().BoolVarP(&flags.SuppressResponseBody, "no-body", "", false, "(Output flag) Suppress the output of the response body")
+	cmd.PersistentFlags().BoolVarP(&flags.Request, "request", "", false, "(Output flag) Output the filled request prior to sending it")
+	cmd.PersistentFlags().StringVarP(&flags.Format, "format", "f", "pretty", "(Output flag) Set output format. `FMT` must be one of 'pretty', 'line', or 'sr')")
 }
 
 func gatherRequestOutputFlags(id string) (morc.OutputControl, error) {

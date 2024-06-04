@@ -58,7 +58,7 @@ var rootCmd = &cobra.Command{
 		"proj --new`, the project file is created at path .morc/project.json relative to the working directory the " +
 		"command is executed from. This is also where MORC looks for a project file by default whenever executing " +
 		"project commands. If a different project file is to be pointed to, all project commands accept a " +
-		"--project_file/-F flag that allows it to be specified." +
+		"--project_file/-F flag that allows it to be specified.\n\n" +
 		"A MORC project records request history, tracks cookes set by responses, and holds a variable store. The " +
 		"variable store is further split into user-defined environments; by default, variables are defined and stored " +
 		"in a default environment. Variables are used to fill request templates at send time; any variable in request " +

@@ -38,7 +38,7 @@ func init() {
 	varsCmd.PersistentFlags().StringVarP(&flagVarsEnv, "env", "e", "", "Run the command against the environment `ENV` instead of the current one. Use --default instead to specify the default environment.")
 	varsCmd.PersistentFlags().BoolVarP(&flagVarsDefaultEnv, "default", "", false, "Run the command against the default environment instead of the current one.")
 	varsCmd.PersistentFlags().BoolVarP(&flagVarsCurrent, "current", "", false, "Apply only to current environment. This is the same as typing --env followed by the name of the current environment.")
-	varsCmd.PersistentFlags().BoolVarP(&flagVarsAll, "all", "", false, "Used with -D. Delete the variable from all environments. This is the only way to effectively specify '--default' while deleting; it is a separate flag to indicate that the variable will indeed be erased everywhere, not just in the default environment.")
+	varsCmd.PersistentFlags().BoolVarP(&flagVarsAll, "all", "a", false, "Used with -D. Delete the variable from all environments. This is the only way to effectively specify '--default' while deleting; it is a separate flag to indicate that the variable will indeed be erased everywhere, not just in the default environment.")
 
 	// mark the env and default flags as mutually exclusive
 	varsCmd.MarkFlagsMutuallyExclusive("env", "default", "all", "current")

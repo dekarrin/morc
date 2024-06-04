@@ -7,15 +7,14 @@ import (
 
 	"github.com/dekarrin/morc"
 	"github.com/dekarrin/morc/cmd/morc/cmdio"
+	"github.com/dekarrin/morc/cmd/morc/commonflags"
 	"github.com/spf13/cobra"
 )
 
 var (
-	flagEnvProjectFile string
-	flagEnvDelete      string
-	flagEnvAll         bool
-	flagEnvDefault     bool
-	flagEnvDeleteAll   bool
+	flagEnvAll       bool
+	flagEnvDefault   bool
+	flagEnvDeleteAll bool
 )
 
 type envAction int
@@ -28,8 +27,8 @@ const (
 )
 
 func init() {
-	envCmd.PersistentFlags().StringVarP(&flagEnvProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
-	envCmd.PersistentFlags().StringVarP(&flagEnvDelete, "delete", "D", "", "Delete environment `ENV`")
+	envCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
+	envCmd.PersistentFlags().StringVarP(&commonflags.Delete, "delete", "D", "", "Delete environment `ENV`")
 	envCmd.PersistentFlags().BoolVarP(&flagEnvDeleteAll, "delete-all", "", false, "Delete all environments and variables")
 	envCmd.PersistentFlags().BoolVarP(&flagEnvAll, "all", "a", false, "List all environments instead of only the current one")
 	envCmd.PersistentFlags().BoolVarP(&flagEnvDefault, "default", "", false, "Change to the default environment")
@@ -62,9 +61,9 @@ var envCmd = &cobra.Command{
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := envOptions{
-			projFile:      flagEnvProjectFile,
+			projFile:      commonflags.ProjectFile,
 			doAll:         flagEnvAll, // TODO: during refactor, eliminate this. it's overloaded.
-			doDelete:      flagEnvDelete != "",
+			doDelete:      commonflags.Delete != "",
 			swapToDefault: flagEnvDefault,
 		}
 		if opts.projFile == "" {
@@ -92,7 +91,7 @@ var envCmd = &cobra.Command{
 			// both --delete-all and --delete will get us here. If it's --delete,
 			// that's the ting to grab.
 			if f.Changed("delete") {
-				env = flagEnvDelete
+				env = commonflags.Delete
 			} else {
 				opts.doAll = true
 			}
@@ -238,7 +237,7 @@ func parseEnvActionFromFlags(cmd *cobra.Command, posArgs []string) (envAction, e
 			return envActionDelete, fmt.Errorf("unknown positional argument %q", posArgs[1])
 		}
 
-		if flagEnvDelete == reservedDefaultEnvName {
+		if commonflags.Delete == reservedDefaultEnvName {
 			return envActionDelete, fmt.Errorf("cannot use reserved environment name %q; use --delete-all to delete all envs (including default)", reservedDefaultEnvName)
 		}
 		return envActionDelete, nil

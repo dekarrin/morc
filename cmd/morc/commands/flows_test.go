@@ -545,7 +545,7 @@ func Test_Flows_List(t *testing.T) {
 func resetFlowsFlags() {
 	commonflags.ProjectFile = ""
 	commonflags.New = ""
-	flagFlowDelete = ""
+	commonflags.Delete = ""
 	flagFlowGet = ""
 	flagFlowName = ""
 	flagFlowStepRemovals = nil

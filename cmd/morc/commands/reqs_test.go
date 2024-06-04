@@ -783,7 +783,7 @@ func Test_Reqs_List(t *testing.T) {
 
 func resetReqsFlags() {
 	commonflags.New = ""
-	flagReqsDelete = ""
+	commonflags.Delete = ""
 	flagReqsGet = ""
 	flagReqsGetHeader = ""
 	flagReqsRemoveHeaders = nil

@@ -7,21 +7,21 @@ import (
 
 	"github.com/dekarrin/morc"
 	"github.com/dekarrin/morc/cmd/morc/cmdio"
+	"github.com/dekarrin/morc/cmd/morc/commonflags"
 	"github.com/spf13/cobra"
 )
 
 var (
-	flagHistProjectFile string
-	flagHistInfo        bool
-	flagHistClear       bool
-	flagHistEnable      bool
-	flagHistDisable     bool
+	flagHistInfo    bool
+	flagHistClear   bool
+	flagHistEnable  bool
+	flagHistDisable bool
 
 	flagHistNoDates bool
 )
 
 func init() {
-	histCmd.PersistentFlags().StringVarP(&flagHistProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
+	histCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	histCmd.PersistentFlags().BoolVarP(&flagHistInfo, "info", "", false, "Print summarizing information about the history")
 	histCmd.PersistentFlags().BoolVarP(&flagHistClear, "clear", "", false, "Delete all history entries")
 	histCmd.PersistentFlags().BoolVarP(&flagHistEnable, "on", "", false, "Enable history for future requests")
@@ -58,7 +58,7 @@ var histCmd = &cobra.Command{
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := histOptions{
-			projFile: flagEnvProjectFile,
+			projFile: commonflags.ProjectFile,
 		}
 		if opts.projFile == "" {
 			return fmt.Errorf("project file is set to empty string")

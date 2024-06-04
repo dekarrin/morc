@@ -11,10 +11,9 @@ import (
 )
 
 var (
-	flagCapsDelete string
-	flagCapsGet    string
-	flagCapsSpec   string
-	flagCapsVar    string
+	flagCapsGet  string
+	flagCapsSpec string
+	flagCapsVar  string
 )
 
 var capsCmd = &cobra.Command{
@@ -76,7 +75,7 @@ var capsCmd = &cobra.Command{
 func init() {
 	capsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	capsCmd.PersistentFlags().StringVarP(&commonflags.New, "new", "N", "", "Create a new capture on REQ that saves captured data to `VAR`. If given, the specification of the new capture must also be given with --spec/-s.")
-	capsCmd.PersistentFlags().StringVarP(&flagCapsDelete, "delete", "D", "", "Delete the given variable capture `VAR` from the request.")
+	capsCmd.PersistentFlags().StringVarP(&commonflags.Delete, "delete", "D", "", "Delete the given variable capture `VAR` from the request.")
 	capsCmd.PersistentFlags().StringVarP(&flagCapsGet, "get", "G", "", "Get the value of a specific attribute `ATTR` of the capture. Can only be used if giving REQ and CAP and no other arguments.")
 	capsCmd.PersistentFlags().StringVarP(&flagCapsSpec, "spec", "s", "", "Specify where in responses that data should be captured from. `SPEC` is a specially-formatted string of form :FROM,TO to specify a byte-offset or a jq-ish syntax string to specify a path to a value within a JSON response body.")
 	capsCmd.PersistentFlags().StringVarP(&flagCapsVar, "var", "V", "", "Set the variable that the capture saves to to `VAR`.")
@@ -391,7 +390,7 @@ func parseCapsArgs(cmd *cobra.Command, posArgs []string, args *capsArgs) error {
 		args.capture = posArgs[1]
 	case capsDelete:
 		// special case of capture set from a CLI flag rather than pos arg.
-		args.capture = flagCapsDelete
+		args.capture = commonflags.Delete
 	case capsGet:
 		// set arg 2 as the capture name
 		args.capture = posArgs[1]
@@ -444,7 +443,7 @@ func parseCapsActionFromFlags(cmd *cobra.Command, posArgs []string) (capsAction,
 	// * mut-exc enforced by cobra: --new and --var setOpt will not be set
 	// * Min args 1.
 
-	if flagCapsDelete != "" {
+	if commonflags.Delete != "" {
 		if len(posArgs) < 1 {
 			return capsDelete, fmt.Errorf("missing request REQ to delete capture from")
 		}

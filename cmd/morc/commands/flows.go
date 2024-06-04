@@ -14,7 +14,6 @@ import (
 )
 
 var (
-	flagFlowDelete       string
 	flagFlowGet          string
 	flagFlowName         string
 	flagFlowStepRemovals []int
@@ -83,7 +82,7 @@ var flowsCmd = &cobra.Command{
 
 func init() {
 	flowsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
-	flowsCmd.PersistentFlags().StringVarP(&flagFlowDelete, "delete", "D", "", "Delete the flow with the name `FLOW`.")
+	flowsCmd.PersistentFlags().StringVarP(&commonflags.Delete, "delete", "D", "", "Delete the flow with the name `FLOW`.")
 	flowsCmd.PersistentFlags().StringVarP(&commonflags.New, "new", "N", "", "Create a new flow with the name `FLOW`. When given, positional arguments are interpreted as ordered names of requests that make up the new flow's steps. At least two requests must be present.")
 	flowsCmd.PersistentFlags().StringVarP(&flagFlowGet, "get", "G", "", "Get the value of an attribute of the flow. `ATTR` can either be 'name', to get the flow name, or the index of a specific step in the flow.")
 	flowsCmd.PersistentFlags().IntSliceVarP(&flagFlowStepRemovals, "remove", "r", nil, "Remove the step at index `IDX` from the flow. Can be given multiple times; if so, will be applied from highest to lowest index. Will be applied after all step updates from --update are applied.")
@@ -498,7 +497,7 @@ func parseFlowsArgs(cmd *cobra.Command, posArgs []string, args *flowsArgs) error
 		args.flow = posArgs[0]
 	case flowsDelete:
 		// special case of flow name set from a CLI flag rather than pos arg.
-		args.flow = flagFlowDelete
+		args.flow = commonflags.Delete
 	case flowsGet:
 		// set arg 1 as the flow name
 		args.flow = posArgs[0]

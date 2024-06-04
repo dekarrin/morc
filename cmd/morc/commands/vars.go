@@ -16,7 +16,6 @@ const (
 )
 
 var (
-	flagVarsDelete     string
 	flagVarsEnv        string
 	flagVarsDefaultEnv bool
 	flagVarsAll        bool
@@ -34,7 +33,7 @@ const (
 
 func init() {
 	varsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath)
-	varsCmd.PersistentFlags().StringVarP(&flagVarsDelete, "delete", "D", "", "Delete the variable `VAR`")
+	varsCmd.PersistentFlags().StringVarP(&commonflags.Delete, "delete", "D", "", "Delete the variable `VAR`")
 	varsCmd.PersistentFlags().StringVarP(&flagVarsEnv, "env", "e", "", "Run the command against the environment `ENV` instead of the current one. Use --default instead to specify the default environment.")
 	varsCmd.PersistentFlags().BoolVarP(&flagVarsDefaultEnv, "default", "", false, "Run the command against the default environment instead of the current one.")
 	varsCmd.PersistentFlags().BoolVarP(&flagVarsCurrent, "current", "", false, "Apply only to current environment. This is the same as typing --env followed by the name of the current environment.")
@@ -73,7 +72,7 @@ var varsCmd = &cobra.Command{
 			envOverride:        flagVarsEnv,
 			envDefaultOverride: flagVarsDefaultEnv,
 			envCurrentOverride: flagVarsCurrent,
-			deleteVar:          flagVarsDelete != "",
+			deleteVar:          commonflags.Delete != "",
 			envAll:             flagVarsAll,
 		}
 		if opts.projFile == "" {
@@ -100,7 +99,7 @@ var varsCmd = &cobra.Command{
 			varName = args[0]
 			varValue = args[1]
 		case varsActionDelete:
-			varName = flagVarsDelete
+			varName = commonflags.Delete
 		}
 
 		// done checking args, don't show usage on error

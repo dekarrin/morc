@@ -15,7 +15,6 @@ import (
 )
 
 var (
-	flagReqsDelete        string
 	flagReqsGet           string
 	flagReqsGetHeader     string
 	flagReqsRemoveHeaders []string
@@ -98,7 +97,7 @@ var reqsCmd = &cobra.Command{
 func init() {
 	reqsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	reqsCmd.PersistentFlags().StringVarP(&commonflags.New, "new", "N", "", "Create a new request template named `REQ`.")
-	reqsCmd.PersistentFlags().StringVarP(&flagReqsDelete, "delete", "D", "", "Delete the request template named `REQ`.")
+	reqsCmd.PersistentFlags().StringVarP(&commonflags.Delete, "delete", "D", "", "Delete the request template named `REQ`.")
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsGet, "get", "G", "", "Get the value of the given attribute `ATTR` from the request. To get a particular header's value, use --get-header instead. ATTR must be one of: "+strings.Join(reqAttrKeyNames(), ", "))
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsGetHeader, "get-header", "", "", "Get the value(s) of the given header `KEY` that is currently set on the request.")
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsName, "name", "n", "", "Change the name of a request template to `NAME`.")
@@ -631,7 +630,7 @@ func parseReqsArgs(cmd *cobra.Command, posArgs []string, args *reqsArgs) error {
 		args.req = posArgs[0]
 	case reqsDelete:
 		// special case of req name set from a CLI flag rather than pos arg.
-		args.req = flagReqsDelete
+		args.req = commonflags.Delete
 
 		args.force = flagReqsDeleteForce
 	case reqsGet:
@@ -684,11 +683,11 @@ func parseReqsActionFromFlags(cmd *cobra.Command, posArgs []string) (reqsAction,
 	// * --force with --get, --get-header, and --new
 
 	// make sure user isn't invalidly using -f because cobra is not enforcing this
-	if flagReqsDeleteForce && flagReqsDelete == "" {
+	if flagReqsDeleteForce && commonflags.Delete == "" {
 		return reqsEdit, fmt.Errorf("--force/-f can only be used with --delete/-D")
 	}
 
-	if flagReqsDelete != "" {
+	if commonflags.Delete != "" {
 		if len(posArgs) > 0 {
 			return reqsAction(0), fmt.Errorf("unknown positional argument %q", posArgs[0])
 		}

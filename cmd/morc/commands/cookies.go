@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/cliflags"
 	"github.com/dekarrin/morc/cmd/morc/cmdio"
-	"github.com/dekarrin/morc/cmd/morc/commonflags"
 	"github.com/spf13/cobra"
 )
 
@@ -22,7 +22,7 @@ var (
 )
 
 func init() {
-	cookiesCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
+	cookiesCmd.PersistentFlags().StringVarP(&cliflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	cookiesCmd.PersistentFlags().BoolVarP(&flagCookiesInfo, "info", "", false, "Print summarizing information about stored cookies")
 	cookiesCmd.PersistentFlags().BoolVarP(&flagCookiesClear, "clear", "", false, "Delete all cookies")
 	cookiesCmd.PersistentFlags().BoolVarP(&flagCookiesEnable, "on", "", false, "Enable cookie recording for future requests")
@@ -56,7 +56,7 @@ var cookiesCmd = &cobra.Command{
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := cookiesOptions{
-			projFile: commonflags.ProjectFile,
+			projFile: cliflags.ProjectFile,
 		}
 		if opts.projFile == "" {
 			return fmt.Errorf("project file is set to empty string")

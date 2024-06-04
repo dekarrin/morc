@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/cliflags"
 	"github.com/dekarrin/morc/cmd/morc/cmdio"
-	"github.com/dekarrin/morc/cmd/morc/commonflags"
 	"github.com/spf13/cobra"
 )
 
@@ -95,9 +95,9 @@ var reqsCmd = &cobra.Command{
 }
 
 func init() {
-	reqsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
-	reqsCmd.PersistentFlags().StringVarP(&commonflags.New, "new", "N", "", "Create a new request template named `REQ`.")
-	reqsCmd.PersistentFlags().StringVarP(&commonflags.Delete, "delete", "D", "", "Delete the request template named `REQ`.")
+	reqsCmd.PersistentFlags().StringVarP(&cliflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
+	reqsCmd.PersistentFlags().StringVarP(&cliflags.New, "new", "N", "", "Create a new request template named `REQ`.")
+	reqsCmd.PersistentFlags().StringVarP(&cliflags.Delete, "delete", "D", "", "Delete the request template named `REQ`.")
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsGet, "get", "G", "", "Get the value of the given attribute `ATTR` from the request. To get a particular header's value, use --get-header instead. ATTR must be one of: "+strings.Join(reqAttrKeyNames(), ", "))
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsGetHeader, "get-header", "", "", "Get the value(s) of the given header `KEY` that is currently set on the request.")
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsName, "name", "n", "", "Change the name of a request template to `NAME`.")
@@ -609,7 +609,7 @@ type reqAttrValues struct {
 }
 
 func parseReqsArgs(cmd *cobra.Command, posArgs []string, args *reqsArgs) error {
-	args.projFile = commonflags.ProjectFile
+	args.projFile = cliflags.ProjectFile
 	if args.projFile == "" {
 		return fmt.Errorf("project file cannot be set to empty string")
 	}
@@ -630,7 +630,7 @@ func parseReqsArgs(cmd *cobra.Command, posArgs []string, args *reqsArgs) error {
 		args.req = posArgs[0]
 	case reqsDelete:
 		// special case of req name set from a CLI flag rather than pos arg.
-		args.req = commonflags.Delete
+		args.req = cliflags.Delete
 
 		args.force = flagReqsDeleteForce
 	case reqsGet:
@@ -656,8 +656,8 @@ func parseReqsArgs(cmd *cobra.Command, posArgs []string, args *reqsArgs) error {
 		}
 
 		// set req name from the flag
-		args.req = commonflags.New
-		args.sets.name = optional[string]{set: true, v: commonflags.New}
+		args.req = cliflags.New
+		args.sets.name = optional[string]{set: true, v: cliflags.New}
 	case reqsEdit:
 		// use arg 1 as the req name
 		args.req = posArgs[0]
@@ -683,16 +683,16 @@ func parseReqsActionFromFlags(cmd *cobra.Command, posArgs []string) (reqsAction,
 	// * --force with --get, --get-header, and --new
 
 	// make sure user isn't invalidly using -f because cobra is not enforcing this
-	if flagReqsDeleteForce && commonflags.Delete == "" {
+	if flagReqsDeleteForce && cliflags.Delete == "" {
 		return reqsEdit, fmt.Errorf("--force/-f can only be used with --delete/-D")
 	}
 
-	if commonflags.Delete != "" {
+	if cliflags.Delete != "" {
 		if len(posArgs) > 0 {
 			return reqsAction(0), fmt.Errorf("unknown positional argument %q", posArgs[0])
 		}
 		return reqsDelete, nil
-	} else if commonflags.New != "" {
+	} else if cliflags.New != "" {
 		if len(posArgs) > 0 {
 			return reqsAction(0), fmt.Errorf("unknown positional argument %q", posArgs[0])
 		}

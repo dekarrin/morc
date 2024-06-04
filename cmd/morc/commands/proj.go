@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/cliflags"
 	"github.com/dekarrin/morc/cmd/morc/cmdio"
-	"github.com/dekarrin/morc/cmd/morc/commonflags"
 	"github.com/dekarrin/rosed"
 	"github.com/spf13/cobra"
 )
@@ -61,7 +61,7 @@ var projCmd = &cobra.Command{
 }
 
 func init() {
-	projCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
+	projCmd.PersistentFlags().StringVarP(&cliflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	projCmd.PersistentFlags().BoolVarP(&flagProjNew, "new", "N", false, "Create a new project instead of reading/editing one. Combine with other arguments to specify values for the new project.")
 	projCmd.PersistentFlags().StringVarP(&flagProjGet, "get", "G", "", "Get the value of a specific attribute of the project. `ATTR` is the name of an attribute to retrieve and must be one of the following: "+strings.Join(projAttrKeyNames(), ", "))
 	projCmd.PersistentFlags().StringVarP(&flagProjName, "name", "n", "", "Set the name of the project to `NAME`")
@@ -385,7 +385,7 @@ func (sfv projAttrValues) changesFilePaths() bool {
 }
 
 func parseProjArgs(cmd *cobra.Command, _ []string, args *projArgs) error {
-	args.projFile = commonflags.ProjectFile
+	args.projFile = cliflags.ProjectFile
 	if args.projFile == "" {
 		return fmt.Errorf("project file cannot be set to empty string")
 	}

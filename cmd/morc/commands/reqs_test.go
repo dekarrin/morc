@@ -784,8 +784,8 @@ func Test_Reqs_List(t *testing.T) {
 func resetReqsFlags() {
 	cliflags.New = ""
 	cliflags.Delete = ""
-	flagReqsGet = ""
-	flagReqsGetHeader = ""
+	cliflags.Get = ""
+	cliflags.GetHeader = ""
 	flagReqsRemoveHeaders = nil
 	flagReqsRemoveBody = false
 	flagReqsBodyData = ""

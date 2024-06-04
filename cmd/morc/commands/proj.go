@@ -13,8 +13,6 @@ import (
 )
 
 var (
-	flagProjNew            bool
-	flagProjGet            string
 	flagProjName           string
 	flagProjHistoryFile    string
 	flagProjSessionFile    string
@@ -62,8 +60,8 @@ var projCmd = &cobra.Command{
 
 func init() {
 	projCmd.PersistentFlags().StringVarP(&cliflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
-	projCmd.PersistentFlags().BoolVarP(&flagProjNew, "new", "N", false, "Create a new project instead of reading/editing one. Combine with other arguments to specify values for the new project.")
-	projCmd.PersistentFlags().StringVarP(&flagProjGet, "get", "G", "", "Get the value of a specific attribute of the project. `ATTR` is the name of an attribute to retrieve and must be one of the following: "+strings.Join(projAttrKeyNames(), ", "))
+	projCmd.PersistentFlags().BoolVarP(&cliflags.BNew, "new", "N", false, "Create a new project instead of reading/editing one. Combine with other arguments to specify values for the new project.")
+	projCmd.PersistentFlags().StringVarP(&cliflags.Get, "get", "G", "", "Get the value of a specific attribute of the project. `ATTR` is the name of an attribute to retrieve and must be one of the following: "+strings.Join(projAttrKeyNames(), ", "))
 	projCmd.PersistentFlags().StringVarP(&flagProjName, "name", "n", "", "Set the name of the project to `NAME`")
 	projCmd.PersistentFlags().StringVarP(&flagProjHistoryFile, "history-file", "H", "", "Set the history file to `FILE`. If the special string '"+morc.ProjDirVar+"' is in the path, it is replaced with the directory containing the project file whenever morc is executed, allowing the history file path to still function even if the containing directory is moved.")
 	projCmd.PersistentFlags().StringVarP(&flagProjSessionFile, "cookies-file", "C", "", "Set the session (cookies) storage file to `FILE`. If the special string '"+morc.ProjDirVar+"' is in the path, it is replaced with the directory containing the project file whenever morc is executed, allowing the session file path to still function even if the containing directory is moved.")
@@ -403,7 +401,7 @@ func parseProjArgs(cmd *cobra.Command, _ []string, args *projArgs) error {
 		// no-op; no further checks to do
 	case projGet:
 		// parse the get from the string
-		args.getItem, err = parseProjAttrKey(flagProjGet)
+		args.getItem, err = parseProjAttrKey(cliflags.Get)
 		if err != nil {
 			return err
 		}
@@ -430,9 +428,9 @@ func parseProjActionFromFlags() (projAction, error) {
 	// not be present.
 	// * No-args.
 
-	if flagProjGet != "" {
+	if cliflags.Get != "" {
 		return projGet, nil
-	} else if flagProjNew {
+	} else if cliflags.BNew {
 		return projNew, nil
 	} else if projSetFlagIsPresent() {
 		return projEdit, nil

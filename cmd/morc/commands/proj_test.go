@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/cliflags"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 )
@@ -146,8 +147,8 @@ func Test_Proj_Get(t *testing.T) {
 }
 
 func resetProjFlags() {
-	flagProjNew = false
-	flagProjGet = ""
+	cliflags.BNew = false
+	cliflags.Get = ""
 	flagProjName = ""
 	flagProjCookieLifetime = ""
 	flagProjSessionFile = ""

@@ -14,6 +14,14 @@ var (
 	// of the resource being deleted.
 	Delete string
 
+	// Get requests an attribute of a resource. It takes the attribute as an
+	// argument.
+	Get string
+
+	// GetHeader requests the value(s) of the header of a resource. It takes the
+	// name of the header as an argument.
+	GetHeader string
+
 	// Env specifies environment to apply to.
 	Env string
 

@@ -14,7 +14,6 @@ import (
 )
 
 var (
-	flagFlowGet          string
 	flagFlowName         string
 	flagFlowStepRemovals []int
 	flagFlowStepAdds     []string
@@ -84,7 +83,7 @@ func init() {
 	flowsCmd.PersistentFlags().StringVarP(&cliflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	flowsCmd.PersistentFlags().StringVarP(&cliflags.Delete, "delete", "D", "", "Delete the flow with the name `FLOW`.")
 	flowsCmd.PersistentFlags().StringVarP(&cliflags.New, "new", "N", "", "Create a new flow with the name `FLOW`. When given, positional arguments are interpreted as ordered names of requests that make up the new flow's steps. At least two requests must be present.")
-	flowsCmd.PersistentFlags().StringVarP(&flagFlowGet, "get", "G", "", "Get the value of an attribute of the flow. `ATTR` can either be 'name', to get the flow name, or the index of a specific step in the flow.")
+	flowsCmd.PersistentFlags().StringVarP(&cliflags.Get, "get", "G", "", "Get the value of an attribute of the flow. `ATTR` can either be 'name', to get the flow name, or the index of a specific step in the flow.")
 	flowsCmd.PersistentFlags().IntSliceVarP(&flagFlowStepRemovals, "remove", "r", nil, "Remove the step at index `IDX` from the flow. Can be given multiple times; if so, will be applied from highest to lowest index. Will be applied after all step updates from --update are applied.")
 	flowsCmd.PersistentFlags().StringArrayVarP(&flagFlowStepAdds, "add", "a", nil, "Add a new step calling request REQ at index IDX, or at the end of current steps if index is omitted. Argument must be a string in form `[IDX]:REQ`. Can be given multiple times; if so, will be applied from lowest to highest index after all updates and removals are applied.")
 	flowsCmd.PersistentFlags().StringArrayVarP(&flagFlowStepMoves, "move", "m", nil, "Move the step at index FROM to index TO. Argument must be a string in form `FROM:[TO]`. Can be given multiple times; if so, will be applied in order given after all replacements, removals, and adds are applied. If TO is not given, the step is moved to the end of the flow.")
@@ -503,7 +502,7 @@ func parseFlowsArgs(cmd *cobra.Command, posArgs []string, args *flowsArgs) error
 		args.flow = posArgs[0]
 
 		// parse the get from the string
-		args.getItem, err = parseFlowAttrKey(flagFlowGet)
+		args.getItem, err = parseFlowAttrKey(cliflags.Get)
 		if err != nil {
 			return err
 		}

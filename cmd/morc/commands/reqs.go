@@ -15,8 +15,6 @@ import (
 )
 
 var (
-	flagReqsGet           string
-	flagReqsGetHeader     string
 	flagReqsRemoveHeaders []string
 	flagReqsRemoveBody    bool
 	flagReqsBodyData      string
@@ -98,8 +96,8 @@ func init() {
 	reqsCmd.PersistentFlags().StringVarP(&cliflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	reqsCmd.PersistentFlags().StringVarP(&cliflags.New, "new", "N", "", "Create a new request template named `REQ`.")
 	reqsCmd.PersistentFlags().StringVarP(&cliflags.Delete, "delete", "D", "", "Delete the request template named `REQ`.")
-	reqsCmd.PersistentFlags().StringVarP(&flagReqsGet, "get", "G", "", "Get the value of the given attribute `ATTR` from the request. To get a particular header's value, use --get-header instead. ATTR must be one of: "+strings.Join(reqAttrKeyNames(), ", "))
-	reqsCmd.PersistentFlags().StringVarP(&flagReqsGetHeader, "get-header", "", "", "Get the value(s) of the given header `KEY` that is currently set on the request.")
+	reqsCmd.PersistentFlags().StringVarP(&cliflags.Get, "get", "G", "", "Get the value of the given attribute `ATTR` from the request. To get a particular header's value, use --get-header instead. ATTR must be one of: "+strings.Join(reqAttrKeyNames(), ", "))
+	reqsCmd.PersistentFlags().StringVarP(&cliflags.GetHeader, "get-header", "", "", "Get the value(s) of the given header `KEY` that is currently set on the request.")
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsName, "name", "n", "", "Change the name of a request template to `NAME`.")
 	reqsCmd.PersistentFlags().StringArrayVarP(&flagReqsRemoveHeaders, "remove-header", "r", []string{}, "Remove header with key `KEY` from the request. If multiple headers with the same key exist, only the most recently added one will be deleted.")
 	reqsCmd.PersistentFlags().StringVarP(&flagReqsBodyData, "data", "d", "", "Add the given `DATA` as a body to the request; prefix with '@' to instead interperet DATA as a filename that body data is to be read from.")
@@ -639,13 +637,13 @@ func parseReqsArgs(cmd *cobra.Command, posArgs []string, args *reqsArgs) error {
 
 		// user is either doing this via flagReqsGet or flagReqsGetHeader;
 		// parsing is different based on which one.
-		if flagReqsGet != "" {
-			args.getItem, err = parseReqAttrKey(flagReqsGet)
+		if cliflags.Get != "" {
+			args.getItem, err = parseReqAttrKey(cliflags.Get)
 			if err != nil {
 				return err
 			}
 		} else {
-			args.getItem = reqKey{header: flagReqsGetHeader}
+			args.getItem = reqKey{header: cliflags.GetHeader}
 		}
 	case reqsNew:
 		// above action parsing already checked that invalid set opts will not
@@ -697,7 +695,7 @@ func parseReqsActionFromFlags(cmd *cobra.Command, posArgs []string) (reqsAction,
 			return reqsAction(0), fmt.Errorf("unknown positional argument %q", posArgs[0])
 		}
 		return reqsNew, nil
-	} else if flagReqsGet != "" || flagReqsGetHeader != "" {
+	} else if cliflags.Get != "" || cliflags.GetHeader != "" {
 		if len(posArgs) < 1 {
 			return reqsGet, fmt.Errorf("missing name of REQ to get from")
 		}

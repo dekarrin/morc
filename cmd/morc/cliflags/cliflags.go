@@ -84,6 +84,10 @@ var (
 	// to capture from the response. It can be specified multiple times.
 	CaptureVars []string
 
+	// BNoDates is an output control switch flag that indicates that dates of
+	// historical events should not be printed when they otherwise would.
+	BNoDates bool
+
 	// BInfo is a switch flag that indicates that the requested operation is
 	// retrieval of a summary of the resource.
 	BInfo bool

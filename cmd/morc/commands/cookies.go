@@ -13,21 +13,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	flagCookiesInfo    bool
-	flagCookiesClear   bool
-	flagCookiesEnable  bool
-	flagCookiesDisable bool
-	flagCookiesURL     string
-)
-
 func init() {
 	cookiesCmd.PersistentFlags().StringVarP(&cliflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
-	cookiesCmd.PersistentFlags().BoolVarP(&flagCookiesInfo, "info", "", false, "Print summarizing information about stored cookies")
-	cookiesCmd.PersistentFlags().BoolVarP(&flagCookiesClear, "clear", "", false, "Delete all cookies")
-	cookiesCmd.PersistentFlags().BoolVarP(&flagCookiesEnable, "on", "", false, "Enable cookie recording for future requests")
-	cookiesCmd.PersistentFlags().BoolVarP(&flagCookiesDisable, "off", "", false, "Disable cookie recording for future requests")
-	cookiesCmd.PersistentFlags().StringVarP(&flagCookiesURL, "url", "u", "", "Get cookies that would only be set on the given URL")
+	cookiesCmd.PersistentFlags().BoolVarP(&cliflags.BInfo, "info", "", false, "Print summarizing information about stored cookies")
+	cookiesCmd.PersistentFlags().BoolVarP(&cliflags.BClear, "clear", "", false, "Delete all cookies")
+	cookiesCmd.PersistentFlags().BoolVarP(&cliflags.BEnable, "on", "", false, "Enable cookie recording for future requests")
+	cookiesCmd.PersistentFlags().BoolVarP(&cliflags.BDisable, "off", "", false, "Disable cookie recording for future requests")
+	cookiesCmd.PersistentFlags().StringVarP(&cliflags.URL, "url", "u", "", "Get cookies that would only be set on the given URL")
 
 	// mark the delete and default flags as mutually exclusive
 	cookiesCmd.MarkFlagsMutuallyExclusive("on", "off", "clear", "info", "url")
@@ -63,25 +55,25 @@ var cookiesCmd = &cobra.Command{
 		}
 
 		// parse the URL if given
-		if flagCookiesURL != "" {
-			lowerURL := strings.ToLower(flagCookiesURL)
+		if cliflags.URL != "" {
+			lowerURL := strings.ToLower(cliflags.URL)
 			if !strings.HasPrefix(lowerURL, "http://") && !strings.HasPrefix(lowerURL, "https://") {
-				flagCookiesURL = "http://" + flagCookiesURL
+				cliflags.URL = "http://" + cliflags.URL
 			}
-			u, err := url.Parse(flagCookiesURL)
+			u, err := url.Parse(cliflags.URL)
 			if err != nil {
 				return fmt.Errorf("invalid URL: %w", err)
 			}
 			opts.url = u
 		}
 
-		if flagCookiesInfo {
+		if cliflags.BInfo {
 			opts.action = cookiesInfo
-		} else if flagCookiesClear {
+		} else if cliflags.BClear {
 			opts.action = cookiesClear
-		} else if flagCookiesEnable {
+		} else if cliflags.BEnable {
 			opts.action = cookiesEnable
-		} else if flagCookiesDisable {
+		} else if cliflags.BDisable {
 			opts.action = cookiesDisable
 		} else {
 			opts.action = cookiesList

@@ -84,6 +84,22 @@ var (
 	// to capture from the response. It can be specified multiple times.
 	CaptureVars []string
 
+	// BInfo is a switch flag that indicates that the requested operation is
+	// retrieval of a summary of the resource.
+	BInfo bool
+
+	// BEnable is a switch flag that indicates that the requested operation is
+	// to enable a feature.
+	BEnable bool
+
+	// BDisable is a switch flag that indicates that the requested operation is
+	// to disable a feature.
+	BDisable bool
+
+	// BClear is a switch flag that indicates that the requested operation is to
+	// erase all instances of the applicable type of resource.
+	BClear bool
+
 	// BRemoveBody is a switch flag that when set, indicates that the body of
 	// the resource is to be removed.
 	BRemoveBody bool

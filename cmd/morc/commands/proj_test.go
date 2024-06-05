@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/dekarrin/morc"
-	"github.com/dekarrin/morc/cmd/morc/cliflags"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 )
@@ -147,14 +146,14 @@ func Test_Proj_Get(t *testing.T) {
 }
 
 func resetProjFlags() {
-	cliflags.BNew = false
-	cliflags.Get = ""
-	cliflags.Name = ""
-	cliflags.CookieLifetime = ""
-	cliflags.SessionFile = ""
-	cliflags.HistoryFile = ""
-	cliflags.RecordCookies = ""
-	cliflags.RecordHistory = ""
+	flags.BNew = false
+	flags.Get = ""
+	flags.Name = ""
+	flags.CookieLifetime = ""
+	flags.SessionFile = ""
+	flags.HistoryFile = ""
+	flags.RecordCookies = ""
+	flags.RecordHistory = ""
 
 	projCmd.Flags().VisitAll(func(fl *pflag.Flag) {
 		fl.Changed = false

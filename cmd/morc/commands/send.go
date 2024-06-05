@@ -6,15 +6,14 @@ import (
 	"strings"
 
 	"github.com/dekarrin/morc"
-	"github.com/dekarrin/morc/cmd/morc/cliflags"
 	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/spf13/cobra"
 )
 
 func init() {
-	sendCmd.PersistentFlags().StringVarP(&cliflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
-	sendCmd.PersistentFlags().StringArrayVarP(&cliflags.Vars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Overrides any value currently in the store. The argument to this flag must be in `VAR=VALUE` format.")
-	sendCmd.PersistentFlags().BoolVarP(&cliflags.BInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
+	sendCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
+	sendCmd.PersistentFlags().StringArrayVarP(&flags.Vars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Overrides any value currently in the store. The argument to this flag must be in `VAR=VALUE` format.")
+	sendCmd.PersistentFlags().BoolVarP(&flags.BInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
 
 	addRequestOutputFlags(sendCmd)
 
@@ -57,7 +56,7 @@ var sendCmd = &cobra.Command{
 func sendFlagsToOptions() (sendOptions, error) {
 	opts := sendOptions{}
 
-	opts.projFile = cliflags.ProjectFile
+	opts.projFile = flags.ProjectFile
 	if opts.projFile == "" {
 		return opts, fmt.Errorf("project file is set to empty string")
 	}
@@ -69,9 +68,9 @@ func sendFlagsToOptions() (sendOptions, error) {
 	}
 
 	// check vars
-	if len(cliflags.Vars) > 0 {
+	if len(flags.Vars) > 0 {
 		oneTimeVars := make(map[string]string)
-		for idx, v := range cliflags.Vars {
+		for idx, v := range flags.Vars {
 			parts := strings.SplitN(v, "=", 2)
 			if len(parts) != 2 {
 				return opts, fmt.Errorf("var #%d (%q) is not in format key=value", idx+1, v)
@@ -86,7 +85,7 @@ func sendFlagsToOptions() (sendOptions, error) {
 		opts.oneTimeVars = oneTimeVars
 	}
 
-	if cliflags.BInsecure {
+	if flags.BInsecure {
 		opts.skipVerify = true
 	}
 

@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/dekarrin/morc"
-	"github.com/dekarrin/morc/cmd/morc/cliflags"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 )
@@ -782,18 +781,18 @@ func Test_Reqs_List(t *testing.T) {
 }
 
 func resetReqsFlags() {
-	cliflags.New = ""
-	cliflags.Delete = ""
-	cliflags.Get = ""
-	cliflags.GetHeader = ""
-	cliflags.RemoveHeaders = nil
-	cliflags.BRemoveBody = false
-	cliflags.BodyData = ""
-	cliflags.Headers = nil
-	cliflags.Method = ""
-	cliflags.URL = ""
-	cliflags.Name = ""
-	cliflags.BForce = false
+	flags.New = ""
+	flags.Delete = ""
+	flags.Get = ""
+	flags.GetHeader = ""
+	flags.RemoveHeaders = nil
+	flags.BRemoveBody = false
+	flags.BodyData = ""
+	flags.Headers = nil
+	flags.Method = ""
+	flags.URL = ""
+	flags.Name = ""
+	flags.BForce = false
 
 	reqsCmd.Flags().VisitAll(func(fl *pflag.Flag) {
 		fl.Changed = false

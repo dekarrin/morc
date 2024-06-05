@@ -8,18 +8,17 @@ import (
 	"time"
 
 	"github.com/dekarrin/morc"
-	"github.com/dekarrin/morc/cmd/morc/cliflags"
 	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/spf13/cobra"
 )
 
 func init() {
-	cookiesCmd.PersistentFlags().StringVarP(&cliflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
-	cookiesCmd.PersistentFlags().BoolVarP(&cliflags.BInfo, "info", "", false, "Print summarizing information about stored cookies")
-	cookiesCmd.PersistentFlags().BoolVarP(&cliflags.BClear, "clear", "", false, "Delete all cookies")
-	cookiesCmd.PersistentFlags().BoolVarP(&cliflags.BEnable, "on", "", false, "Enable cookie recording for future requests")
-	cookiesCmd.PersistentFlags().BoolVarP(&cliflags.BDisable, "off", "", false, "Disable cookie recording for future requests")
-	cookiesCmd.PersistentFlags().StringVarP(&cliflags.URL, "url", "u", "", "Get cookies that would only be set on the given URL")
+	cookiesCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
+	cookiesCmd.PersistentFlags().BoolVarP(&flags.BInfo, "info", "", false, "Print summarizing information about stored cookies")
+	cookiesCmd.PersistentFlags().BoolVarP(&flags.BClear, "clear", "", false, "Delete all cookies")
+	cookiesCmd.PersistentFlags().BoolVarP(&flags.BEnable, "on", "", false, "Enable cookie recording for future requests")
+	cookiesCmd.PersistentFlags().BoolVarP(&flags.BDisable, "off", "", false, "Disable cookie recording for future requests")
+	cookiesCmd.PersistentFlags().StringVarP(&flags.URL, "url", "u", "", "Get cookies that would only be set on the given URL")
 
 	// mark the delete and default flags as mutually exclusive
 	cookiesCmd.MarkFlagsMutuallyExclusive("on", "off", "clear", "info", "url")
@@ -48,32 +47,32 @@ var cookiesCmd = &cobra.Command{
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := cookiesOptions{
-			projFile: cliflags.ProjectFile,
+			projFile: flags.ProjectFile,
 		}
 		if opts.projFile == "" {
 			return fmt.Errorf("project file is set to empty string")
 		}
 
 		// parse the URL if given
-		if cliflags.URL != "" {
-			lowerURL := strings.ToLower(cliflags.URL)
+		if flags.URL != "" {
+			lowerURL := strings.ToLower(flags.URL)
 			if !strings.HasPrefix(lowerURL, "http://") && !strings.HasPrefix(lowerURL, "https://") {
-				cliflags.URL = "http://" + cliflags.URL
+				flags.URL = "http://" + flags.URL
 			}
-			u, err := url.Parse(cliflags.URL)
+			u, err := url.Parse(flags.URL)
 			if err != nil {
 				return fmt.Errorf("invalid URL: %w", err)
 			}
 			opts.url = u
 		}
 
-		if cliflags.BInfo {
+		if flags.BInfo {
 			opts.action = cookiesInfo
-		} else if cliflags.BClear {
+		} else if flags.BClear {
 			opts.action = cookiesClear
-		} else if cliflags.BEnable {
+		} else if flags.BEnable {
 			opts.action = cookiesEnable
-		} else if cliflags.BDisable {
+		} else if flags.BDisable {
 			opts.action = cookiesDisable
 		} else {
 			opts.action = cookiesList

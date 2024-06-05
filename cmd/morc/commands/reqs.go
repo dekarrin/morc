@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/dekarrin/morc"
-	"github.com/dekarrin/morc/cmd/morc/cliflags"
 	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/spf13/cobra"
 )
@@ -82,19 +81,19 @@ var reqsCmd = &cobra.Command{
 }
 
 func init() {
-	reqsCmd.PersistentFlags().StringVarP(&cliflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
-	reqsCmd.PersistentFlags().StringVarP(&cliflags.New, "new", "N", "", "Create a new request template named `REQ`.")
-	reqsCmd.PersistentFlags().StringVarP(&cliflags.Delete, "delete", "D", "", "Delete the request template named `REQ`.")
-	reqsCmd.PersistentFlags().StringVarP(&cliflags.Get, "get", "G", "", "Get the value of the given attribute `ATTR` from the request. To get a particular header's value, use --get-header instead. ATTR must be one of: "+strings.Join(reqAttrKeyNames(), ", "))
-	reqsCmd.PersistentFlags().StringVarP(&cliflags.GetHeader, "get-header", "", "", "Get the value(s) of the given header `KEY` that is currently set on the request.")
-	reqsCmd.PersistentFlags().StringVarP(&cliflags.Name, "name", "n", "", "Change the name of a request template to `NAME`.")
-	reqsCmd.PersistentFlags().StringArrayVarP(&cliflags.RemoveHeaders, "remove-header", "r", []string{}, "Remove header with key `KEY` from the request. If multiple headers with the same key exist, only the most recently added one will be deleted.")
-	reqsCmd.PersistentFlags().StringVarP(&cliflags.BodyData, "data", "d", "", "Add the given `DATA` as a body to the request; prefix with '@' to instead interperet DATA as a filename that body data is to be read from.")
-	reqsCmd.PersistentFlags().StringArrayVarP(&cliflags.Headers, "header", "H", []string{}, "Add a header to the request. Format is `KEY:VALUE`. Multiple headers may be set by providing multiple -H flags. If multiple headers with the same key are set, they will be set in the order they were given.")
-	reqsCmd.PersistentFlags().StringVarP(&cliflags.Method, "method", "X", "GET", "Set the request method to `METHOD`.")
-	reqsCmd.PersistentFlags().StringVarP(&cliflags.URL, "url", "u", "http://example.com", "Specify the `URL` for the request.")
-	reqsCmd.PersistentFlags().BoolVarP(&cliflags.BRemoveBody, "remove-body", "R", false, "Delete all existing body data from the request")
-	reqsCmd.PersistentFlags().BoolVarP(&cliflags.BForce, "force", "f", false, "Force deletion of the request template even if it is used in flows. Only valid with --delete/-D.")
+	reqsCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
+	reqsCmd.PersistentFlags().StringVarP(&flags.New, "new", "N", "", "Create a new request template named `REQ`.")
+	reqsCmd.PersistentFlags().StringVarP(&flags.Delete, "delete", "D", "", "Delete the request template named `REQ`.")
+	reqsCmd.PersistentFlags().StringVarP(&flags.Get, "get", "G", "", "Get the value of the given attribute `ATTR` from the request. To get a particular header's value, use --get-header instead. ATTR must be one of: "+strings.Join(reqAttrKeyNames(), ", "))
+	reqsCmd.PersistentFlags().StringVarP(&flags.GetHeader, "get-header", "", "", "Get the value(s) of the given header `KEY` that is currently set on the request.")
+	reqsCmd.PersistentFlags().StringVarP(&flags.Name, "name", "n", "", "Change the name of a request template to `NAME`.")
+	reqsCmd.PersistentFlags().StringArrayVarP(&flags.RemoveHeaders, "remove-header", "r", []string{}, "Remove header with key `KEY` from the request. If multiple headers with the same key exist, only the most recently added one will be deleted.")
+	reqsCmd.PersistentFlags().StringVarP(&flags.BodyData, "data", "d", "", "Add the given `DATA` as a body to the request; prefix with '@' to instead interperet DATA as a filename that body data is to be read from.")
+	reqsCmd.PersistentFlags().StringArrayVarP(&flags.Headers, "header", "H", []string{}, "Add a header to the request. Format is `KEY:VALUE`. Multiple headers may be set by providing multiple -H flags. If multiple headers with the same key are set, they will be set in the order they were given.")
+	reqsCmd.PersistentFlags().StringVarP(&flags.Method, "method", "X", "GET", "Set the request method to `METHOD`.")
+	reqsCmd.PersistentFlags().StringVarP(&flags.URL, "url", "u", "http://example.com", "Specify the `URL` for the request.")
+	reqsCmd.PersistentFlags().BoolVarP(&flags.BRemoveBody, "remove-body", "R", false, "Delete all existing body data from the request")
+	reqsCmd.PersistentFlags().BoolVarP(&flags.BForce, "force", "f", false, "Force deletion of the request template even if it is used in flows. Only valid with --delete/-D.")
 
 	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "get-header", "name")
 	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "get-header", "remove-header")
@@ -596,7 +595,7 @@ type reqAttrValues struct {
 }
 
 func parseReqsArgs(cmd *cobra.Command, posArgs []string, args *reqsArgs) error {
-	args.projFile = cliflags.ProjectFile
+	args.projFile = flags.ProjectFile
 	if args.projFile == "" {
 		return fmt.Errorf("project file cannot be set to empty string")
 	}
@@ -617,22 +616,22 @@ func parseReqsArgs(cmd *cobra.Command, posArgs []string, args *reqsArgs) error {
 		args.req = posArgs[0]
 	case reqsDelete:
 		// special case of req name set from a CLI flag rather than pos arg.
-		args.req = cliflags.Delete
+		args.req = flags.Delete
 
-		args.force = cliflags.BForce
+		args.force = flags.BForce
 	case reqsGet:
 		// use arg 1 as the req name
 		args.req = posArgs[0]
 
 		// user is either doing this via --get or --get-header;
 		// parsing is different based on which one.
-		if cliflags.Get != "" {
-			args.getItem, err = parseReqAttrKey(cliflags.Get)
+		if flags.Get != "" {
+			args.getItem, err = parseReqAttrKey(flags.Get)
 			if err != nil {
 				return err
 			}
 		} else {
-			args.getItem = reqKey{header: cliflags.GetHeader}
+			args.getItem = reqKey{header: flags.GetHeader}
 		}
 	case reqsNew:
 		// above action parsing already checked that invalid set opts will not
@@ -643,8 +642,8 @@ func parseReqsArgs(cmd *cobra.Command, posArgs []string, args *reqsArgs) error {
 		}
 
 		// set req name from the flag
-		args.req = cliflags.New
-		args.sets.name = optional[string]{set: true, v: cliflags.New}
+		args.req = flags.New
+		args.sets.name = optional[string]{set: true, v: flags.New}
 	case reqsEdit:
 		// use arg 1 as the req name
 		args.req = posArgs[0]
@@ -670,21 +669,21 @@ func parseReqsActionFromFlags(cmd *cobra.Command, posArgs []string) (reqsAction,
 	// * --force with --get, --get-header, and --new
 
 	// make sure user isn't invalidly using -f because cobra is not enforcing this
-	if cliflags.BForce && cliflags.Delete == "" {
+	if flags.BForce && flags.Delete == "" {
 		return reqsEdit, fmt.Errorf("--force/-f can only be used with --delete/-D")
 	}
 
-	if cliflags.Delete != "" {
+	if flags.Delete != "" {
 		if len(posArgs) > 0 {
 			return reqsAction(0), fmt.Errorf("unknown positional argument %q", posArgs[0])
 		}
 		return reqsDelete, nil
-	} else if cliflags.New != "" {
+	} else if flags.New != "" {
 		if len(posArgs) > 0 {
 			return reqsAction(0), fmt.Errorf("unknown positional argument %q", posArgs[0])
 		}
 		return reqsNew, nil
-	} else if cliflags.Get != "" || cliflags.GetHeader != "" {
+	} else if flags.Get != "" || flags.GetHeader != "" {
 		if len(posArgs) < 1 {
 			return reqsGet, fmt.Errorf("missing name of REQ to get from")
 		}
@@ -715,33 +714,33 @@ func parseReqsSetFlags(cmd *cobra.Command, attrs *reqAttrValues) error {
 	f := cmd.Flags()
 
 	if f.Changed("name") {
-		attrs.name = optional[string]{set: true, v: cliflags.Name}
+		attrs.name = optional[string]{set: true, v: flags.Name}
 	}
 
 	if f.Changed("method") {
-		attrs.method = optional[string]{set: true, v: strings.ToUpper(cliflags.Method)}
+		attrs.method = optional[string]{set: true, v: strings.ToUpper(flags.Method)}
 	}
 
 	if f.Changed("url") {
 		// DO NOT PARSE UNTIL SEND TIME; parsing could clobber var uses.
-		attrs.url = optional[string]{set: true, v: cliflags.URL}
+		attrs.url = optional[string]{set: true, v: flags.URL}
 	}
 
 	if f.Changed("data") {
-		if strings.HasPrefix(cliflags.BodyData, "@") {
+		if strings.HasPrefix(flags.BodyData, "@") {
 			// read entire file now
-			fRaw, err := os.Open(cliflags.BodyData[1:])
+			fRaw, err := os.Open(flags.BodyData[1:])
 			if err != nil {
-				return fmt.Errorf("open %q: %w", cliflags.BodyData[1:], err)
+				return fmt.Errorf("open %q: %w", flags.BodyData[1:], err)
 			}
 			defer fRaw.Close()
 			bodyData, err := io.ReadAll(fRaw)
 			if err != nil {
-				return fmt.Errorf("read %q: %w", cliflags.BodyData[1:], err)
+				return fmt.Errorf("read %q: %w", flags.BodyData[1:], err)
 			}
 			attrs.body = optional[[]byte]{set: true, v: bodyData}
 		} else {
-			attrs.body = optional[[]byte]{set: true, v: []byte(cliflags.BodyData)}
+			attrs.body = optional[[]byte]{set: true, v: []byte(flags.BodyData)}
 		}
 	}
 
@@ -751,7 +750,7 @@ func parseReqsSetFlags(cmd *cobra.Command, attrs *reqAttrValues) error {
 
 	if f.Changed("header") {
 		headers := make(http.Header)
-		for idx, h := range cliflags.Headers {
+		for idx, h := range flags.Headers {
 
 			// split the header into key and value
 			parts := strings.SplitN(h, ":", 2)
@@ -769,8 +768,8 @@ func parseReqsSetFlags(cmd *cobra.Command, attrs *reqAttrValues) error {
 	}
 
 	if f.Changed("remove-header") {
-		delHeaders := make([]string, len(cliflags.RemoveHeaders))
-		for idx, h := range cliflags.RemoveHeaders {
+		delHeaders := make([]string, len(flags.RemoveHeaders))
+		for idx, h := range flags.RemoveHeaders {
 			trimmed := strings.TrimSpace(h)
 			if strings.Contains(trimmed, " ") || strings.Contains(trimmed, ":") {
 				return fmt.Errorf("header delete #%d (%q) is not a valid header key", idx+1, h)

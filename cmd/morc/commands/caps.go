@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/dekarrin/morc"
-	"github.com/dekarrin/morc/cmd/morc/cliflags"
 	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/spf13/cobra"
 )
@@ -67,12 +66,12 @@ var capsCmd = &cobra.Command{
 }
 
 func init() {
-	capsCmd.PersistentFlags().StringVarP(&cliflags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
-	capsCmd.PersistentFlags().StringVarP(&cliflags.New, "new", "N", "", "Create a new capture on REQ that saves captured data to `VAR`. If given, the specification of the new capture must also be given with --spec/-s.")
-	capsCmd.PersistentFlags().StringVarP(&cliflags.Delete, "delete", "D", "", "Delete the given variable capture `VAR` from the request.")
-	capsCmd.PersistentFlags().StringVarP(&cliflags.Get, "get", "G", "", "Get the value of a specific attribute `ATTR` of the capture. Can only be used if giving REQ and CAP and no other arguments.")
-	capsCmd.PersistentFlags().StringVarP(&cliflags.Spec, "spec", "s", "", "Specify where in responses that data should be captured from. `SPEC` is a specially-formatted string of form :FROM,TO to specify a byte-offset or a jq-ish syntax string to specify a path to a value within a JSON response body.")
-	capsCmd.PersistentFlags().StringVarP(&cliflags.VarName, "var", "V", "", "Set the variable that the capture saves to to `VAR`.")
+	capsCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
+	capsCmd.PersistentFlags().StringVarP(&flags.New, "new", "N", "", "Create a new capture on REQ that saves captured data to `VAR`. If given, the specification of the new capture must also be given with --spec/-s.")
+	capsCmd.PersistentFlags().StringVarP(&flags.Delete, "delete", "D", "", "Delete the given variable capture `VAR` from the request.")
+	capsCmd.PersistentFlags().StringVarP(&flags.Get, "get", "G", "", "Get the value of a specific attribute `ATTR` of the capture. Can only be used if giving REQ and CAP and no other arguments.")
+	capsCmd.PersistentFlags().StringVarP(&flags.Spec, "spec", "s", "", "Specify where in responses that data should be captured from. `SPEC` is a specially-formatted string of form :FROM,TO to specify a byte-offset or a jq-ish syntax string to specify a path to a value within a JSON response body.")
+	capsCmd.PersistentFlags().StringVarP(&flags.VarName, "var", "V", "", "Set the variable that the capture saves to to `VAR`.")
 
 	// cannot delete while doing new
 	capsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get")
@@ -360,7 +359,7 @@ type capAttrValues struct {
 }
 
 func parseCapsArgs(cmd *cobra.Command, posArgs []string, args *capsArgs) error {
-	args.projFile = cliflags.ProjectFile
+	args.projFile = flags.ProjectFile
 	if args.projFile == "" {
 		return fmt.Errorf("project file cannot be set to empty string")
 	}
@@ -384,13 +383,13 @@ func parseCapsArgs(cmd *cobra.Command, posArgs []string, args *capsArgs) error {
 		args.capture = posArgs[1]
 	case capsDelete:
 		// special case of capture set from a CLI flag rather than pos arg.
-		args.capture = cliflags.Delete
+		args.capture = flags.Delete
 	case capsGet:
 		// set arg 2 as the capture name
 		args.capture = posArgs[1]
 
 		// parse the get from the string
-		args.getItem, err = parseCapAttrKey(cliflags.Get)
+		args.getItem, err = parseCapAttrKey(flags.Get)
 		if err != nil {
 			return err
 		}
@@ -403,7 +402,7 @@ func parseCapsArgs(cmd *cobra.Command, posArgs []string, args *capsArgs) error {
 		}
 
 		// still need to parse the new name, above func won't hit it
-		name, err := morc.ParseVarName(cliflags.VarName)
+		name, err := morc.ParseVarName(flags.VarName)
 		if err != nil {
 			return fmt.Errorf("--new/-N: %w", err)
 		}
@@ -437,7 +436,7 @@ func parseCapsActionFromFlags(cmd *cobra.Command, posArgs []string) (capsAction,
 	// * mut-exc enforced by cobra: --new and --var setOpt will not be set
 	// * Min args 1.
 
-	if cliflags.Delete != "" {
+	if flags.Delete != "" {
 		if len(posArgs) < 1 {
 			return capsDelete, fmt.Errorf("missing request REQ to delete capture from")
 		}
@@ -445,7 +444,7 @@ func parseCapsActionFromFlags(cmd *cobra.Command, posArgs []string) (capsAction,
 			return capsDelete, fmt.Errorf("unknown 2nd positional argument: %q", posArgs[1])
 		}
 		return capsDelete, nil
-	} else if cliflags.New != "" {
+	} else if flags.New != "" {
 		if len(posArgs) < 1 {
 			return capsNew, fmt.Errorf("missing request REQ to add new capture to")
 		}
@@ -459,7 +458,7 @@ func parseCapsActionFromFlags(cmd *cobra.Command, posArgs []string) (capsAction,
 			return capsNew, fmt.Errorf("--new/-N already gives var name; cannot be used with --var/-V")
 		}
 		return capsNew, nil
-	} else if cliflags.Get != "" {
+	} else if flags.Get != "" {
 		if len(posArgs) < 1 {
 			return capsGet, fmt.Errorf("missing request REQ and capture VAR to get attribute from")
 		}
@@ -496,7 +495,7 @@ func parseCapsActionFromFlags(cmd *cobra.Command, posArgs []string) (capsAction,
 
 func parseCapsSetFlags(cmd *cobra.Command, attrs *capAttrValues) error {
 	if cmd.Flags().Lookup("spec").Changed {
-		spec, err := morc.ParseVarScraperSpec("", cliflags.Spec)
+		spec, err := morc.ParseVarScraperSpec("", flags.Spec)
 		if err != nil {
 			return fmt.Errorf("--spec/-s: %w", err)
 		}
@@ -505,7 +504,7 @@ func parseCapsSetFlags(cmd *cobra.Command, attrs *capAttrValues) error {
 	}
 
 	if cmd.Flags().Lookup("var").Changed {
-		name, err := morc.ParseVarName(cliflags.VarName)
+		name, err := morc.ParseVarName(flags.VarName)
 		if err != nil {
 			return fmt.Errorf("--var/-V: %w", err)
 		}
@@ -516,7 +515,7 @@ func parseCapsSetFlags(cmd *cobra.Command, attrs *capAttrValues) error {
 }
 
 func capsSetFlagIsPresent() bool {
-	return cliflags.VarName != "" || cliflags.Spec != ""
+	return flags.VarName != "" || flags.Spec != ""
 }
 
 type capsAction int

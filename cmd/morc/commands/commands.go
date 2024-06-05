@@ -6,11 +6,15 @@ import (
 	"strings"
 
 	"github.com/dekarrin/morc"
-	"github.com/dekarrin/morc/cmd/morc/cliflags"
 	"github.com/dekarrin/rosed"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"golang.org/x/term"
+)
+
+var (
+	// global flags struct. kept in struct for readability, glub.
+	flags = &cliFlags{}
 )
 
 const (
@@ -160,37 +164,37 @@ Usage:
 {{with longHelp .}}{{. | trimTrailingWhitespaces}}{{end}}{{if or .Runnable .HasSubCommands}}` + usageAfterUseLineTemplate + `{{end}}`
 
 func addRequestOutputFlags(cmd *cobra.Command) {
-	cmd.PersistentFlags().BoolVarP(&cliflags.BHeaders, "headers", "", false, "(Output flag) Output the headers of the response")
-	cmd.PersistentFlags().BoolVarP(&cliflags.BCaptures, "captures", "", false, "(Output flag) Output the captures from the response")
-	cmd.PersistentFlags().BoolVarP(&cliflags.BNoBody, "no-body", "", false, "(Output flag) Suppress the output of the response body")
-	cmd.PersistentFlags().BoolVarP(&cliflags.BRequest, "request", "", false, "(Output flag) Output the filled request prior to sending it")
-	cmd.PersistentFlags().StringVarP(&cliflags.Format, "format", "f", "pretty", "(Output flag) Set output format. `FMT` must be one of 'pretty', 'line', or 'sr')")
+	cmd.PersistentFlags().BoolVarP(&flags.BHeaders, "headers", "", false, "(Output flag) Output the headers of the response")
+	cmd.PersistentFlags().BoolVarP(&flags.BCaptures, "captures", "", false, "(Output flag) Output the captures from the response")
+	cmd.PersistentFlags().BoolVarP(&flags.BNoBody, "no-body", "", false, "(Output flag) Suppress the output of the response body")
+	cmd.PersistentFlags().BoolVarP(&flags.BRequest, "request", "", false, "(Output flag) Output the filled request prior to sending it")
+	cmd.PersistentFlags().StringVarP(&flags.Format, "format", "f", "pretty", "(Output flag) Set output format. `FMT` must be one of 'pretty', 'line', or 'sr')")
 }
 
 func gatherRequestOutputFlags() (morc.OutputControl, error) {
 	oc := morc.OutputControl{}
 
 	// check format
-	switch strings.ToLower(cliflags.Format) {
+	switch strings.ToLower(flags.Format) {
 	case "pretty":
 		oc.Format = morc.FormatPretty
 	case "sr":
 		oc.Format = morc.FormatLine
 
 		// check if user is trying to turn on things that aren't allowed
-		if cliflags.BRequest || cliflags.BHeaders || cliflags.BNoBody || cliflags.BCaptures {
+		if flags.BRequest || flags.BHeaders || flags.BNoBody || flags.BCaptures {
 			return oc, fmt.Errorf("format 'sr' only allows status line and response body; use format 'line' for control over output")
 		}
 	case "line":
 		oc.Format = morc.FormatLine
 	default:
-		return oc, fmt.Errorf("invalid format %q; must be one of pretty, line, or sr", cliflags.Format)
+		return oc, fmt.Errorf("invalid format %q; must be one of pretty, line, or sr", flags.Format)
 	}
 
-	oc.Request = cliflags.BRequest
-	oc.Headers = cliflags.BHeaders
-	oc.Captures = cliflags.BCaptures
-	oc.SuppressResponseBody = cliflags.BNoBody
+	oc.Request = flags.BRequest
+	oc.Headers = flags.BHeaders
+	oc.Captures = flags.BCaptures
+	oc.SuppressResponseBody = flags.BNoBody
 
 	return oc, nil
 }
@@ -241,3 +245,186 @@ func parseOnOff(s string) (bool, error) {
 // 	io       cmdio.IO
 // 	projFile string
 // }
+
+type cliFlags struct {
+
+	// ProjectFile is the flag that specifies the project file to use while
+	// calling `morc req` or subcommands.
+	ProjectFile string
+
+	// New takes as argument the name of the resource being created.
+	New string
+
+	// Delete requests the deletion of a resource. It takes as argument the name
+	// of the resource being deleted.
+	Delete string
+
+	// Get requests an attribute of a resource. It takes the attribute as an
+	// argument.
+	Get string
+
+	// GetHeader requests the value(s) of the header of a resource. It takes the
+	// name of the header as an argument.
+	GetHeader string
+
+	// Env specifies environment to apply to.
+	Env string
+
+	// Vars is variables, in NAME=VALUE format. Can be specified more than once.
+	Vars []string
+
+	// RemoveHeaders is a list of headers to be removed.
+	RemoveHeaders []string
+
+	// Name is the name of the resource in question.
+	Name string
+
+	// VarName is identical to Name but is named differently for readability.
+	VarName string
+
+	// BodyData is the bytes of the body of a request. This is either the bytes
+	// of the body directly or a filename prepended with an '@' character.
+	BodyData string
+
+	// Headers is a list of headers to be added to the request.
+	Headers []string
+
+	// Method is the HTTP method to use for the request.
+	Method string
+
+	// URL is the URL to send the request to.
+	URL string
+
+	// HistoryFile is the path to a history file. It may contain the special
+	// string "::PROJ_DIR::"; if so, it will be interpreted as the current
+	// directory of the project file at runtime.
+	HistoryFile string
+
+	// SessionFile is the path to a history file. It may contain the special
+	// string "::PROJ_DIR::"; if so, it will be interpreted as the current
+	// directory of the project file at runtime.
+	SessionFile string
+
+	// CookieLifetime is a duration string that specifies the maximum lifetime
+	// of recorded Set-Cookie instructions.
+	CookieLifetime string
+
+	// RecordHistory is a toggle-string flag that indicates whether history
+	// recording should be "ON" or "OFF".
+	RecordHistory string
+
+	// RecordCookies  is a toggle-string flag that indicates whether cookie
+	// recording should be "ON" or "OFF".
+	RecordCookies string
+
+	// WriteStateFile is a flag used in one-off commands that gives the path to
+	// a state file to write out cookies and variables to.
+	WriteStateFile string
+
+	// ReadStateFile is a flag used in one-off commands that gives the path to a
+	// state file to read cookies and variables from.
+	ReadStateFile string
+
+	// CaptureVars is a flag used in one-off commands that specifies a variable
+	// to capture from the response. It can be specified multiple times.
+	CaptureVars []string
+
+	// Spec is a flag that gives the specification for a variable capture.
+	Spec string
+
+	// StepRemovals is a flag indicating that the given step index is to be
+	// removed. It can be specified multiple times.
+	StepRemovals []int
+
+	// StepAdds is a flag indicating that the given request is to be added. It
+	// is in format [IDX]:REQ. It can be specified multiple times.
+	StepAdds []string
+
+	// StepMoves is a flag indicating that the given step is to be moved to the
+	// given index. It is in format FROM:[TO]. It can be specified multiple
+	// times.
+	StepMoves []string
+
+	// StepReplaces is a flag indicating that the request called at the given
+	// step is to be updated to the given request. It is in format IDX:REQ.
+	// It can be specified multiple times.
+	StepReplaces []string
+
+	// Format is a request output control flag that gives the format of the
+	// output.
+	Format string
+
+	// BRequest is a request output control switch flag that indicates that the
+	// request should be printed in addition to any other output.
+	BRequest bool
+
+	// BCaptures is a request output control switch flag that indicates that the
+	// captures retrieved from a response should be printed in addition to any
+	// other output.
+	BCaptures bool
+
+	// BHeaders is a request output control switch flag that indicates that the
+	// headers of the response should be printed in addition to any other
+	// output.
+	BHeaders bool
+
+	// BNoBody is a request output control switch flag that indicates that the
+	// body of the response should not be printed.
+	BNoBody bool
+
+	// BNoDates is a historical request output control switch flag that
+	// indicates that dates of historical events should not be printed when they
+	// otherwise would.
+	BNoDates bool
+
+	// BInfo is a switch flag that indicates that the requested operation is
+	// retrieval of a summary of the resource.
+	BInfo bool
+
+	// BEnable is a switch flag that indicates that the requested operation is
+	// to enable a feature.
+	BEnable bool
+
+	// BDisable is a switch flag that indicates that the requested operation is
+	// to disable a feature.
+	BDisable bool
+
+	// BClear is a switch flag that indicates that the requested operation is to
+	// erase all instances of the applicable type of resource.
+	BClear bool
+
+	// BRemoveBody is a switch flag that when set, indicates that the body of
+	// the resource is to be removed.
+	BRemoveBody bool
+
+	// BForce is a switch flag that indicates that the requested operation
+	// should proceed even if it is destructive or leads to a non-pristine
+	// state.
+	BForce bool
+
+	// BDefault is a switch flag that, when set, indicates that the requested
+	// operation should be applied to the default environment.
+	BDefault bool
+
+	// BNew is a switch flag that, when set, indicates that a new resource is
+	// being created. Resource creations should generally use [New] instead,
+	// but this flag is used when the resource is not required to have a name.
+	BNew bool
+
+	// BDeleteAll is a switch flag that, when set, indicates that all applicable
+	// resources of the given type should be deleted.
+	BDeleteAll bool
+
+	// BCurrent is a switch flag that, when set, indicates that the requested
+	// operation should be applied to the current environment explicitly.
+	BCurrent bool
+
+	// BAll is a switch flag that, when set, indicates that the requested
+	// operation should be done with all instances of the applicable resource.
+	BAll bool
+
+	// BInsecure is a switch flag that, when set, disables TLS certificate
+	// verification, allowing requests to go through even if the server's
+	// certificate is invalid.
+	BInsecure bool
+}

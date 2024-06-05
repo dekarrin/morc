@@ -84,6 +84,9 @@ var (
 	// to capture from the response. It can be specified multiple times.
 	CaptureVars []string
 
+	// Spec is a flag that gives the specification for a variable capture.
+	Spec string
+
 	// BNoDates is an output control switch flag that indicates that dates of
 	// historical events should not be printed when they otherwise would.
 	BNoDates bool

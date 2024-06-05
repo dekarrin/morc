@@ -1,3 +1,16 @@
+v0.3.1 - June 5, 2024
+---------------------
+* All `--project_file` flags have been updated to `--project-file`.
+* Fixed bug where `morc cookies` did not respect `--project-file`/`-F`.
+* Fixed bug where `morc hist` did not respect `--project-file`/`-F`.
+* Fixed bug where `morc caps` ignored the value of `--get`/`-G`.
+* Fixed bug where `morc hist ENTRY` printed dates when `--no-dates` was set.
+* Removed `morc oneoff` and friends' `--var-symbol` flag. It was being
+inconsistently applied and could not be used in project-oriented use. It will be
+restored in a future release where it will be added to all commands that
+interpret templates.
+
+
 v0.3.0 - June 4, 2024
 ---------------------
 * Added new `--insecure`/`-k` flag to disable TLS certificate validation on

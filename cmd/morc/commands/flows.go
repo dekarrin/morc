@@ -170,12 +170,12 @@ func invokeFlowsEdit(io cmdio.IO, projFile, flowName string, attrs flowAttrValue
 		newVal := strings.ToLower(upsert.template)
 
 		var err error
-		idx, err = flowStepIndexFromOrdinal(flow.Steps, idx, false)
+		idx, err = sliceops.RealIndex(flow.Steps, idx, false)
 		if err != nil {
 			return fmt.Errorf("cannot set value of step #%d: %w", idx+1, err)
 		}
 
-		// no need for bounds check, already done in flowStepIndexFromOrdinal
+		// no need for bounds check, already done in RealIndex
 		oldVal := strings.ToLower(flow.Steps[idx].Template)
 		modKey := flowKey{stepIndex: idx, uniqueInt: stepOpCount}
 		stepOpCount++
@@ -190,7 +190,7 @@ func invokeFlowsEdit(io cmdio.IO, projFile, flowName string, attrs flowAttrValue
 	}
 
 	for _, delIdx := range attrs.stepRemovals {
-		actualIdx, err := flowStepIndexFromOrdinal(flow.Steps, delIdx, false)
+		actualIdx, err := sliceops.RealIndex(flow.Steps, delIdx, false)
 		if err != nil {
 			return fmt.Errorf("cannot remove step #%d: %w", actualIdx, err)
 		}
@@ -215,7 +215,7 @@ func invokeFlowsEdit(io cmdio.IO, projFile, flowName string, attrs flowAttrValue
 		// one-past end
 
 		updatedSteps := make([]morc.FlowStep, len(flow.Steps)+1)
-		actualIdx, err := flowStepIndexFromOrdinal(updatedSteps, add.index, true)
+		actualIdx, err := sliceops.RealIndex(updatedSteps, add.index, true)
 		if err != nil {
 			return fmt.Errorf("cannot add step at #%d: %w", actualIdx, err)
 		}
@@ -245,11 +245,11 @@ func invokeFlowsEdit(io cmdio.IO, projFile, flowName string, attrs flowAttrValue
 	}
 
 	for _, move := range attrs.stepMoves {
-		actualFrom, err := flowStepIndexFromOrdinal(flow.Steps, move.from, false)
+		actualFrom, err := sliceops.RealIndex(flow.Steps, move.from, false)
 		if err != nil {
 			return fmt.Errorf("cannot move step #%d: step %w", actualFrom, err)
 		}
-		actualTo, err := flowStepIndexFromOrdinal(flow.Steps, move.to, true)
+		actualTo, err := sliceops.RealIndex(flow.Steps, move.to, true)
 		if err != nil {
 			return fmt.Errorf("cannot move step #%d to #%d: destination %w", actualFrom+1, actualTo, err)
 		}
@@ -302,7 +302,7 @@ func invokeFlowsGet(io cmdio.IO, projFile, flowName string, getItem flowKey) err
 		io.Printf("%s\n", flow.Name)
 	default:
 		idx := getItem.stepIndex
-		idx, err = flowStepIndexFromOrdinal(flow.Steps, idx, false)
+		idx, err = sliceops.RealIndex(flow.Steps, idx, false)
 		if err != nil {
 			return fmt.Errorf("cannot get step #%d: %w", getItem.stepIndex, err)
 		}
@@ -771,24 +771,4 @@ func parseFlowAttrKey(s string) (flowKey, error) {
 	default:
 		return flowKey{}, fmt.Errorf("must be a step index or one of: %s", strings.Join(flowAttrKeyNames(), ", "))
 	}
-}
-
-func flowStepIndexFromOrdinal(steps []morc.FlowStep, idx int, autoClampMax bool) (int, error) {
-	// TODO: replace all uses of this func w the below func
-	return sliceops.RealIndex(steps, idx, autoClampMax)
-	// basically, we will decrement (unless the sigil value -1) and then feed to
-	// sliceops func that will translate -1's. If the index cannot be translated
-	// to a valid index, we will return an error.
-
-	// TODO: horribly messy to refer to steps by number but actually store them by index. this tool is for engineers; we know it's 0-based.
-
-	// if idx == 0 {
-	// 	// never valid; no 0th value for ordinals
-	// 	return 0, fmt.Errorf("does not exist")
-	// }
-
-	// if idx != -1 {
-	// 	return sliceops.RealIndex(steps, idx-1, autoClampMax)
-	// }
-	// return sliceops.RealIndex(steps, idx, autoClampMax)
 }

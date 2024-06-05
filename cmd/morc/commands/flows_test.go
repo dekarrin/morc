@@ -548,10 +548,10 @@ func resetFlowsFlags() {
 	cliflags.Delete = ""
 	cliflags.Get = ""
 	cliflags.Name = ""
-	flagFlowStepRemovals = nil
-	flagFlowStepAdds = nil
-	flagFlowStepMoves = nil
-	flagFlowStepReplaces = nil
+	cliflags.StepRemovals = nil
+	cliflags.StepAdds = nil
+	cliflags.StepMoves = nil
+	cliflags.StepReplaces = nil
 
 	flowsCmd.Flags().VisitAll(func(fl *pflag.Flag) {
 		fl.Changed = false

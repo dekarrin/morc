@@ -87,6 +87,24 @@ var (
 	// Spec is a flag that gives the specification for a variable capture.
 	Spec string
 
+	// StepRemovals is a flag indicating that the given step index is to be
+	// removed. It can be specified multiple times.
+	StepRemovals []int
+
+	// StepAdds is a flag indicating that the given request is to be added. It
+	// is in format [IDX]:REQ. It can be specified multiple times.
+	StepAdds []string
+
+	// StepMoves is a flag indicating that the given step is to be moved to the
+	// given index. It is in format FROM:[TO]. It can be specified multiple
+	// times.
+	StepMoves []string
+
+	// StepReplaces is a flag indicating that the request called at the given
+	// step is to be updated to the given request. It is in format IDX:REQ.
+	// It can be specified multiple times.
+	StepReplaces []string
+
 	// BNoDates is an output control switch flag that indicates that dates of
 	// historical events should not be printed when they otherwise would.
 	BNoDates bool

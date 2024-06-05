@@ -150,11 +150,11 @@ func resetProjFlags() {
 	cliflags.BNew = false
 	cliflags.Get = ""
 	cliflags.Name = ""
-	flagProjCookieLifetime = ""
-	flagProjSessionFile = ""
-	flagProjHistoryFile = ""
-	flagProjRecordCookies = ""
-	flagProjRecordHistory = ""
+	cliflags.CookieLifetime = ""
+	cliflags.SessionFile = ""
+	cliflags.HistoryFile = ""
+	cliflags.RecordCookies = ""
+	cliflags.RecordHistory = ""
 
 	projCmd.Flags().VisitAll(func(fl *pflag.Flag) {
 		fl.Changed = false

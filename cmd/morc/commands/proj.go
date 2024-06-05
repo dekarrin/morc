@@ -12,14 +12,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	flagProjHistoryFile    string
-	flagProjSessionFile    string
-	flagProjCookieLifetime string
-	flagProjRecordCookies  string
-	flagProjRecordHistory  string
-)
-
 var projCmd = &cobra.Command{
 	Use: "proj",
 	Annotations: map[string]string{
@@ -62,11 +54,11 @@ func init() {
 	projCmd.PersistentFlags().BoolVarP(&cliflags.BNew, "new", "N", false, "Create a new project instead of reading/editing one. Combine with other arguments to specify values for the new project.")
 	projCmd.PersistentFlags().StringVarP(&cliflags.Get, "get", "G", "", "Get the value of a specific attribute of the project. `ATTR` is the name of an attribute to retrieve and must be one of the following: "+strings.Join(projAttrKeyNames(), ", "))
 	projCmd.PersistentFlags().StringVarP(&cliflags.Name, "name", "n", "", "Set the name of the project to `NAME`")
-	projCmd.PersistentFlags().StringVarP(&flagProjHistoryFile, "history-file", "H", "", "Set the history file to `FILE`. If the special string '"+morc.ProjDirVar+"' is in the path, it is replaced with the directory containing the project file whenever morc is executed, allowing the history file path to still function even if the containing directory is moved.")
-	projCmd.PersistentFlags().StringVarP(&flagProjSessionFile, "cookies-file", "C", "", "Set the session (cookies) storage file to `FILE`. If the special string '"+morc.ProjDirVar+"' is in the path, it is replaced with the directory containing the project file whenever morc is executed, allowing the session file path to still function even if the containing directory is moved.")
-	projCmd.PersistentFlags().StringVarP(&flagProjCookieLifetime, "cookie-lifetime", "L", "", "Set the lifetime of recorded cookies to `DUR`. DUR must be a duration string such as 8m2s or similar. If set to 0 or less, it will be interpreted as '24h'. Altering this on an existing project will immediately apply an eviction check to all current cookies; this may result in some being purged.")
-	projCmd.PersistentFlags().StringVarP(&flagProjRecordCookies, "cookies", "c", "", "Set whether cookie recording is enabled. `ON|OFF` must be one of 'ON' or 'OFF'. Setting this is equivalent to calling 'morc cookies --on' or 'morc cookies --off'")
-	projCmd.PersistentFlags().StringVarP(&flagProjRecordHistory, "history", "R", "", "Set whether history recording is enabled. `ON|OFF` must be one of 'ON' or 'OFF'. Setting this is equivalent to calling 'morc history --on' or 'morc history --off'")
+	projCmd.PersistentFlags().StringVarP(&cliflags.HistoryFile, "history-file", "H", "", "Set the history file to `FILE`. If the special string '"+morc.ProjDirVar+"' is in the path, it is replaced with the directory containing the project file whenever morc is executed, allowing the history file path to still function even if the containing directory is moved.")
+	projCmd.PersistentFlags().StringVarP(&cliflags.SessionFile, "cookies-file", "C", "", "Set the session (cookies) storage file to `FILE`. If the special string '"+morc.ProjDirVar+"' is in the path, it is replaced with the directory containing the project file whenever morc is executed, allowing the session file path to still function even if the containing directory is moved.")
+	projCmd.PersistentFlags().StringVarP(&cliflags.CookieLifetime, "cookie-lifetime", "L", "", "Set the lifetime of recorded cookies to `DUR`. DUR must be a duration string such as 8m2s or similar. If set to 0 or less, it will be interpreted as '24h'. Altering this on an existing project will immediately apply an eviction check to all current cookies; this may result in some being purged.")
+	projCmd.PersistentFlags().StringVarP(&cliflags.RecordCookies, "cookies", "c", "", "Set whether cookie recording is enabled. `ON|OFF` must be one of 'ON' or 'OFF'. Setting this is equivalent to calling 'morc cookies --on' or 'morc cookies --off'")
+	projCmd.PersistentFlags().StringVarP(&cliflags.RecordHistory, "history", "R", "", "Set whether history recording is enabled. `ON|OFF` must be one of 'ON' or 'OFF'. Setting this is equivalent to calling 'morc history --on' or 'morc history --off'")
 
 	projCmd.MarkFlagsMutuallyExclusive("new", "get")
 	projCmd.MarkFlagsMutuallyExclusive("cookies", "get")
@@ -443,15 +435,15 @@ func parseProjSetFlags(cmd *cobra.Command, attrs *projAttrValues) error {
 	}
 
 	if cmd.Flags().Lookup("history-file").Changed {
-		attrs.histFile = optionalC[string]{set: true, v: flagProjHistoryFile}
+		attrs.histFile = optionalC[string]{set: true, v: cliflags.HistoryFile}
 	}
 
 	if cmd.Flags().Lookup("cookies-file").Changed {
-		attrs.seshFile = optionalC[string]{set: true, v: flagProjSessionFile}
+		attrs.seshFile = optionalC[string]{set: true, v: cliflags.SessionFile}
 	}
 
 	if cmd.Flags().Lookup("cookie-lifetime").Changed {
-		cl, err := time.ParseDuration(flagProjCookieLifetime)
+		cl, err := time.ParseDuration(cliflags.CookieLifetime)
 		if err != nil {
 			return fmt.Errorf("cookie-lifetime: %w", err)
 		}
@@ -459,7 +451,7 @@ func parseProjSetFlags(cmd *cobra.Command, attrs *projAttrValues) error {
 	}
 
 	if cmd.Flags().Lookup("cookies").Changed {
-		isOn, err := parseOnOff(flagProjRecordCookies)
+		isOn, err := parseOnOff(cliflags.RecordCookies)
 		if err != nil {
 			return fmt.Errorf("cookies: %w", err)
 		}
@@ -467,7 +459,7 @@ func parseProjSetFlags(cmd *cobra.Command, attrs *projAttrValues) error {
 	}
 
 	if cmd.Flags().Lookup("history").Changed {
-		isOn, err := parseOnOff(flagProjRecordHistory)
+		isOn, err := parseOnOff(cliflags.RecordHistory)
 		if err != nil {
 			return fmt.Errorf("history: %w", err)
 		}
@@ -478,7 +470,7 @@ func parseProjSetFlags(cmd *cobra.Command, attrs *projAttrValues) error {
 }
 
 func projSetFlagIsPresent() bool {
-	return cliflags.Name != "" || flagProjHistoryFile != "" || flagProjSessionFile != "" || flagProjCookieLifetime != "" || flagProjRecordCookies != "" || flagProjRecordHistory != ""
+	return cliflags.Name != "" || cliflags.HistoryFile != "" || cliflags.SessionFile != "" || cliflags.CookieLifetime != "" || cliflags.RecordCookies != "" || cliflags.RecordHistory != ""
 }
 
 type projAction int

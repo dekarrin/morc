@@ -50,6 +50,28 @@ var (
 	// URL is the URL to send the request to.
 	URL string
 
+	// HistoryFile is the path to a history file. It may contain the special
+	// string "::PROJ_DIR::"; if so, it will be interpreted as the current
+	// directory of the project file at runtime.
+	HistoryFile string
+
+	// SessionFile is the path to a history file. It may contain the special
+	// string "::PROJ_DIR::"; if so, it will be interpreted as the current
+	// directory of the project file at runtime.
+	SessionFile string
+
+	// CookieLifetime is a duration string that specifies the maximum lifetime
+	// of recorded Set-Cookie instructions.
+	CookieLifetime string
+
+	// RecordHistory is a toggle-string flag that indicates whether history
+	// recording should be "ON" or "OFF".
+	RecordHistory string
+
+	// RecordCookies  is a toggle-string flag that indicates whether cookie
+	// recording should be "ON" or "OFF".
+	RecordCookies string
+
 	// BRemoveBody is a switch flag that when set, indicates that the body of
 	// the resource is to be removed.
 	BRemoveBody bool

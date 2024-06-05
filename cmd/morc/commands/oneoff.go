@@ -13,16 +13,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	flagVarSymbol string
-)
-
 func addRequestFlags(id string, cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVarP(&cliflags.WriteStateFile, "write-state", "b", "", "Write collected cookies and captured vars to statefile `FILE`.")
 	cmd.PersistentFlags().StringVarP(&cliflags.ReadStateFile, "read-state", "c", "", "Read and use the cookies and vars saved in statefile `FILE`.")
 	cmd.PersistentFlags().StringArrayVarP(&cliflags.Headers, "header", "H", []string{}, "Add a header to the request. Argument is in form `KEY:VALUE` (spaces after the colon are allowed). May be set multiple times.")
 	cmd.PersistentFlags().StringVarP(&cliflags.BodyData, "data", "d", "", "Add the given `DATA` as a body to the request; prefix with '@' to instead interperet DATA as a filename that body data is to be read from.")
-	cmd.PersistentFlags().StringVarP(&flagVarSymbol, "var-symbol", "", "$", "Set the leading variable symbol used to indicate the start of a variable in the request to `SYM`.")
+	//cmd.PersistentFlags().StringVarP(&flagVarSymbol, "var-symbol", "", "$", "Set the leading variable symbol used to indicate the start of a variable in the request to `SYM`.")
 	cmd.PersistentFlags().StringArrayVarP(&cliflags.CaptureVars, "capture-var", "C", []string{}, "Get a variable's value from the response. Argument is in format `VAR:SPEC`. The SPEC part has format ':START,END' for byte offset (note the leading colon, resulting in 'VAR::START,END'), or 'path[0].to.value' (jq-ish syntax) for JSON body data.")
 	cmd.PersistentFlags().StringArrayVarP(&cliflags.Vars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Format is `VAR=VALUE`.")
 	cmd.PersistentFlags().BoolVarP(&cliflags.BInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
@@ -65,7 +61,7 @@ var oneoffCmd = &cobra.Command{
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
 
-		return invokeRequest(io, args[0], args[1], flagVarSymbol, opts)
+		return invokeOneoff(io, args[0], args[1], opts)
 	},
 }
 
@@ -104,7 +100,7 @@ func addQuickMethodCommand(method string) {
 			cmd.SilenceUsage = true
 			io := cmdio.From(cmd)
 
-			return invokeRequest(io, upperMeth, args[0], flagVarSymbol, opts)
+			return invokeOneoff(io, upperMeth, args[0], opts)
 		},
 	}
 
@@ -117,10 +113,6 @@ func oneoffFlagsToOptions(cmdID string) (oneoffOptions, error) {
 		stateFileIn:  cliflags.ReadStateFile,
 		stateFileOut: cliflags.WriteStateFile,
 		skipVerify:   cliflags.BInsecure,
-	}
-
-	if flagVarSymbol == "" {
-		return opts, fmt.Errorf("variable symbol cannot be empty")
 	}
 
 	var err error
@@ -197,8 +189,8 @@ func oneoffFlagsToOptions(cmdID string) (oneoffOptions, error) {
 	return opts, nil
 }
 
-// invokeRequest receives named vars and checked/defaulted requestOptions.
-func invokeRequest(io cmdio.IO, method, url, varSymbol string, opts oneoffOptions) error {
+// invokeOneoff receives named vars and checked/defaulted requestOptions.
+func invokeOneoff(io cmdio.IO, method, url string, opts oneoffOptions) error {
 	opts.outputCtrl.Writer = io.Out
 
 	sendOpts := morc.SendOptions{
@@ -215,6 +207,6 @@ func invokeRequest(io cmdio.IO, method, url, varSymbol string, opts oneoffOption
 	// inject the http client, in case we are to use a specific one
 	sendOpts.Client = cmdio.HTTPClient
 
-	_, err := morc.Send(method, url, varSymbol, sendOpts)
+	_, err := morc.Send(method, url, "$", sendOpts)
 	return err
 }

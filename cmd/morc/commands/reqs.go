@@ -624,7 +624,7 @@ func parseReqsArgs(cmd *cobra.Command, posArgs []string, args *reqsArgs) error {
 		// use arg 1 as the req name
 		args.req = posArgs[0]
 
-		// user is either doing this via flagReqsGet or flagReqsGetHeader;
+		// user is either doing this via --get or --get-header;
 		// parsing is different based on which one.
 		if cliflags.Get != "" {
 			args.getItem, err = parseReqAttrKey(cliflags.Get)

@@ -12,22 +12,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	flagCookiesProjectFile string
-	flagCookiesInfo        bool
-	flagCookiesClear       bool
-	flagCookiesEnable      bool
-	flagCookiesDisable     bool
-	flagCookiesURL         string
-)
-
 func init() {
-	cookiesCmd.PersistentFlags().StringVarP(&flagCookiesProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
-	cookiesCmd.PersistentFlags().BoolVarP(&flagCookiesInfo, "info", "", false, "Print summarizing information about stored cookies")
-	cookiesCmd.PersistentFlags().BoolVarP(&flagCookiesClear, "clear", "", false, "Delete all cookies")
-	cookiesCmd.PersistentFlags().BoolVarP(&flagCookiesEnable, "on", "", false, "Enable cookie recording for future requests")
-	cookiesCmd.PersistentFlags().BoolVarP(&flagCookiesDisable, "off", "", false, "Disable cookie recording for future requests")
-	cookiesCmd.PersistentFlags().StringVarP(&flagCookiesURL, "url", "u", "", "Get cookies that would only be set on the given URL")
+	cookiesCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
+	cookiesCmd.PersistentFlags().BoolVarP(&flags.BInfo, "info", "", false, "Print summarizing information about stored cookies")
+	cookiesCmd.PersistentFlags().BoolVarP(&flags.BClear, "clear", "", false, "Delete all cookies")
+	cookiesCmd.PersistentFlags().BoolVarP(&flags.BEnable, "on", "", false, "Enable cookie recording for future requests")
+	cookiesCmd.PersistentFlags().BoolVarP(&flags.BDisable, "off", "", false, "Disable cookie recording for future requests")
+	cookiesCmd.PersistentFlags().StringVarP(&flags.URL, "url", "u", "", "Get cookies that would only be set on the given URL")
 
 	// mark the delete and default flags as mutually exclusive
 	cookiesCmd.MarkFlagsMutuallyExclusive("on", "off", "clear", "info", "url")
@@ -56,32 +47,32 @@ var cookiesCmd = &cobra.Command{
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := cookiesOptions{
-			projFile: flagEnvProjectFile,
+			projFile: flags.ProjectFile,
 		}
 		if opts.projFile == "" {
 			return fmt.Errorf("project file is set to empty string")
 		}
 
 		// parse the URL if given
-		if flagCookiesURL != "" {
-			lowerURL := strings.ToLower(flagCookiesURL)
+		if flags.URL != "" {
+			lowerURL := strings.ToLower(flags.URL)
 			if !strings.HasPrefix(lowerURL, "http://") && !strings.HasPrefix(lowerURL, "https://") {
-				flagCookiesURL = "http://" + flagCookiesURL
+				flags.URL = "http://" + flags.URL
 			}
-			u, err := url.Parse(flagCookiesURL)
+			u, err := url.Parse(flags.URL)
 			if err != nil {
 				return fmt.Errorf("invalid URL: %w", err)
 			}
 			opts.url = u
 		}
 
-		if flagCookiesInfo {
+		if flags.BInfo {
 			opts.action = cookiesInfo
-		} else if flagCookiesClear {
+		} else if flags.BClear {
 			opts.action = cookiesClear
-		} else if flagCookiesEnable {
+		} else if flags.BEnable {
 			opts.action = cookiesEnable
-		} else if flagCookiesDisable {
+		} else if flags.BDisable {
 			opts.action = cookiesDisable
 		} else {
 			opts.action = cookiesList

@@ -10,11 +10,11 @@ import (
 )
 
 func init() {
-	execCmd.PersistentFlags().StringVarP(&flagProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
-	execCmd.PersistentFlags().StringArrayVarP(&flagVars, "var", "V", []string{}, "Temporarily set a variable's value at the start of the flow. The argument to this flag must be in `VAR=VALUE` format.")
-	execCmd.PersistentFlags().BoolVarP(&flagSendInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
+	execCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
+	execCmd.PersistentFlags().StringArrayVarP(&flags.Vars, "var", "V", []string{}, "Temporarily set a variable's value at the start of the flow. The argument to this flag must be in `VAR=VALUE` format.")
+	execCmd.PersistentFlags().BoolVarP(&flags.BInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
 
-	setupRequestOutputFlags("morc exec", execCmd)
+	addRequestOutputFlags(execCmd)
 
 	rootCmd.AddCommand(execCmd)
 }
@@ -52,24 +52,24 @@ var execCmd = &cobra.Command{
 
 func execFlagsToOptions() (execOptions, error) {
 	opts := execOptions{
-		skipVerify: flagSendInsecure,
+		skipVerify: flags.BInsecure,
 	}
 
-	opts.projFile = flagProjectFile
+	opts.projFile = flags.ProjectFile
 	if opts.projFile == "" {
 		return opts, fmt.Errorf("project file is set to empty string")
 	}
 
 	var err error
-	opts.outputCtrl, err = gatherRequestOutputFlags("morc exec")
+	opts.outputCtrl, err = gatherRequestOutputFlags()
 	if err != nil {
 		return opts, err
 	}
 
 	// check vars
-	if len(flagVars) > 0 {
+	if len(flags.Vars) > 0 {
 		oneTimeVars := make(map[string]string)
-		for idx, v := range flagVars {
+		for idx, v := range flags.Vars {
 			parts := strings.SplitN(v, ":", 2)
 			if len(parts) != 2 {
 				return opts, fmt.Errorf("var #%d (%q) is not in format key:value", idx+1, v)

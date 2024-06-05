@@ -8,20 +8,8 @@ import (
 
 	"github.com/dekarrin/morc"
 	"github.com/dekarrin/morc/cmd/morc/cmdio"
-	"github.com/dekarrin/morc/cmd/morc/commonflags"
 	"github.com/dekarrin/morc/internal/sliceops"
 	"github.com/spf13/cobra"
-)
-
-var (
-	flagFlowNew          string
-	flagFlowDelete       string
-	flagFlowGet          string
-	flagFlowName         string
-	flagFlowStepRemovals []int
-	flagFlowStepAdds     []string
-	flagFlowStepMoves    []string
-	flagFlowStepReplaces []string
 )
 
 var flowsCmd = &cobra.Command{
@@ -83,15 +71,15 @@ var flowsCmd = &cobra.Command{
 }
 
 func init() {
-	flowsCmd.PersistentFlags().StringVarP(&commonflags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
-	flowsCmd.PersistentFlags().StringVarP(&flagFlowDelete, "delete", "D", "", "Delete the flow with the name `FLOW`.")
-	flowsCmd.PersistentFlags().StringVarP(&flagFlowNew, "new", "N", "", "Create a new flow with the name `FLOW`. When given, positional arguments are interpreted as ordered names of requests that make up the new flow's steps. At least two requests must be present.")
-	flowsCmd.PersistentFlags().StringVarP(&flagFlowGet, "get", "G", "", "Get the value of an attribute of the flow. `ATTR` can either be 'name', to get the flow name, or the index of a specific step in the flow.")
-	flowsCmd.PersistentFlags().IntSliceVarP(&flagFlowStepRemovals, "remove", "r", nil, "Remove the step at index `IDX` from the flow. Can be given multiple times; if so, will be applied from highest to lowest index. Will be applied after all step updates from --update are applied.")
-	flowsCmd.PersistentFlags().StringArrayVarP(&flagFlowStepAdds, "add", "a", nil, "Add a new step calling request REQ at index IDX, or at the end of current steps if index is omitted. Argument must be a string in form `[IDX]:REQ`. Can be given multiple times; if so, will be applied from lowest to highest index after all updates and removals are applied.")
-	flowsCmd.PersistentFlags().StringArrayVarP(&flagFlowStepMoves, "move", "m", nil, "Move the step at index FROM to index TO. Argument must be a string in form `FROM:[TO]`. Can be given multiple times; if so, will be applied in order given after all replacements, removals, and adds are applied. If TO is not given, the step is moved to the end of the flow.")
-	flowsCmd.PersistentFlags().StringArrayVarP(&flagFlowStepReplaces, "update", "u", nil, "Update the template called in step IDX to REQ. Argument must be a string in form `IDX:REQ`. Can be given multiple times; if so, will be applied in order given before any other step modifications.")
-	flowsCmd.PersistentFlags().StringVarP(&flagFlowName, "name", "n", "", "Change the name of the flow to `NAME`.")
+	flowsCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
+	flowsCmd.PersistentFlags().StringVarP(&flags.Delete, "delete", "D", "", "Delete the flow with the name `FLOW`.")
+	flowsCmd.PersistentFlags().StringVarP(&flags.New, "new", "N", "", "Create a new flow with the name `FLOW`. When given, positional arguments are interpreted as ordered names of requests that make up the new flow's steps. At least two requests must be present.")
+	flowsCmd.PersistentFlags().StringVarP(&flags.Get, "get", "G", "", "Get the value of an attribute of the flow. `ATTR` can either be 'name', to get the flow name, or the index of a specific step in the flow.")
+	flowsCmd.PersistentFlags().IntSliceVarP(&flags.StepRemovals, "remove", "r", nil, "Remove the step at index `IDX` from the flow. Can be given multiple times; if so, will be applied from highest to lowest index. Will be applied after all step updates from --update are applied.")
+	flowsCmd.PersistentFlags().StringArrayVarP(&flags.StepAdds, "add", "a", nil, "Add a new step calling request REQ at index IDX, or at the end of current steps if index is omitted. Argument must be a string in form `[IDX]:REQ`. Can be given multiple times; if so, will be applied from lowest to highest index after all updates and removals are applied.")
+	flowsCmd.PersistentFlags().StringArrayVarP(&flags.StepMoves, "move", "m", nil, "Move the step at index FROM to index TO. Argument must be a string in form `FROM:[TO]`. Can be given multiple times; if so, will be applied in order given after all replacements, removals, and adds are applied. If TO is not given, the step is moved to the end of the flow.")
+	flowsCmd.PersistentFlags().StringArrayVarP(&flags.StepReplaces, "update", "u", nil, "Update the template called in step IDX to REQ. Argument must be a string in form `IDX:REQ`. Can be given multiple times; if so, will be applied in order given before any other step modifications.")
+	flowsCmd.PersistentFlags().StringVarP(&flags.Name, "name", "n", "", "Change the name of the flow to `NAME`.")
 
 	flowsCmd.MarkFlagsMutuallyExclusive("delete", "new", "get", "remove")
 	flowsCmd.MarkFlagsMutuallyExclusive("delete", "new", "get", "add")
@@ -174,12 +162,12 @@ func invokeFlowsEdit(io cmdio.IO, projFile, flowName string, attrs flowAttrValue
 		newVal := strings.ToLower(upsert.template)
 
 		var err error
-		idx, err = flowStepIndexFromOrdinal(flow.Steps, idx, false)
+		idx, err = sliceops.RealIndex(flow.Steps, idx, false)
 		if err != nil {
 			return fmt.Errorf("cannot set value of step #%d: %w", idx+1, err)
 		}
 
-		// no need for bounds check, already done in flowStepIndexFromOrdinal
+		// no need for bounds check, already done in RealIndex
 		oldVal := strings.ToLower(flow.Steps[idx].Template)
 		modKey := flowKey{stepIndex: idx, uniqueInt: stepOpCount}
 		stepOpCount++
@@ -194,7 +182,7 @@ func invokeFlowsEdit(io cmdio.IO, projFile, flowName string, attrs flowAttrValue
 	}
 
 	for _, delIdx := range attrs.stepRemovals {
-		actualIdx, err := flowStepIndexFromOrdinal(flow.Steps, delIdx, false)
+		actualIdx, err := sliceops.RealIndex(flow.Steps, delIdx, false)
 		if err != nil {
 			return fmt.Errorf("cannot remove step #%d: %w", actualIdx, err)
 		}
@@ -219,7 +207,7 @@ func invokeFlowsEdit(io cmdio.IO, projFile, flowName string, attrs flowAttrValue
 		// one-past end
 
 		updatedSteps := make([]morc.FlowStep, len(flow.Steps)+1)
-		actualIdx, err := flowStepIndexFromOrdinal(updatedSteps, add.index, true)
+		actualIdx, err := sliceops.RealIndex(updatedSteps, add.index, true)
 		if err != nil {
 			return fmt.Errorf("cannot add step at #%d: %w", actualIdx, err)
 		}
@@ -249,11 +237,11 @@ func invokeFlowsEdit(io cmdio.IO, projFile, flowName string, attrs flowAttrValue
 	}
 
 	for _, move := range attrs.stepMoves {
-		actualFrom, err := flowStepIndexFromOrdinal(flow.Steps, move.from, false)
+		actualFrom, err := sliceops.RealIndex(flow.Steps, move.from, false)
 		if err != nil {
 			return fmt.Errorf("cannot move step #%d: step %w", actualFrom, err)
 		}
-		actualTo, err := flowStepIndexFromOrdinal(flow.Steps, move.to, true)
+		actualTo, err := sliceops.RealIndex(flow.Steps, move.to, true)
 		if err != nil {
 			return fmt.Errorf("cannot move step #%d to #%d: destination %w", actualFrom+1, actualTo, err)
 		}
@@ -306,7 +294,7 @@ func invokeFlowsGet(io cmdio.IO, projFile, flowName string, getItem flowKey) err
 		io.Printf("%s\n", flow.Name)
 	default:
 		idx := getItem.stepIndex
-		idx, err = flowStepIndexFromOrdinal(flow.Steps, idx, false)
+		idx, err = sliceops.RealIndex(flow.Steps, idx, false)
 		if err != nil {
 			return fmt.Errorf("cannot get step #%d: %w", getItem.stepIndex, err)
 		}
@@ -478,7 +466,7 @@ type flowStepMove struct {
 }
 
 func parseFlowsArgs(cmd *cobra.Command, posArgs []string, args *flowsArgs) error {
-	args.projFile = commonflags.ProjectFile
+	args.projFile = flags.ProjectFile
 	if args.projFile == "" {
 		return fmt.Errorf("project file cannot be set to empty string")
 	}
@@ -499,20 +487,20 @@ func parseFlowsArgs(cmd *cobra.Command, posArgs []string, args *flowsArgs) error
 		args.flow = posArgs[0]
 	case flowsDelete:
 		// special case of flow name set from a CLI flag rather than pos arg.
-		args.flow = flagFlowDelete
+		args.flow = flags.Delete
 	case flowsGet:
 		// set arg 1 as the flow name
 		args.flow = posArgs[0]
 
 		// parse the get from the string
-		args.getItem, err = parseFlowAttrKey(flagFlowGet)
+		args.getItem, err = parseFlowAttrKey(flags.Get)
 		if err != nil {
 			return err
 		}
 	case flowsNew:
 		// pick up requests from args and set the flow name from the flag
-		args.flow = flagFlowNew
-		args.sets.name = optional[string]{set: true, v: flagFlowNew}
+		args.flow = flags.New
+		args.sets.name = optional[string]{set: true, v: flags.New}
 		args.reqs = posArgs
 	case flowsEdit:
 		// set arg 1 as the flow name
@@ -581,12 +569,12 @@ func parseFlowsSetFlags(cmd *cobra.Command, attrs *flowAttrValues) error {
 	f := cmd.Flags()
 
 	if f.Lookup("name").Changed {
-		attrs.name = optional[string]{set: true, v: flagFlowName}
+		attrs.name = optional[string]{set: true, v: flags.Name}
 	}
 
 	if f.Lookup("update").Changed {
 		// replace is in form IDX:REQ, no exceptions.
-		for flagIdx, repl := range flagFlowStepReplaces {
+		for flagIdx, repl := range flags.StepReplaces {
 			up, err := parseFlowUpsertArg(repl, false)
 			if err != nil {
 				return fmt.Errorf("--update #%d: %w", flagIdx+1, err)
@@ -598,12 +586,12 @@ func parseFlowsSetFlags(cmd *cobra.Command, attrs *flowAttrValues) error {
 
 	if f.Lookup("remove").Changed {
 		// remove is in form IDX, no exceptions.
-		attrs.stepRemovals = flagFlowStepRemovals
+		attrs.stepRemovals = flags.StepRemovals
 	}
 
 	if f.Lookup("add").Changed {
 		// add is in form IDX:REQ, optionally may be :REQ (or just REQ).
-		for flagIdx, add := range flagFlowStepAdds {
+		for flagIdx, add := range flags.StepAdds {
 			up, err := parseFlowUpsertArg(add, true)
 			if err != nil {
 				return fmt.Errorf("--add #%d: %w", flagIdx+1, err)
@@ -615,7 +603,7 @@ func parseFlowsSetFlags(cmd *cobra.Command, attrs *flowAttrValues) error {
 
 	if f.Lookup("move").Changed {
 		// move is in form FROM:TO, optionally may be FROM: (or just FROM).
-		for flagIdx, move := range flagFlowStepMoves {
+		for flagIdx, move := range flags.StepMoves {
 			up, err := parseFlowMoveArg(move)
 			if err != nil {
 				return fmt.Errorf("--move #%d: %w", flagIdx+1, err)
@@ -775,24 +763,4 @@ func parseFlowAttrKey(s string) (flowKey, error) {
 	default:
 		return flowKey{}, fmt.Errorf("must be a step index or one of: %s", strings.Join(flowAttrKeyNames(), ", "))
 	}
-}
-
-func flowStepIndexFromOrdinal(steps []morc.FlowStep, idx int, autoClampMax bool) (int, error) {
-	// TODO: replace all uses of this func w the below func
-	return sliceops.RealIndex(steps, idx, autoClampMax)
-	// basically, we will decrement (unless the sigil value -1) and then feed to
-	// sliceops func that will translate -1's. If the index cannot be translated
-	// to a valid index, we will return an error.
-
-	// TODO: horribly messy to refer to steps by number but actually store them by index. this tool is for engineers; we know it's 0-based.
-
-	// if idx == 0 {
-	// 	// never valid; no 0th value for ordinals
-	// 	return 0, fmt.Errorf("does not exist")
-	// }
-
-	// if idx != -1 {
-	// 	return sliceops.RealIndex(steps, idx-1, autoClampMax)
-	// }
-	// return sliceops.RealIndex(steps, idx, autoClampMax)
 }

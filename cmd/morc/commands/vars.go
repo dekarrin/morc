@@ -14,15 +14,6 @@ const (
 	reservedDefaultEnvName = "<DEFAULT>"
 )
 
-var (
-	flagVarsProjectFile string
-	flagVarsDelete      string
-	flagVarsEnv         string
-	flagVarsDefaultEnv  bool
-	flagVarsAll         bool
-	flagVarsCurrent     bool
-)
-
 type varsAction int
 
 const (
@@ -33,12 +24,12 @@ const (
 )
 
 func init() {
-	varsCmd.PersistentFlags().StringVarP(&flagVarsProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath)
-	varsCmd.PersistentFlags().StringVarP(&flagVarsDelete, "delete", "D", "", "Delete the variable `VAR`")
-	varsCmd.PersistentFlags().StringVarP(&flagVarsEnv, "env", "e", "", "Run the command against the environment `ENV` instead of the current one. Use --default instead to specify the default environment.")
-	varsCmd.PersistentFlags().BoolVarP(&flagVarsDefaultEnv, "default", "", false, "Run the command against the default environment instead of the current one.")
-	varsCmd.PersistentFlags().BoolVarP(&flagVarsCurrent, "current", "", false, "Apply only to current environment. This is the same as typing --env followed by the name of the current environment.")
-	varsCmd.PersistentFlags().BoolVarP(&flagVarsAll, "all", "a", false, "Used with -D. Delete the variable from all environments. This is the only way to effectively specify '--default' while deleting; it is a separate flag to indicate that the variable will indeed be erased everywhere, not just in the default environment.")
+	varsCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath)
+	varsCmd.PersistentFlags().StringVarP(&flags.Delete, "delete", "D", "", "Delete the variable `VAR`")
+	varsCmd.PersistentFlags().StringVarP(&flags.Env, "env", "e", "", "Run the command against the environment `ENV` instead of the current one. Use --default instead to specify the default environment.")
+	varsCmd.PersistentFlags().BoolVarP(&flags.BDefault, "default", "", false, "Run the command against the default environment instead of the current one.")
+	varsCmd.PersistentFlags().BoolVarP(&flags.BCurrent, "current", "", false, "Apply only to current environment. This is the same as typing --env followed by the name of the current environment.")
+	varsCmd.PersistentFlags().BoolVarP(&flags.BAll, "all", "a", false, "Used with -D. Delete the variable from all environments. This is the only way to effectively specify '--default' while deleting; it is a separate flag to indicate that the variable will indeed be erased everywhere, not just in the default environment.")
 
 	// mark the env and default flags as mutually exclusive
 	varsCmd.MarkFlagsMutuallyExclusive("env", "default", "all", "current")
@@ -69,12 +60,12 @@ var varsCmd = &cobra.Command{
 	Args: cobra.MaximumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := varOptions{
-			projFile:           flagVarsProjectFile,
-			envOverride:        flagVarsEnv,
-			envDefaultOverride: flagVarsDefaultEnv,
-			envCurrentOverride: flagVarsCurrent,
-			deleteVar:          flagVarsDelete != "",
-			envAll:             flagVarsAll,
+			projFile:           flags.ProjectFile,
+			envOverride:        flags.Env,
+			envDefaultOverride: flags.BDefault,
+			envCurrentOverride: flags.BCurrent,
+			deleteVar:          flags.Delete != "",
+			envAll:             flags.BAll,
 		}
 		if opts.projFile == "" {
 			return fmt.Errorf("project file is set to empty string")
@@ -100,7 +91,7 @@ var varsCmd = &cobra.Command{
 			varName = args[0]
 			varValue = args[1]
 		case varsActionDelete:
-			varName = flagVarsDelete
+			varName = flags.Delete
 		}
 
 		// done checking args, don't show usage on error
@@ -304,7 +295,7 @@ func parseVarsActionFromFlags(cmd *cobra.Command, posArgs []string) (varsAction,
 		if f.Changed("default") {
 			return varsActionDelete, fmt.Errorf("cannot specify --default with --delete/-D; use --all to delete from all envs")
 		}
-		if flagVarsEnv == reservedDefaultEnvName {
+		if flags.Env == reservedDefaultEnvName {
 			return varsActionDelete, fmt.Errorf("cannot use reserved environment name %q; use --all to delete from all envs (including default)", reservedDefaultEnvName)
 		}
 		return varsActionDelete, nil
@@ -312,28 +303,28 @@ func parseVarsActionFromFlags(cmd *cobra.Command, posArgs []string) (varsAction,
 
 	if len(posArgs) == 0 {
 		// listing mode
-		if flagVarsAll {
+		if flags.BAll {
 			return varsActionList, fmt.Errorf("--all is only valid when deleting a var; use --default to list vars in default env")
 		}
-		if flagVarsEnv == reservedDefaultEnvName {
+		if flags.Env == reservedDefaultEnvName {
 			return varsActionList, fmt.Errorf("cannot use reserved environment name %q; use --default to list vars in default env", reservedDefaultEnvName)
 		}
 		return varsActionList, nil
 	} else if len(posArgs) == 1 {
 		// setting mode
-		if flagVarsAll {
+		if flags.BAll {
 			return varsActionGet, fmt.Errorf("--all is only valid when deleting a var; use --default to get from default env")
 		}
-		if flagVarsEnv == reservedDefaultEnvName {
+		if flags.Env == reservedDefaultEnvName {
 			return varsActionList, fmt.Errorf("cannot use reserved environment name %q; use --default to get from default env", reservedDefaultEnvName)
 		}
 		return varsActionGet, nil
 	} else if len(posArgs) == 2 {
 		// setting mode
-		if flagVarsAll {
+		if flags.BAll {
 			return varsActionSet, fmt.Errorf("--all is only valid when deleting; use --default to set var in the default environment")
 		}
-		if flagVarsEnv == reservedDefaultEnvName {
+		if flags.Env == reservedDefaultEnvName {
 			return varsActionList, fmt.Errorf("cannot use reserved environment name %q; use --default to set in default env", reservedDefaultEnvName)
 		}
 		return varsActionSet, nil

@@ -781,18 +781,18 @@ func Test_Reqs_List(t *testing.T) {
 }
 
 func resetReqsFlags() {
-	flagReqsNew = ""
-	flagReqsDelete = ""
-	flagReqsGet = ""
-	flagReqsGetHeader = ""
-	flagReqsRemoveHeaders = nil
-	flagReqsRemoveBody = false
-	flagReqsBodyData = ""
-	flagReqsHeaders = nil
-	flagReqsMethod = ""
-	flagReqsURL = ""
-	flagReqsName = ""
-	flagReqsDeleteForce = false
+	flags.New = ""
+	flags.Delete = ""
+	flags.Get = ""
+	flags.GetHeader = ""
+	flags.RemoveHeaders = nil
+	flags.BRemoveBody = false
+	flags.BodyData = ""
+	flags.Headers = nil
+	flags.Method = ""
+	flags.URL = ""
+	flags.Name = ""
+	flags.BForce = false
 
 	reqsCmd.Flags().VisitAll(func(fl *pflag.Flag) {
 		fl.Changed = false

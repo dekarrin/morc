@@ -542,14 +542,15 @@ func Test_Flows_List(t *testing.T) {
 }
 
 func resetFlowsFlags() {
-	flagFlowNew = ""
-	flagFlowDelete = ""
-	flagFlowGet = ""
-	flagFlowName = ""
-	flagFlowStepRemovals = nil
-	flagFlowStepAdds = nil
-	flagFlowStepMoves = nil
-	flagFlowStepReplaces = nil
+	flags.ProjectFile = ""
+	flags.New = ""
+	flags.Delete = ""
+	flags.Get = ""
+	flags.Name = ""
+	flags.StepRemovals = nil
+	flags.StepAdds = nil
+	flags.StepMoves = nil
+	flags.StepReplaces = nil
 
 	flowsCmd.Flags().VisitAll(func(fl *pflag.Flag) {
 		fl.Changed = false

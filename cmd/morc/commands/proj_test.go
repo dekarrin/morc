@@ -146,14 +146,14 @@ func Test_Proj_Get(t *testing.T) {
 }
 
 func resetProjFlags() {
-	flagProjNew = false
-	flagProjGet = ""
-	flagProjName = ""
-	flagProjCookieLifetime = ""
-	flagProjSessionFile = ""
-	flagProjHistoryFile = ""
-	flagProjRecordCookies = ""
-	flagProjRecordHistory = ""
+	flags.BNew = false
+	flags.Get = ""
+	flags.Name = ""
+	flags.CookieLifetime = ""
+	flags.SessionFile = ""
+	flags.HistoryFile = ""
+	flags.RecordCookies = ""
+	flags.RecordHistory = ""
 
 	projCmd.Flags().VisitAll(func(fl *pflag.Flag) {
 		fl.Changed = false

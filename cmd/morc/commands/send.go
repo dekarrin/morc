@@ -10,17 +10,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	flagProjectFile  string
-	flagSendInsecure bool
-)
-
 func init() {
-	sendCmd.PersistentFlags().StringVarP(&flagProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
-	sendCmd.PersistentFlags().StringArrayVarP(&flagVars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Overrides any value currently in the store. The argument to this flag must be in `VAR=VALUE` format.")
-	sendCmd.PersistentFlags().BoolVarP(&flagSendInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
+	sendCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
+	sendCmd.PersistentFlags().StringArrayVarP(&flags.Vars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Overrides any value currently in the store. The argument to this flag must be in `VAR=VALUE` format.")
+	sendCmd.PersistentFlags().BoolVarP(&flags.BInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
 
-	setupRequestOutputFlags("morc send", sendCmd)
+	addRequestOutputFlags(sendCmd)
 
 	rootCmd.AddCommand(sendCmd)
 }
@@ -61,21 +56,21 @@ var sendCmd = &cobra.Command{
 func sendFlagsToOptions() (sendOptions, error) {
 	opts := sendOptions{}
 
-	opts.projFile = flagProjectFile
+	opts.projFile = flags.ProjectFile
 	if opts.projFile == "" {
 		return opts, fmt.Errorf("project file is set to empty string")
 	}
 
 	var err error
-	opts.outputCtrl, err = gatherRequestOutputFlags("morc send")
+	opts.outputCtrl, err = gatherRequestOutputFlags()
 	if err != nil {
 		return opts, err
 	}
 
 	// check vars
-	if len(flagVars) > 0 {
+	if len(flags.Vars) > 0 {
 		oneTimeVars := make(map[string]string)
-		for idx, v := range flagVars {
+		for idx, v := range flags.Vars {
 			parts := strings.SplitN(v, "=", 2)
 			if len(parts) != 2 {
 				return opts, fmt.Errorf("var #%d (%q) is not in format key=value", idx+1, v)
@@ -90,7 +85,7 @@ func sendFlagsToOptions() (sendOptions, error) {
 		opts.oneTimeVars = oneTimeVars
 	}
 
-	if flagSendInsecure {
+	if flags.BInsecure {
 		opts.skipVerify = true
 	}
 

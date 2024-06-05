@@ -10,29 +10,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	flagHistProjectFile string
-	flagHistInfo        bool
-	flagHistClear       bool
-	flagHistEnable      bool
-	flagHistDisable     bool
-
-	flagHistNoDates bool
-)
-
 func init() {
-	histCmd.PersistentFlags().StringVarP(&flagHistProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
-	histCmd.PersistentFlags().BoolVarP(&flagHistInfo, "info", "", false, "Print summarizing information about the history")
-	histCmd.PersistentFlags().BoolVarP(&flagHistClear, "clear", "", false, "Delete all history entries")
-	histCmd.PersistentFlags().BoolVarP(&flagHistEnable, "on", "", false, "Enable history for future requests")
-	histCmd.PersistentFlags().BoolVarP(&flagHistDisable, "off", "", false, "Disable history for future requests")
-
-	histCmd.PersistentFlags().BoolVarP(&flagHistNoDates, "no-dates", "", false, "Do not prefix the request with the date of request and response with date of response. Output control option; only used with 'hist ENTRY'")
+	histCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
+	histCmd.PersistentFlags().BoolVarP(&flags.BInfo, "info", "", false, "Print summarizing information about the history")
+	histCmd.PersistentFlags().BoolVarP(&flags.BClear, "clear", "", false, "Delete all history entries")
+	histCmd.PersistentFlags().BoolVarP(&flags.BEnable, "on", "", false, "Enable history for future requests")
+	histCmd.PersistentFlags().BoolVarP(&flags.BDisable, "off", "", false, "Disable history for future requests")
+	histCmd.PersistentFlags().BoolVarP(&flags.BNoDates, "no-dates", "", false, "(Output flag) Do not prefix the request with the date of request and response with date of response. Only used with 'hist ENTRY'")
 
 	// mark the delete and default flags as mutually exclusive
 	histCmd.MarkFlagsMutuallyExclusive("on", "off", "clear", "info")
 
-	setupRequestOutputFlags("morc hist", histCmd)
+	addRequestOutputFlags(histCmd)
 
 	rootCmd.AddCommand(histCmd)
 }
@@ -58,34 +47,34 @@ var histCmd = &cobra.Command{
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := histOptions{
-			projFile: flagEnvProjectFile,
+			projFile: flags.ProjectFile,
 		}
 		if opts.projFile == "" {
 			return fmt.Errorf("project file is set to empty string")
 		}
 
 		var err error
-		opts.outputCtrl, err = gatherRequestOutputFlags("morc hist")
+		opts.outputCtrl, err = gatherRequestOutputFlags()
 		if err != nil {
 			return err
 		}
 
-		if flagHistInfo {
+		if flags.BInfo {
 			if len(args) > 0 {
 				return fmt.Errorf("cannot use --info when giving an entry number")
 			}
 			opts.action = histInfo
-		} else if flagHistClear {
+		} else if flags.BClear {
 			if len(args) > 0 {
 				return fmt.Errorf("cannot use --clear when giving an entry number")
 			}
 			opts.action = histClear
-		} else if flagHistEnable {
+		} else if flags.BEnable {
 			if len(args) > 0 {
 				return fmt.Errorf("cannot use --on when giving an entry number")
 			}
 			opts.action = histEnable
-		} else if flagHistDisable {
+		} else if flags.BDisable {
 			if len(args) > 0 {
 				return fmt.Errorf("cannot use --off when giving an entry number")
 			}
@@ -95,11 +84,12 @@ var histCmd = &cobra.Command{
 		}
 
 		if len(args) > 0 {
+			opts.suppressDates = flags.BNoDates
 			opts.action = histDetail
 		}
 
 		if opts.action != histDetail {
-			if flagHistNoDates {
+			if flags.BNoDates {
 				return fmt.Errorf("--no-dates is only valid when printing history entry details")
 			}
 			if opts.outputCtrl.Request {

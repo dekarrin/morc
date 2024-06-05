@@ -10,14 +10,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	flagEnvProjectFile string
-	flagEnvDelete      string
-	flagEnvAll         bool
-	flagEnvDefault     bool
-	flagEnvDeleteAll   bool
-)
-
 type envAction int
 
 const (
@@ -28,11 +20,11 @@ const (
 )
 
 func init() {
-	envCmd.PersistentFlags().StringVarP(&flagEnvProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
-	envCmd.PersistentFlags().StringVarP(&flagEnvDelete, "delete", "D", "", "Delete environment `ENV`")
-	envCmd.PersistentFlags().BoolVarP(&flagEnvDeleteAll, "delete-all", "", false, "Delete all environments and variables")
-	envCmd.PersistentFlags().BoolVarP(&flagEnvAll, "all", "a", false, "List all environments instead of only the current one")
-	envCmd.PersistentFlags().BoolVarP(&flagEnvDefault, "default", "", false, "Change to the default environment")
+	envCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
+	envCmd.PersistentFlags().StringVarP(&flags.Delete, "delete", "D", "", "Delete environment `ENV`")
+	envCmd.PersistentFlags().BoolVarP(&flags.BDeleteAll, "delete-all", "", false, "Delete all environments and variables")
+	envCmd.PersistentFlags().BoolVarP(&flags.BAll, "all", "a", false, "List all environments instead of only the current one")
+	envCmd.PersistentFlags().BoolVarP(&flags.BDefault, "default", "", false, "Change to the default environment")
 
 	// mark the delete and default flags as mutually exclusive
 	envCmd.MarkFlagsMutuallyExclusive("all", "default", "delete", "delete-all")
@@ -62,10 +54,10 @@ var envCmd = &cobra.Command{
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := envOptions{
-			projFile:      flagEnvProjectFile,
-			doAll:         flagEnvAll, // TODO: during refactor, eliminate this. it's overloaded.
-			doDelete:      flagEnvDelete != "",
-			swapToDefault: flagEnvDefault,
+			projFile:      flags.ProjectFile,
+			doAll:         flags.BAll, // TODO: during refactor, eliminate this. it's overloaded.
+			doDelete:      flags.Delete != "",
+			swapToDefault: flags.BDefault,
 		}
 		if opts.projFile == "" {
 			return fmt.Errorf("project file is set to empty string")
@@ -92,7 +84,7 @@ var envCmd = &cobra.Command{
 			// both --delete-all and --delete will get us here. If it's --delete,
 			// that's the ting to grab.
 			if f.Changed("delete") {
-				env = flagEnvDelete
+				env = flags.Delete
 			} else {
 				opts.doAll = true
 			}
@@ -238,7 +230,7 @@ func parseEnvActionFromFlags(cmd *cobra.Command, posArgs []string) (envAction, e
 			return envActionDelete, fmt.Errorf("unknown positional argument %q", posArgs[1])
 		}
 
-		if flagEnvDelete == reservedDefaultEnvName {
+		if flags.Delete == reservedDefaultEnvName {
 			return envActionDelete, fmt.Errorf("cannot use reserved environment name %q; use --delete-all to delete all envs (including default)", reservedDefaultEnvName)
 		}
 		return envActionDelete, nil

@@ -14,19 +14,16 @@ import (
 )
 
 var (
-	flagWriteStateFile string
-	flagReadStateFile  string
-	flagVarSymbol      string
-	flagGetVars        []string
+	flagVarSymbol string
 )
 
 func addRequestFlags(id string, cmd *cobra.Command) {
-	cmd.PersistentFlags().StringVarP(&flagWriteStateFile, "write-state", "b", "", "Write collected cookies and captured vars to statefile `FILE`.")
-	cmd.PersistentFlags().StringVarP(&flagReadStateFile, "read-state", "c", "", "Read and use the cookies and vars saved in statefile `FILE`.")
+	cmd.PersistentFlags().StringVarP(&cliflags.WriteStateFile, "write-state", "b", "", "Write collected cookies and captured vars to statefile `FILE`.")
+	cmd.PersistentFlags().StringVarP(&cliflags.ReadStateFile, "read-state", "c", "", "Read and use the cookies and vars saved in statefile `FILE`.")
 	cmd.PersistentFlags().StringArrayVarP(&cliflags.Headers, "header", "H", []string{}, "Add a header to the request. Argument is in form `KEY:VALUE` (spaces after the colon are allowed). May be set multiple times.")
 	cmd.PersistentFlags().StringVarP(&cliflags.BodyData, "data", "d", "", "Add the given `DATA` as a body to the request; prefix with '@' to instead interperet DATA as a filename that body data is to be read from.")
 	cmd.PersistentFlags().StringVarP(&flagVarSymbol, "var-symbol", "", "$", "Set the leading variable symbol used to indicate the start of a variable in the request to `SYM`.")
-	cmd.PersistentFlags().StringArrayVarP(&flagGetVars, "capture-var", "C", []string{}, "Get a variable's value from the response. Argument is in format `VAR:SPEC`. The SPEC part has format ':START,END' for byte offset (note the leading colon, resulting in 'VAR::START,END'), or 'path[0].to.value' (jq-ish syntax) for JSON body data.")
+	cmd.PersistentFlags().StringArrayVarP(&cliflags.CaptureVars, "capture-var", "C", []string{}, "Get a variable's value from the response. Argument is in format `VAR:SPEC`. The SPEC part has format ':START,END' for byte offset (note the leading colon, resulting in 'VAR::START,END'), or 'path[0].to.value' (jq-ish syntax) for JSON body data.")
 	cmd.PersistentFlags().StringArrayVarP(&cliflags.Vars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Format is `VAR=VALUE`.")
 	cmd.PersistentFlags().BoolVarP(&cliflags.BInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
 
@@ -117,8 +114,8 @@ func addQuickMethodCommand(method string) {
 
 func oneoffFlagsToOptions(cmdID string) (oneoffOptions, error) {
 	opts := oneoffOptions{
-		stateFileIn:  flagReadStateFile,
-		stateFileOut: flagWriteStateFile,
+		stateFileIn:  cliflags.ReadStateFile,
+		stateFileOut: cliflags.WriteStateFile,
 		skipVerify:   cliflags.BInsecure,
 	}
 
@@ -133,10 +130,10 @@ func oneoffFlagsToOptions(cmdID string) (oneoffOptions, error) {
 	}
 
 	// check get vars
-	if len(flagGetVars) > 0 {
+	if len(cliflags.CaptureVars) > 0 {
 		scrapers := []morc.VarScraper{}
 
-		for idx, gv := range flagGetVars {
+		for idx, gv := range cliflags.CaptureVars {
 			scraper, err := morc.ParseVarScraper(gv)
 			if err != nil {
 				return opts, fmt.Errorf("get-var #%d (%q): %w", idx+1, gv, err)

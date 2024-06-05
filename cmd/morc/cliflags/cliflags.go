@@ -72,6 +72,18 @@ var (
 	// recording should be "ON" or "OFF".
 	RecordCookies string
 
+	// WriteStateFile is a flag used in one-off commands that gives the path to
+	// a state file to write out cookies and variables to.
+	WriteStateFile string
+
+	// ReadStateFile is a flag used in one-off commands that gives the path to a
+	// state file to read cookies and variables from.
+	ReadStateFile string
+
+	// CaptureVars is a flag used in one-off commands that specifies a variable
+	// to capture from the response. It can be specified multiple times.
+	CaptureVars []string
+
 	// BRemoveBody is a switch flag that when set, indicates that the body of
 	// the resource is to be removed.
 	BRemoveBody bool

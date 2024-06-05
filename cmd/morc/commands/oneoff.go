@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func addRequestFlags(id string, cmd *cobra.Command) {
+func addOneoffRequestFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVarP(&cliflags.WriteStateFile, "write-state", "b", "", "Write collected cookies and captured vars to statefile `FILE`.")
 	cmd.PersistentFlags().StringVarP(&cliflags.ReadStateFile, "read-state", "c", "", "Read and use the cookies and vars saved in statefile `FILE`.")
 	cmd.PersistentFlags().StringArrayVarP(&cliflags.Headers, "header", "H", []string{}, "Add a header to the request. Argument is in form `KEY:VALUE` (spaces after the colon are allowed). May be set multiple times.")
@@ -23,7 +23,7 @@ func addRequestFlags(id string, cmd *cobra.Command) {
 	cmd.PersistentFlags().StringArrayVarP(&cliflags.Vars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Format is `VAR=VALUE`.")
 	cmd.PersistentFlags().BoolVarP(&cliflags.BInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
 
-	setupRequestOutputFlags(id, cmd)
+	addRequestOutputFlags(cmd)
 }
 
 type oneoffOptions struct {
@@ -49,7 +49,7 @@ var oneoffCmd = &cobra.Command{
 		"project file is consulted, but state files may be read and written.",
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		opts, err := oneoffFlagsToOptions("morc oneoff")
+		opts, err := oneoffFlagsToOptions()
 		if err != nil {
 			return err
 		}
@@ -66,7 +66,7 @@ var oneoffCmd = &cobra.Command{
 }
 
 func init() {
-	addRequestFlags("morc oneoff", oneoffCmd)
+	addOneoffRequestFlags(oneoffCmd)
 	rootCmd.AddCommand(oneoffCmd)
 
 	quickMethods := []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE"}
@@ -91,7 +91,7 @@ func addQuickMethodCommand(method string) {
 			"consulted, but state files may be read and written. Same as 'morc oneoff -X " + upperMeth + "'",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts, err := oneoffFlagsToOptions("morc " + lowerMeth)
+			opts, err := oneoffFlagsToOptions()
 			if err != nil {
 				return err
 			}
@@ -104,11 +104,11 @@ func addQuickMethodCommand(method string) {
 		},
 	}
 
-	addRequestFlags("morc "+lowerMeth, quickCmd)
+	addOneoffRequestFlags(quickCmd)
 	rootCmd.AddCommand(quickCmd)
 }
 
-func oneoffFlagsToOptions(cmdID string) (oneoffOptions, error) {
+func oneoffFlagsToOptions() (oneoffOptions, error) {
 	opts := oneoffOptions{
 		stateFileIn:  cliflags.ReadStateFile,
 		stateFileOut: cliflags.WriteStateFile,
@@ -116,7 +116,7 @@ func oneoffFlagsToOptions(cmdID string) (oneoffOptions, error) {
 	}
 
 	var err error
-	opts.outputCtrl, err = gatherRequestOutputFlags(cmdID)
+	opts.outputCtrl, err = gatherRequestOutputFlags()
 	if err != nil {
 		return opts, err
 	}

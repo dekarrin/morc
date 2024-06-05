@@ -22,7 +22,7 @@ func init() {
 	// mark the delete and default flags as mutually exclusive
 	histCmd.MarkFlagsMutuallyExclusive("on", "off", "clear", "info")
 
-	setupRequestOutputFlags("morc hist", histCmd)
+	addRequestOutputFlags(histCmd)
 
 	rootCmd.AddCommand(histCmd)
 }
@@ -55,7 +55,7 @@ var histCmd = &cobra.Command{
 		}
 
 		var err error
-		opts.outputCtrl, err = gatherRequestOutputFlags("morc hist")
+		opts.outputCtrl, err = gatherRequestOutputFlags()
 		if err != nil {
 			return err
 		}

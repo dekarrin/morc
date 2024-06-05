@@ -105,8 +105,31 @@ var (
 	// It can be specified multiple times.
 	StepReplaces []string
 
-	// BNoDates is an output control switch flag that indicates that dates of
-	// historical events should not be printed when they otherwise would.
+	// Format is a request output control flag that gives the format of the
+	// output.
+	Format string
+
+	// BRequest is a request output control switch flag that indicates that the
+	// request should be printed in addition to any other output.
+	BRequest bool
+
+	// BCaptures is a request output control switch flag that indicates that the
+	// captures retrieved from a response should be printed in addition to any
+	// other output.
+	BCaptures bool
+
+	// BHeaders is a request output control switch flag that indicates that the
+	// headers of the response should be printed in addition to any other
+	// output.
+	BHeaders bool
+
+	// BNoBody is a request output control switch flag that indicates that the
+	// body of the response should not be printed.
+	BNoBody bool
+
+	// BNoDates is a historical request output control switch flag that
+	// indicates that dates of historical events should not be printed when they
+	// otherwise would.
 	BNoDates bool
 
 	// BInfo is a switch flag that indicates that the requested operation is

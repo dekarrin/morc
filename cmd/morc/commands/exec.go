@@ -15,7 +15,7 @@ func init() {
 	execCmd.PersistentFlags().StringArrayVarP(&cliflags.Vars, "var", "V", []string{}, "Temporarily set a variable's value at the start of the flow. The argument to this flag must be in `VAR=VALUE` format.")
 	execCmd.PersistentFlags().BoolVarP(&cliflags.BInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
 
-	setupRequestOutputFlags("morc exec", execCmd)
+	addRequestOutputFlags(execCmd)
 
 	rootCmd.AddCommand(execCmd)
 }
@@ -62,7 +62,7 @@ func execFlagsToOptions() (execOptions, error) {
 	}
 
 	var err error
-	opts.outputCtrl, err = gatherRequestOutputFlags("morc exec")
+	opts.outputCtrl, err = gatherRequestOutputFlags()
 	if err != nil {
 		return opts, err
 	}

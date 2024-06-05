@@ -16,7 +16,7 @@ func init() {
 	sendCmd.PersistentFlags().StringArrayVarP(&cliflags.Vars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Overrides any value currently in the store. The argument to this flag must be in `VAR=VALUE` format.")
 	sendCmd.PersistentFlags().BoolVarP(&cliflags.BInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
 
-	setupRequestOutputFlags("morc send", sendCmd)
+	addRequestOutputFlags(sendCmd)
 
 	rootCmd.AddCommand(sendCmd)
 }
@@ -63,7 +63,7 @@ func sendFlagsToOptions() (sendOptions, error) {
 	}
 
 	var err error
-	opts.outputCtrl, err = gatherRequestOutputFlags("morc send")
+	opts.outputCtrl, err = gatherRequestOutputFlags()
 	if err != nil {
 		return opts, err
 	}

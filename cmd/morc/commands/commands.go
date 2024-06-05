@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/cliflags"
 	"github.com/dekarrin/rosed"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -158,62 +159,38 @@ Usage:
 {{end}}
 {{with longHelp .}}{{. | trimTrailingWhitespaces}}{{end}}{{if or .Runnable .HasSubCommands}}` + usageAfterUseLineTemplate + `{{end}}`
 
-type requestOutputFlagSet struct {
-	Request              bool
-	Captures             bool
-	Headers              bool
-	SuppressResponseBody bool
-	Format               string
+func addRequestOutputFlags(cmd *cobra.Command) {
+	cmd.PersistentFlags().BoolVarP(&cliflags.BHeaders, "headers", "", false, "(Output flag) Output the headers of the response")
+	cmd.PersistentFlags().BoolVarP(&cliflags.BCaptures, "captures", "", false, "(Output flag) Output the captures from the response")
+	cmd.PersistentFlags().BoolVarP(&cliflags.BNoBody, "no-body", "", false, "(Output flag) Suppress the output of the response body")
+	cmd.PersistentFlags().BoolVarP(&cliflags.BRequest, "request", "", false, "(Output flag) Output the filled request prior to sending it")
+	cmd.PersistentFlags().StringVarP(&cliflags.Format, "format", "f", "pretty", "(Output flag) Set output format. `FMT` must be one of 'pretty', 'line', or 'sr')")
 }
 
-var (
-	managedFlagSets = map[string]*requestOutputFlagSet{}
-)
-
-func setupRequestOutputFlags(id string, cmd *cobra.Command) {
-	if _, ok := managedFlagSets[id]; ok {
-		panic("Flag set already exists for " + id)
-	}
-
-	flags := &requestOutputFlagSet{}
-	managedFlagSets[id] = flags
-
-	cmd.PersistentFlags().BoolVarP(&flags.Headers, "headers", "", false, "(Output flag) Output the headers of the response")
-	cmd.PersistentFlags().BoolVarP(&flags.Captures, "captures", "", false, "(Output flag) Output the captures from the response")
-	cmd.PersistentFlags().BoolVarP(&flags.SuppressResponseBody, "no-body", "", false, "(Output flag) Suppress the output of the response body")
-	cmd.PersistentFlags().BoolVarP(&flags.Request, "request", "", false, "(Output flag) Output the filled request prior to sending it")
-	cmd.PersistentFlags().StringVarP(&flags.Format, "format", "f", "pretty", "(Output flag) Set output format. `FMT` must be one of 'pretty', 'line', or 'sr')")
-}
-
-func gatherRequestOutputFlags(id string) (morc.OutputControl, error) {
-	flags, ok := managedFlagSets[id]
-	if !ok {
-		panic("No flag set exists for " + id)
-	}
-
+func gatherRequestOutputFlags() (morc.OutputControl, error) {
 	oc := morc.OutputControl{}
 
 	// check format
-	switch strings.ToLower(flags.Format) {
+	switch strings.ToLower(cliflags.Format) {
 	case "pretty":
 		oc.Format = morc.FormatPretty
 	case "sr":
 		oc.Format = morc.FormatLine
 
 		// check if user is trying to turn on things that aren't allowed
-		if flags.Request || flags.Headers || flags.SuppressResponseBody || flags.Captures {
+		if cliflags.BRequest || cliflags.BHeaders || cliflags.BNoBody || cliflags.BCaptures {
 			return oc, fmt.Errorf("format 'sr' only allows status line and response body; use format 'line' for control over output")
 		}
 	case "line":
 		oc.Format = morc.FormatLine
 	default:
-		return oc, fmt.Errorf("invalid format %q; must be one of pretty, line, or sr", flags.Format)
+		return oc, fmt.Errorf("invalid format %q; must be one of pretty, line, or sr", cliflags.Format)
 	}
 
-	oc.Request = flags.Request
-	oc.Headers = flags.Headers
-	oc.Captures = flags.Captures
-	oc.SuppressResponseBody = flags.SuppressResponseBody
+	oc.Request = cliflags.BRequest
+	oc.Headers = cliflags.BHeaders
+	oc.Captures = cliflags.BCaptures
+	oc.SuppressResponseBody = cliflags.BNoBody
 
 	return oc, nil
 }

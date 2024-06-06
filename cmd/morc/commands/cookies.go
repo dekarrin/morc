@@ -45,78 +45,35 @@ var cookiesCmd = &cobra.Command{
 		"such as those sent by 'morc oneoff' or any of the method shorthand versions will not have their cookies " +
 		"associated with the project.",
 	Args: cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		opts := cookiesOptions{
-			projFile: flags.ProjectFile,
-		}
-		if opts.projFile == "" {
-			return fmt.Errorf("project file is set to empty string")
-		}
-
-		// parse the URL if given
-		if flags.URL != "" {
-			lowerURL := strings.ToLower(flags.URL)
-			if !strings.HasPrefix(lowerURL, "http://") && !strings.HasPrefix(lowerURL, "https://") {
-				flags.URL = "http://" + flags.URL
-			}
-			u, err := url.Parse(flags.URL)
-			if err != nil {
-				return fmt.Errorf("invalid URL: %w", err)
-			}
-			opts.url = u
-		}
-
-		if flags.BInfo {
-			opts.action = cookiesInfo
-		} else if flags.BClear {
-			opts.action = cookiesClear
-		} else if flags.BEnable {
-			opts.action = cookiesEnable
-		} else if flags.BDisable {
-			opts.action = cookiesDisable
-		} else {
-			opts.action = cookiesList
+	RunE: func(cmd *cobra.Command, posArgs []string) error {
+		var args cookiesArgs
+		if err := parseCookiesArgs(cmd, posArgs, &args); err != nil {
+			return err
 		}
 
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
 
-		switch opts.action {
-		case cookiesList:
-			return invokeCookiesList(io, opts)
-		case cookiesInfo:
-			return invokeCookiesInfo(io, opts)
-		case cookiesClear:
-			return invokeCookiesClear(io, opts)
-		case cookiesEnable:
-			return invokeCookiesOn(io, opts)
-		case cookiesDisable:
-			return invokeCookiesOff(io, opts)
+		switch args.action {
+		case cookiesActionList:
+			return invokeCookiesList(io, args.projFile, args.url)
+		case cookiesActionInfo:
+			return invokeCookiesInfo(io, args.projFile)
+		case cookiesActionClear:
+			return invokeCookiesClear(io, args.projFile)
+		case cookiesActionEnable:
+			return invokeCookiesOn(io, args.projFile)
+		case cookiesActionDisable:
+			return invokeCookiesOff(io, args.projFile)
 		default:
-			panic(fmt.Sprintf("unhandled cookies action %q", opts.action))
+			panic(fmt.Sprintf("unhandled cookies action %q", args.action))
 		}
 	},
 }
 
-type cookiesAction int
-
-const (
-	cookiesList cookiesAction = iota
-	cookiesInfo
-	cookiesClear
-	cookiesEnable
-	cookiesDisable
-)
-
-type cookiesOptions struct {
-	projFile string
-	action   cookiesAction
-	url      *url.URL
-}
-
-func invokeCookiesOn(io cmdio.IO, opts cookiesOptions) error {
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+func invokeCookiesOn(io cmdio.IO, projFile string) error {
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -128,33 +85,51 @@ func invokeCookiesOn(io cmdio.IO, opts cookiesOptions) error {
 
 	p.Config.RecordSession = true
 
-	return p.PersistToDisk(false)
+	if err := p.PersistToDisk(false); err != nil {
+		return err
+	}
+
+	io.PrintLoudf("Cookie recording enabled")
+
+	return nil
 }
 
-func invokeCookiesOff(_ cmdio.IO, opts cookiesOptions) error {
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+func invokeCookiesOff(io cmdio.IO, projFile string) error {
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
 
 	p.Config.RecordSession = false
 
-	return p.PersistToDisk(false)
+	if err := p.PersistToDisk(false); err != nil {
+		return err
+	}
+
+	io.PrintLoudf("Cookie recording disabled")
+
+	return nil
 }
 
-func invokeCookiesClear(_ cmdio.IO, opts cookiesOptions) error {
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+func invokeCookiesClear(io cmdio.IO, projFile string) error {
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
 
 	p.Session.Cookies = nil
 
-	return p.PersistSessionToDisk()
+	if err := p.PersistSessionToDisk(); err != nil {
+		return err
+	}
+
+	io.PrintLoudf("Cookies cleared")
+
+	return nil
 }
 
-func invokeCookiesInfo(io cmdio.IO, opts cookiesOptions) error {
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+func invokeCookiesInfo(io cmdio.IO, projFile string) error {
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -199,8 +174,8 @@ func invokeCookiesInfo(io cmdio.IO, opts cookiesOptions) error {
 	return nil
 }
 
-func invokeCookiesList(io cmdio.IO, opts cookiesOptions) error {
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+func invokeCookiesList(io cmdio.IO, projFile string, url *url.URL) error {
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -210,10 +185,10 @@ func invokeCookiesList(io cmdio.IO, opts cookiesOptions) error {
 		return nil
 	}
 
-	if opts.url != nil {
+	if url != nil {
 		// list only cookies that would be set on the given URL
 
-		cookies := p.CookiesForURL(opts.url)
+		cookies := p.CookiesForURL(url)
 
 		if len(cookies) == 0 {
 			io.Println("(no cookies)")
@@ -257,3 +232,75 @@ func invokeCookiesList(io cmdio.IO, opts cookiesOptions) error {
 
 	return nil
 }
+
+type cookiesArgs struct {
+	projFile string
+	action   cookiesAction
+	url      *url.URL
+}
+
+func parseCookiesArgs(cmd *cobra.Command, posArgs []string, args *cookiesArgs) error {
+	args.projFile = flags.ProjectFile
+
+	if args.projFile == "" {
+		return fmt.Errorf("project file cannot be set to empty string")
+	}
+
+	var err error
+
+	args.action, err = parseCookiesActionFromFlags(cmd, posArgs)
+	if err != nil {
+		return err
+	}
+
+	switch args.action {
+	case cookiesActionList:
+		// pick up
+		if flags.URL != "" {
+			lowerURL := strings.ToLower(flags.URL)
+			if !strings.HasPrefix(lowerURL, "http://") && !strings.HasPrefix(lowerURL, "https://") {
+				flags.URL = "http://" + flags.URL
+			}
+			u, err := url.Parse(flags.URL)
+			if err != nil {
+				return fmt.Errorf("invalid URL: %w", err)
+			}
+			args.url = u
+		}
+	case cookiesActionInfo, cookiesActionClear, cookiesActionEnable, cookiesActionDisable:
+		// no additional args to parse
+	default:
+		panic(fmt.Sprintf("unhandled cookies action %q", args.action))
+	}
+
+	return nil
+}
+
+func parseCookiesActionFromFlags(cmd *cobra.Command, _ []string) (cookiesAction, error) {
+	// mutual exclusions enforced by cobra (and therefore we do not check them here):
+	// * --on, --off, --clear, --info, --url.
+
+	f := cmd.Flags()
+
+	if f.Changed("on") {
+		return cookiesActionEnable, nil
+	} else if f.Changed("off") {
+		return cookiesActionDisable, nil
+	} else if f.Changed("clear") {
+		return cookiesActionClear, nil
+	} else if f.Changed("info") {
+		return cookiesActionInfo, nil
+	}
+
+	return cookiesActionList, nil
+}
+
+type cookiesAction int
+
+const (
+	cookiesActionList cookiesAction = iota
+	cookiesActionInfo
+	cookiesActionClear
+	cookiesActionEnable
+	cookiesActionDisable
+)

@@ -46,11 +46,11 @@ var envCmd = &cobra.Command{
 		case envActionDelete:
 			return invokeEnvDelete(io, args.projFile, args.env)
 		case envActionSwitch:
-			return invokeEnvSwitch(io, env, opts)
+			return invokeEnvSwitch(io, args.projFile, args.env)
 		case envActionShow:
-			return invokeEnvShowCurrent(io, opts)
+			return invokeEnvShowCurrent(io, args.projFile)
 		default:
-			return fmt.Errorf("unhandled action %d", action)
+			return fmt.Errorf("unhandled env action %d", args.action)
 		}
 	},
 }
@@ -162,12 +162,12 @@ func invokeEnvSwitch(io cmdio.IO, projFile string, env envSelection) error {
 		return err
 	}
 
-	io.PrintLoudf("Switched to ", env.String())
+	io.PrintLoudf("Switched to %s", env.String())
 	return nil
 }
 
-func invokeEnvShowCurrent(io cmdio.IO, opts envOptions) error {
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+func invokeEnvShowCurrent(io cmdio.IO, projFile string) error {
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -185,13 +185,6 @@ type envArgs struct {
 	projFile string
 	action   envAction
 	env      envSelection
-}
-
-type envOptions struct {
-	projFile      string
-	doAll         bool
-	doDelete      bool
-	swapToDefault bool
 }
 
 func parseEnvArgs(cmd *cobra.Command, posArgs []string, args *envArgs) error {

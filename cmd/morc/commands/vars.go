@@ -49,7 +49,7 @@ var varsCmd = &cobra.Command{
 		case varsActionSet:
 			return invokeVarSet(io, args.projFile, args.env, args.varName, args.value)
 		case varsActionDelete:
-			return invokeVarDelete(io, args.projFile, args.env, args.varName, args.all)
+			return invokeVarDelete(io, args.projFile, args.env, args.varName)
 		default:
 			panic(fmt.Sprintf("unhandled vars action %q", args.action))
 		}
@@ -141,26 +141,24 @@ func invokeVarGet(io cmdio.IO, projFile string, env envSelection, varName string
 	return nil
 }
 
-func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName string, all bool) error {
+func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName string) error {
 	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
 
 	// are we looking to delete from a specific environment?
-	if env.IsSpecified() {
-		if env.useDefault {
-			// should never happen as user must specify --all to get this behavior
-			return fmt.Errorf("cannot delete from default environment by specifying useDefault; set all=true instead")
-		}
-
-		// is the 'no default in --env' rule being bypassed by doing --current? reject if we are in the default env
-		if env.useCurrent && p.Vars.Environment == "" {
-			return fmt.Errorf("cannot delete from current env when current env is default env; set all=true instead")
-		}
+	if env.useDefault {
+		// should never happen as user must specify --all to get this behavior
+		return fmt.Errorf("cannot delete from default environment by specifying useDefault; set all=true instead")
 	}
 
-	if all {
+	// is the 'no default in --env' rule being bypassed by doing --current? reject if we are in the default env
+	if env.useCurrent && p.Vars.Environment == "" {
+		return fmt.Errorf("cannot delete from current env when current env is default env; set all=true instead")
+	}
+
+	if env.useAll {
 		// easy, just delete from all environments
 		p.Vars.Remove(varName)
 		if err := p.PersistToDisk(false); err != nil {
@@ -254,32 +252,6 @@ func invokeVarList(io cmdio.IO, projFile string, env envSelection) error {
 	return nil
 }
 
-type envSelection struct {
-	useName    string
-	useCurrent bool
-	useDefault bool
-}
-
-func (es envSelection) IsSpecified() bool {
-	return es.useName != "" || es.useCurrent || es.useDefault
-}
-
-func (es envSelection) String() string {
-	if !es.IsSpecified() {
-		return "(not specified)"
-	}
-
-	if es.useName != "" {
-		return fmt.Sprintf("environment %s", es.useName)
-	} else if es.useCurrent {
-		return "the current environment"
-	} else if es.useDefault {
-		return "the default environment"
-	}
-
-	panic("should never happen - no selection is set")
-}
-
 type varsArgs struct {
 	projFile string
 	action   varsAction
@@ -324,7 +296,7 @@ func parseVarsArgs(cmd *cobra.Command, posArgs []string, args *varsArgs) error {
 		args.value = posArgs[1]
 	case varsActionDelete:
 		args.varName = flags.Delete
-		args.all = flags.BAll
+		args.env.useAll = flags.BAll
 	default:
 		panic(fmt.Sprintf("unhandled vars action %q", args.action))
 	}

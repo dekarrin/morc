@@ -240,6 +240,37 @@ func parseOnOff(s string) (bool, error) {
 	return false, fmt.Errorf("invalid value %q; must be ON or OFF (case-insensitive)", s)
 }
 
+// TODO: probs betta off as struct with constants for type and special type for
+// when name is set.
+type envSelection struct {
+	useName    string
+	useCurrent bool
+	useDefault bool
+	useAll     bool
+}
+
+func (es envSelection) IsSpecified() bool {
+	return es.useName != "" || es.useCurrent || es.useDefault || es.useAll
+}
+
+func (es envSelection) String() string {
+	if !es.IsSpecified() {
+		return "(not specified)"
+	}
+
+	if es.useName != "" {
+		return fmt.Sprintf("environment %s", es.useName)
+	} else if es.useCurrent {
+		return "the current environment"
+	} else if es.useDefault {
+		return "the default environment"
+	} else if es.useAll {
+		return "all environments"
+	}
+
+	panic("should never happen - no selection is set")
+}
+
 // Invoker gathers args and holds definitions for invoked commands. IO and
 // project file are always available and must be set before invoking most
 // commands.

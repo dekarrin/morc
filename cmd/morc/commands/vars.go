@@ -256,7 +256,6 @@ type varsArgs struct {
 	projFile string
 	action   varsAction
 	env      envSelection
-	all      bool
 	varName  string
 	value    string
 }

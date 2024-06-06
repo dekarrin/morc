@@ -18,6 +18,10 @@ var (
 )
 
 const (
+	reservedDefaultEnvName = "<DEFAULT>"
+)
+
+const (
 	// multi-line uses
 	annotationKeyHelpUsages = "morc_help_usages"
 )

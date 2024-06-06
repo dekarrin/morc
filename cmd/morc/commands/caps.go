@@ -47,17 +47,17 @@ var capsCmd = &cobra.Command{
 		io := cmdio.From(cmd)
 
 		switch args.action {
-		case capsList:
+		case capsActionList:
 			return invokeCapsList(io, args.projFile, args.request)
-		case capsShow:
+		case capsActionShow:
 			return invokeCapsShow(io, args.projFile, args.request, args.capture)
-		case capsDelete:
+		case capsActionDelete:
 			return invokeCapsDelete(io, args.projFile, args.request, args.capture)
-		case capsNew:
+		case capsActionNew:
 			return invokeCapsNew(io, args.projFile, args.request, args.capture, args.sets)
-		case capsGet:
+		case capsActionGet:
 			return invokeCapsGet(io, args.projFile, args.request, args.capture, args.getItem)
-		case capsEdit:
+		case capsActionEdit:
 			return invokeCapsEdit(io, args.projFile, args.request, args.capture, args.sets)
 		default:
 			return fmt.Errorf("unknown action %d", args.action)
@@ -376,15 +376,15 @@ func parseCapsArgs(cmd *cobra.Command, posArgs []string, args *capsArgs) error {
 
 	// do action-specific arg and flag parsing
 	switch args.action {
-	case capsList:
+	case capsActionList:
 		// nothing else to do; all args already gathered
-	case capsShow:
+	case capsActionShow:
 		// set arg 2 as the capture name
 		args.capture = posArgs[1]
-	case capsDelete:
+	case capsActionDelete:
 		// special case of capture set from a CLI flag rather than pos arg.
 		args.capture = flags.Delete
-	case capsGet:
+	case capsActionGet:
 		// set arg 2 as the capture name
 		args.capture = posArgs[1]
 
@@ -393,7 +393,7 @@ func parseCapsArgs(cmd *cobra.Command, posArgs []string, args *capsArgs) error {
 		if err != nil {
 			return err
 		}
-	case capsNew:
+	case capsActionNew:
 		// above parsing already checked that -V will not be present and -s will
 		// so we can just run through normal parseCapsSetFlags and then use
 		// --new argument to set the new cap var manaully.
@@ -411,7 +411,7 @@ func parseCapsArgs(cmd *cobra.Command, posArgs []string, args *capsArgs) error {
 		// grab from args.capture, but this way is a bit more defensive.
 		args.sets.capVar = optional[string]{set: true, v: name}
 		args.capture = name
-	case capsEdit:
+	case capsActionEdit:
 		// set arg 2 as the capture name
 		args.capture = posArgs[1]
 
@@ -438,58 +438,58 @@ func parseCapsActionFromFlags(cmd *cobra.Command, posArgs []string) (capsAction,
 
 	if flags.Delete != "" {
 		if len(posArgs) < 1 {
-			return capsDelete, fmt.Errorf("missing request REQ to delete capture from")
+			return capsActionDelete, fmt.Errorf("missing request REQ to delete capture from")
 		}
 		if len(posArgs) > 1 {
-			return capsDelete, fmt.Errorf("unknown 2nd positional argument: %q", posArgs[1])
+			return capsActionDelete, fmt.Errorf("unknown 2nd positional argument: %q", posArgs[1])
 		}
-		return capsDelete, nil
+		return capsActionDelete, nil
 	} else if flags.New != "" {
 		if len(posArgs) < 1 {
-			return capsNew, fmt.Errorf("missing request REQ to add new capture to")
+			return capsActionNew, fmt.Errorf("missing request REQ to add new capture to")
 		}
 		if len(posArgs) > 1 {
-			return capsNew, fmt.Errorf("unknown 2nd positional argument: %q", posArgs[1])
+			return capsActionNew, fmt.Errorf("unknown 2nd positional argument: %q", posArgs[1])
 		}
 		if !cmd.Flags().Changed("spec") {
-			return capsNew, fmt.Errorf("--new/-N requires --spec/-s")
+			return capsActionNew, fmt.Errorf("--new/-N requires --spec/-s")
 		}
 		if cmd.Flags().Changed("var") {
-			return capsNew, fmt.Errorf("--new/-N already gives var name; cannot be used with --var/-V")
+			return capsActionNew, fmt.Errorf("--new/-N already gives var name; cannot be used with --var/-V")
 		}
-		return capsNew, nil
+		return capsActionNew, nil
 	} else if flags.Get != "" {
 		if len(posArgs) < 1 {
-			return capsGet, fmt.Errorf("missing request REQ and capture VAR to get attribute from")
+			return capsActionGet, fmt.Errorf("missing request REQ and capture VAR to get attribute from")
 		}
 		if len(posArgs) < 2 {
-			return capsGet, fmt.Errorf("missing capture VAR to get attribute from")
+			return capsActionGet, fmt.Errorf("missing capture VAR to get attribute from")
 		}
 		if len(posArgs) > 2 {
-			return capsGet, fmt.Errorf("unknown 3rd positional argument: %q", posArgs[2])
+			return capsActionGet, fmt.Errorf("unknown 3rd positional argument: %q", posArgs[2])
 		}
-		return capsGet, nil
+		return capsActionGet, nil
 	} else if capsSetFlagIsPresent() {
 		if len(posArgs) < 1 {
-			return capsEdit, fmt.Errorf("missing request REQ and capture VAR to edit")
+			return capsActionEdit, fmt.Errorf("missing request REQ and capture VAR to edit")
 		}
 		if len(posArgs) < 2 {
-			return capsEdit, fmt.Errorf("missing capture var to edit")
+			return capsActionEdit, fmt.Errorf("missing capture var to edit")
 		}
 		if len(posArgs) > 2 {
-			return capsEdit, fmt.Errorf("unknown 3rd positional argument: %q", posArgs[2])
+			return capsActionEdit, fmt.Errorf("unknown 3rd positional argument: %q", posArgs[2])
 		}
-		return capsEdit, nil
+		return capsActionEdit, nil
 	}
 
 	if len(posArgs) == 0 {
-		return capsList, fmt.Errorf("missing request REQ to list captures for")
+		return capsActionList, fmt.Errorf("missing request REQ to list captures for")
 	} else if len(posArgs) == 1 {
-		return capsList, nil
+		return capsActionList, nil
 	} else if len(posArgs) == 2 {
-		return capsShow, nil
+		return capsActionShow, nil
 	} else {
-		return capsShow, fmt.Errorf("unknown 3rd positional argument: %q", posArgs[2])
+		return capsActionShow, fmt.Errorf("unknown 3rd positional argument: %q", posArgs[2])
 	}
 }
 
@@ -521,12 +521,12 @@ func capsSetFlagIsPresent() bool {
 type capsAction int
 
 const (
-	capsList capsAction = iota
-	capsShow
-	capsGet
-	capsDelete
-	capsNew
-	capsEdit
+	capsActionList capsAction = iota
+	capsActionShow
+	capsActionGet
+	capsActionDelete
+	capsActionNew
+	capsActionEdit
 )
 
 type capKey string

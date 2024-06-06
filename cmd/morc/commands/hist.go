@@ -10,22 +10,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func init() {
-	histCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
-	histCmd.PersistentFlags().BoolVarP(&flags.BInfo, "info", "", false, "Print summarizing information about the history")
-	histCmd.PersistentFlags().BoolVarP(&flags.BClear, "clear", "", false, "Delete all history entries")
-	histCmd.PersistentFlags().BoolVarP(&flags.BEnable, "on", "", false, "Enable history for future requests")
-	histCmd.PersistentFlags().BoolVarP(&flags.BDisable, "off", "", false, "Disable history for future requests")
-	histCmd.PersistentFlags().BoolVarP(&flags.BNoDates, "no-dates", "", false, "(Output flag) Do not prefix the request with the date of request and response with date of response. Only used with 'hist ENTRY'")
-
-	// mark the delete and default flags as mutually exclusive
-	histCmd.MarkFlagsMutuallyExclusive("on", "off", "clear", "info")
-
-	addRequestOutputFlags(histCmd)
-
-	rootCmd.AddCommand(histCmd)
-}
-
 var histCmd = &cobra.Command{
 	Use: "hist [ENTRY]",
 	Annotations: map[string]string{
@@ -45,154 +29,88 @@ var histCmd = &cobra.Command{
 		"History only applies to requests created from request templates in a project; one-off requests such as those " +
 		"sent by 'morc oneoff' or any of the method shorthand versions are not saved in history.",
 	Args: cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		opts := histOptions{
-			projFile: flags.ProjectFile,
-		}
-		if opts.projFile == "" {
-			return fmt.Errorf("project file is set to empty string")
-		}
-
-		var err error
-		opts.outputCtrl, err = gatherRequestOutputFlags()
-		if err != nil {
+	RunE: func(cmd *cobra.Command, posArgs []string) error {
+		var args histArgs
+		if err := parseHistArgs(cmd, posArgs, &args); err != nil {
 			return err
-		}
-
-		if flags.BInfo {
-			if len(args) > 0 {
-				return fmt.Errorf("cannot use --info when giving an entry number")
-			}
-			opts.action = histInfo
-		} else if flags.BClear {
-			if len(args) > 0 {
-				return fmt.Errorf("cannot use --clear when giving an entry number")
-			}
-			opts.action = histClear
-		} else if flags.BEnable {
-			if len(args) > 0 {
-				return fmt.Errorf("cannot use --on when giving an entry number")
-			}
-			opts.action = histEnable
-		} else if flags.BDisable {
-			if len(args) > 0 {
-				return fmt.Errorf("cannot use --off when giving an entry number")
-			}
-			opts.action = histDisable
-		} else {
-			opts.action = histList
-		}
-
-		if len(args) > 0 {
-			opts.suppressDates = flags.BNoDates
-			opts.action = histDetail
-		}
-
-		if opts.action != histDetail {
-			if flags.BNoDates {
-				return fmt.Errorf("--no-dates is only valid when printing history entry details")
-			}
-			if opts.outputCtrl.Request {
-				return fmt.Errorf("--request is only valid when printing history entry details")
-			}
-			if opts.outputCtrl.Captures {
-				return fmt.Errorf("--captures is only valid when printing history entry details")
-			}
-			if opts.outputCtrl.Headers {
-				return fmt.Errorf("--headers is only valid when printing history entry details")
-			}
-			if opts.outputCtrl.SuppressResponseBody {
-				return fmt.Errorf("--no-body is only valid when printing history entry details")
-			}
-		}
-
-		var entryIndex int
-
-		if opts.action == histDetail {
-			entryIndex, err = strconv.Atoi(args[0])
-			if err != nil {
-				return fmt.Errorf("%q is not a valid history entry index; it must be an integer", args[0])
-			}
 		}
 
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
 
-		switch opts.action {
-		case histList:
-			return invokeHistList(io, opts)
-		case histDetail:
-			return invokeHistDetail(io, entryIndex, opts)
-		case histInfo:
-			return invokeHistInfo(io, opts)
-		case histClear:
-			return invokeHistClear(io, opts)
-		case histEnable:
-			return invokeHistOn(io, opts)
-		case histDisable:
-			return invokeHistOff(io, opts)
+		switch args.action {
+		case histActionList:
+			return invokeHistList(io, args.projFile)
+		case histActionDetail:
+			return invokeHistDetail(io, args.projFile, args.entry, args.outputCtrl, args.noDates)
+		case histActionInfo:
+			return invokeHistInfo(io, args.projFile)
+		case histActionClear:
+			return invokeHistClear(io, args.projFile)
+		case histActionEnable:
+			return invokeHistOn(io, args.projFile)
+		case histActionDisable:
+			return invokeHistOff(io, args.projFile)
 		default:
-			panic(fmt.Sprintf("unhandled hist action %q", opts.action))
+			panic(fmt.Sprintf("unhandled hist action %q", args.action))
 		}
 	},
 }
 
-type histAction int
+func init() {
+	histCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
+	histCmd.PersistentFlags().BoolVarP(&flags.BInfo, "info", "", false, "Print summarizing information about the history")
+	histCmd.PersistentFlags().BoolVarP(&flags.BClear, "clear", "", false, "Delete all history entries")
+	histCmd.PersistentFlags().BoolVarP(&flags.BEnable, "on", "", false, "Enable history for future requests")
+	histCmd.PersistentFlags().BoolVarP(&flags.BDisable, "off", "", false, "Disable history for future requests")
+	histCmd.PersistentFlags().BoolVarP(&flags.BNoDates, "no-dates", "", false, "(Output flag) Do not prefix the request with the date of request and response with date of response. Only used with 'hist ENTRY'")
 
-const (
-	histList histAction = iota
-	histDetail
-	histInfo
-	histClear
-	histEnable
-	histDisable
-)
+	// mark the delete and default flags as mutually exclusive
+	histCmd.MarkFlagsMutuallyExclusive("on", "off", "clear", "info")
 
-type histOptions struct {
-	projFile      string
-	action        histAction
-	outputCtrl    morc.OutputControl
-	suppressDates bool
+	addRequestOutputFlags(histCmd)
+
+	rootCmd.AddCommand(histCmd)
 }
 
-func invokeHistDetail(io cmdio.IO, entryNum int, opts histOptions) error {
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+func invokeHistDetail(io cmdio.IO, projFile string, entry int, reqOC morc.OutputControl, noDates bool) error {
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
 
-	if entryNum < 0 {
+	if entry < 0 {
 		return fmt.Errorf("entry number must be positive")
 	}
-	if entryNum >= len(p.History) {
-		return fmt.Errorf("can't get entry %d; %d is the highest entry available", entryNum, len(p.History)-1)
+	if entry >= len(p.History) {
+		return fmt.Errorf("can't get entry %d; %d is the highest entry available", entry, len(p.History)-1)
 	}
 
-	hist := p.History[entryNum]
+	hist := p.History[entry]
 
 	io.Printf("Request template: %s\n", hist.Template)
 
-	if !opts.suppressDates {
+	if !noDates {
 		io.Printf("Request sent:          %s\n", hist.ReqTime.Format(time.RFC3339))
 		io.Printf("Response received:     %s\n", hist.RespTime.Format(time.RFC3339))
 		io.Printf("Total round-trip time: %s\n", hist.RespTime.Sub(hist.ReqTime))
 	}
 
-	opts.outputCtrl.Writer = io.Out
-	if err := morc.OutputRequest(hist.Request, opts.outputCtrl); err != nil {
+	reqOC.Writer = io.Out
+	if err := morc.OutputRequest(hist.Request, reqOC); err != nil {
 		return err
 	}
 
-	if err := morc.OutputResponse(hist.Response, hist.Captures, opts.outputCtrl); err != nil {
+	if err := morc.OutputResponse(hist.Response, hist.Captures, reqOC); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func invokeHistOn(io cmdio.IO, opts histOptions) error {
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+func invokeHistOn(io cmdio.IO, projFile string) error {
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -204,33 +122,51 @@ func invokeHistOn(io cmdio.IO, opts histOptions) error {
 
 	p.Config.RecordHistory = true
 
-	return p.PersistToDisk(false)
+	if err := p.PersistToDisk(false); err != nil {
+		return err
+	}
+
+	io.PrintLoudf("History enabled")
+
+	return nil
 }
 
-func invokeHistOff(_ cmdio.IO, opts histOptions) error {
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+func invokeHistOff(io cmdio.IO, projFile string) error {
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
 
 	p.Config.RecordHistory = false
 
-	return p.PersistToDisk(false)
+	if err := p.PersistToDisk(false); err != nil {
+		return err
+	}
+
+	io.PrintLoudf("History disabled")
+
+	return nil
 }
 
-func invokeHistClear(_ cmdio.IO, opts histOptions) error {
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+func invokeHistClear(io cmdio.IO, projFile string) error {
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
 
 	p.History = nil
 
-	return p.PersistHistoryToDisk()
+	if err := p.PersistHistoryToDisk(); err != nil {
+		return err
+	}
+
+	io.PrintLoudf("History cleared")
+
+	return nil
 }
 
-func invokeHistInfo(io cmdio.IO, opts histOptions) error {
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+func invokeHistInfo(io cmdio.IO, projFile string) error {
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -256,8 +192,8 @@ func invokeHistInfo(io cmdio.IO, opts histOptions) error {
 	return nil
 }
 
-func invokeHistList(io cmdio.IO, opts histOptions) error {
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+func invokeHistList(io cmdio.IO, projFile string) error {
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -285,3 +221,119 @@ func invokeHistList(io cmdio.IO, opts histOptions) error {
 
 	return nil
 }
+
+type histArgs struct {
+	projFile string
+	action   histAction
+
+	entry      int
+	outputCtrl morc.OutputControl
+	noDates    bool
+}
+
+func parseHistArgs(cmd *cobra.Command, posArgs []string, args *histArgs) error {
+	args.projFile = flags.ProjectFile
+
+	if args.projFile == "" {
+		return fmt.Errorf("project file cannot be set to empty string")
+	}
+
+	var err error
+
+	args.action, err = parseHistActionFromFlags(cmd, posArgs)
+	if err != nil {
+		return err
+	}
+
+	switch args.action {
+	case histActionList:
+		// no additional args to parse
+	case histActionDetail:
+		args.entry, err = strconv.Atoi(posArgs[0])
+		if err != nil {
+			return fmt.Errorf("%q is not a valid history entry index; it must be an integer", posArgs[0])
+		}
+
+		args.outputCtrl, err = gatherRequestOutputFlags()
+		if err != nil {
+			return err
+		}
+
+		args.noDates = flags.BNoDates
+	case histActionInfo, histActionClear, histActionEnable, histActionDisable:
+		// no additional args to parse
+	default:
+		panic(fmt.Sprintf("unhandled hist action %q", args.action))
+	}
+
+	return nil
+}
+
+func parseHistActionFromFlags(cmd *cobra.Command, posArgs []string) (histAction, error) {
+	// mutual exclusions enforced by cobra (and therefore we do not check them here):
+	// * --on, --off, --clear, --info
+
+	f := cmd.Flags()
+
+	if f.Changed("on") {
+		if len(posArgs) > 0 {
+			return histActionEnable, fmt.Errorf("--on cannot be used with positional argument %q", posArgs[0])
+		}
+		if requestOutputFlagIsPresent(cmd) {
+			return histActionEnable, fmt.Errorf("cannot use output flags with --on")
+		}
+		return histActionEnable, nil
+	} else if f.Changed("off") {
+		if len(posArgs) > 0 {
+			return histActionDisable, fmt.Errorf("--off cannot be used with positional argument %q", posArgs[0])
+		}
+		if requestOutputFlagIsPresent(cmd) {
+			return histActionEnable, fmt.Errorf("cannot use output flags with --off")
+		}
+		return histActionDisable, nil
+	} else if f.Changed("clear") {
+		if len(posArgs) > 0 {
+			return histActionClear, fmt.Errorf("--clear cannot be used with positional argument %q", posArgs[0])
+		}
+		if requestOutputFlagIsPresent(cmd) {
+			return histActionEnable, fmt.Errorf("cannot use output flags with --clear")
+		}
+		return histActionClear, nil
+	} else if f.Changed("info") {
+		if len(posArgs) > 0 {
+			return histActionInfo, fmt.Errorf("--info cannot be used with positional argument %q", posArgs[0])
+		}
+		if requestOutputFlagIsPresent(cmd) {
+			return histActionEnable, fmt.Errorf("cannot use output flags with --info")
+		}
+		return histActionInfo, nil
+	}
+
+	if len(posArgs) == 0 {
+		if requestOutputFlagIsPresent(cmd) {
+			return histActionList, fmt.Errorf("output flags are only valid when selecting a history entry to show")
+		}
+		return histActionList, nil
+	} else if len(posArgs) == 1 {
+		return histActionDetail, nil
+	} else {
+		return histActionList, fmt.Errorf("unknown positional argument %q", posArgs[1])
+	}
+}
+
+func requestOutputFlagIsPresent(cmd *cobra.Command) bool {
+	f := cmd.Flags()
+
+	return f.Changed("request") || f.Changed("captures") || f.Changed("headers") || f.Changed("no-body") || f.Changed("flags") || f.Changed("no-dates")
+}
+
+type histAction int
+
+const (
+	histActionList histAction = iota
+	histActionDetail
+	histActionInfo
+	histActionClear
+	histActionEnable
+	histActionDisable
+)

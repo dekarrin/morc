@@ -10,10 +10,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func init() {
-	rootCmd.AddCommand(initCmd)
-}
-
 var initCmd = &cobra.Command{
 	Use: "init [PROJECT_NAME]",
 	Annotations: map[string]string{
@@ -40,6 +36,10 @@ var initCmd = &cobra.Command{
 
 		return invokeInit(projName)
 	},
+}
+
+func init() {
+	rootCmd.AddCommand(initCmd)
 }
 
 func invokeInit(projName string) error {

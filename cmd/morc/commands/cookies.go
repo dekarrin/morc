@@ -12,20 +12,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func init() {
-	cookiesCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
-	cookiesCmd.PersistentFlags().BoolVarP(&flags.BInfo, "info", "", false, "Print summarizing information about stored cookies")
-	cookiesCmd.PersistentFlags().BoolVarP(&flags.BClear, "clear", "", false, "Delete all cookies")
-	cookiesCmd.PersistentFlags().BoolVarP(&flags.BEnable, "on", "", false, "Enable cookie recording for future requests")
-	cookiesCmd.PersistentFlags().BoolVarP(&flags.BDisable, "off", "", false, "Disable cookie recording for future requests")
-	cookiesCmd.PersistentFlags().StringVarP(&flags.URL, "url", "u", "", "Get cookies that would only be set on the given URL")
-
-	// mark the delete and default flags as mutually exclusive
-	cookiesCmd.MarkFlagsMutuallyExclusive("on", "off", "clear", "info", "url")
-
-	rootCmd.AddCommand(cookiesCmd)
-}
-
 var cookiesCmd = &cobra.Command{
 	Use: "cookies",
 	Annotations: map[string]string{
@@ -70,6 +56,20 @@ var cookiesCmd = &cobra.Command{
 			panic(fmt.Sprintf("unhandled cookies action %q", args.action))
 		}
 	},
+}
+
+func init() {
+	cookiesCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
+	cookiesCmd.PersistentFlags().BoolVarP(&flags.BInfo, "info", "", false, "Print summarizing information about stored cookies")
+	cookiesCmd.PersistentFlags().BoolVarP(&flags.BClear, "clear", "", false, "Delete all cookies")
+	cookiesCmd.PersistentFlags().BoolVarP(&flags.BEnable, "on", "", false, "Enable cookie recording for future requests")
+	cookiesCmd.PersistentFlags().BoolVarP(&flags.BDisable, "off", "", false, "Disable cookie recording for future requests")
+	cookiesCmd.PersistentFlags().StringVarP(&flags.URL, "url", "u", "", "Get cookies that would only be set on the given URL")
+
+	// mark the delete and default flags as mutually exclusive
+	cookiesCmd.MarkFlagsMutuallyExclusive("on", "off", "clear", "info", "url")
+
+	rootCmd.AddCommand(cookiesCmd)
 }
 
 func invokeCookiesOn(io cmdio.IO, projFile string) error {

@@ -9,23 +9,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func init() {
-	execCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
-	execCmd.PersistentFlags().StringArrayVarP(&flags.Vars, "var", "V", []string{}, "Temporarily set a variable's value at the start of the flow. The argument to this flag must be in `VAR=VALUE` format.")
-	execCmd.PersistentFlags().BoolVarP(&flags.BInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
-
-	addRequestOutputFlags(execCmd)
-
-	rootCmd.AddCommand(execCmd)
-}
-
-type execOptions struct {
-	projFile    string
-	oneTimeVars map[string]string
-	outputCtrl  morc.OutputControl
-	skipVerify  bool
-}
-
 var execCmd = &cobra.Command{
 	Use: "exec FLOW",
 	Annotations: map[string]string{
@@ -36,9 +19,9 @@ var execCmd = &cobra.Command{
 	Long:    "Execute a sequence of requests defined in a flow stored in the project. Initial variable values can be set with -V and will override any in the store before the first request in the flow is executed.",
 	Args:    cobra.ExactArgs(1),
 	GroupID: "sending",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		opts, err := execFlagsToOptions()
-		if err != nil {
+	RunE: func(cmd *cobra.Command, posArgs []string) error {
+		var args execArgs
+		if err := parseExecArgs(posArgs, &args); err != nil {
 			return err
 		}
 
@@ -46,46 +29,24 @@ var execCmd = &cobra.Command{
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
 
-		return invokeExec(io, args[0], opts)
+		return invokeExec(io, args.projFile, args.flow, args.oneTimeVars, args.skipVerify, args.outputCtrl)
 	},
 }
 
-func execFlagsToOptions() (execOptions, error) {
-	opts := execOptions{
-		skipVerify: flags.BInsecure,
-	}
+func init() {
+	execCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
+	execCmd.PersistentFlags().StringArrayVarP(&flags.Vars, "var", "V", []string{}, "Temporarily set a variable's value at the start of the flow. The argument to this flag must be in `VAR=VALUE` format.")
+	execCmd.PersistentFlags().BoolVarP(&flags.BInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
 
-	opts.projFile = flags.ProjectFile
-	if opts.projFile == "" {
-		return opts, fmt.Errorf("project file is set to empty string")
-	}
+	addRequestOutputFlags(execCmd)
 
-	var err error
-	opts.outputCtrl, err = gatherRequestOutputFlags()
-	if err != nil {
-		return opts, err
-	}
-
-	// check vars
-	if len(flags.Vars) > 0 {
-		oneTimeVars := make(map[string]string)
-		for idx, v := range flags.Vars {
-			parts := strings.SplitN(v, ":", 2)
-			if len(parts) != 2 {
-				return opts, fmt.Errorf("var #%d (%q) is not in format key:value", idx+1, v)
-			}
-			oneTimeVars[parts[0]] = parts[1]
-		}
-		opts.oneTimeVars = oneTimeVars
-	}
-
-	return opts, nil
+	rootCmd.AddCommand(execCmd)
 }
 
 // invokeExec receives the name of the flow to execute and the options to use.
-func invokeExec(io cmdio.IO, flowName string, opts execOptions) error {
+func invokeExec(io cmdio.IO, projFile, flowName string, initialVarOverrides map[string]string, skipVerify bool, oc morc.OutputControl) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -115,13 +76,13 @@ func invokeExec(io cmdio.IO, flowName string, opts execOptions) error {
 
 	varOverrides := make(map[string]string)
 	// copy in the one-time vars
-	for k, v := range opts.oneTimeVars {
+	for k, v := range initialVarOverrides {
 		varOverrides[strings.ToUpper(k)] = v
 	}
 
-	opts.outputCtrl.Writer = io.Out
+	oc.Writer = io.Out
 	for i, tmpl := range templates {
-		result, err := sendTemplate(&p, tmpl, p.Vars.MergedSet(varOverrides), opts.skipVerify, opts.outputCtrl)
+		result, err := sendTemplate(&p, tmpl, p.Vars.MergedSet(varOverrides), skipVerify, oc)
 		if err != nil {
 			return fmt.Errorf("step #%d: %w", i, err)
 		}
@@ -132,6 +93,47 @@ func invokeExec(io cmdio.IO, flowName string, opts execOptions) error {
 			delete(varOverrides, strings.ToUpper(k))
 		}
 	}
+
+	return nil
+}
+
+type execArgs struct {
+	projFile string
+
+	flow        string
+	oneTimeVars map[string]string
+	outputCtrl  morc.OutputControl
+	skipVerify  bool
+}
+
+func parseExecArgs(posArgs []string, args *execArgs) error {
+	args.projFile = flags.ProjectFile
+	if args.projFile == "" {
+		return fmt.Errorf("project file cannot be set to empty string")
+	}
+
+	args.skipVerify = flags.BInsecure
+
+	var err error
+	args.outputCtrl, err = gatherRequestOutputFlags()
+	if err != nil {
+		return err
+	}
+
+	// check vars
+	if len(flags.Vars) > 0 {
+		oneTimeVars := make(map[string]string)
+		for idx, v := range flags.Vars {
+			parts := strings.SplitN(v, ":", 2)
+			if len(parts) != 2 {
+				return fmt.Errorf("var #%d (%q) is not in format key:value", idx+1, v)
+			}
+			oneTimeVars[parts[0]] = parts[1]
+		}
+		args.oneTimeVars = oneTimeVars
+	}
+
+	args.flow = posArgs[0]
 
 	return nil
 }

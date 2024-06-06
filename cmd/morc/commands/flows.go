@@ -51,17 +51,17 @@ var flowsCmd = &cobra.Command{
 		io := cmdio.From(cmd)
 
 		switch args.action {
-		case flowsList:
+		case flowsActionList:
 			return invokeFlowsList(io, args.projFile)
-		case flowsShow:
+		case flowsActionShow:
 			return invokeFlowsShow(io, args.projFile, args.flow)
-		case flowsDelete:
+		case flowsActionDelete:
 			return invokeFlowsDelete(io, args.projFile, args.flow)
-		case flowsEdit:
+		case flowsActionEdit:
 			return invokeFlowsEdit(io, args.projFile, args.flow, args.sets)
-		case flowsGet:
+		case flowsActionGet:
 			return invokeFlowsGet(io, args.projFile, args.flow, args.getItem)
-		case flowsNew:
+		case flowsActionNew:
 			return invokeFlowsNew(io, args.projFile, args.flow, args.reqs)
 
 		default:
@@ -480,15 +480,15 @@ func parseFlowsArgs(cmd *cobra.Command, posArgs []string, args *flowsArgs) error
 
 	// do action-specific arg and flag parsing
 	switch args.action {
-	case flowsList:
+	case flowsActionList:
 		// nothing else to do
-	case flowsShow:
+	case flowsActionShow:
 		// set arg 1 as the flow name
 		args.flow = posArgs[0]
-	case flowsDelete:
+	case flowsActionDelete:
 		// special case of flow name set from a CLI flag rather than pos arg.
 		args.flow = flags.Delete
-	case flowsGet:
+	case flowsActionGet:
 		// set arg 1 as the flow name
 		args.flow = posArgs[0]
 
@@ -497,12 +497,12 @@ func parseFlowsArgs(cmd *cobra.Command, posArgs []string, args *flowsArgs) error
 		if err != nil {
 			return err
 		}
-	case flowsNew:
+	case flowsActionNew:
 		// pick up requests from args and set the flow name from the flag
 		args.flow = flags.New
 		args.sets.name = optional[string]{set: true, v: flags.New}
 		args.reqs = posArgs
-	case flowsEdit:
+	case flowsActionEdit:
 		// set arg 1 as the flow name
 		args.flow = posArgs[0]
 
@@ -530,38 +530,38 @@ func parseFlowsActionFromFlags(cmd *cobra.Command, posArgs []string) (flowAction
 
 	if f.Changed("delete") {
 		if len(posArgs) > 0 {
-			return flowsDelete, fmt.Errorf("unknown positional argument %q", posArgs[0])
+			return flowsActionDelete, fmt.Errorf("unknown positional argument %q", posArgs[0])
 		}
-		return flowsDelete, nil
+		return flowsActionDelete, nil
 	} else if f.Changed("new") {
 		if len(posArgs) < 2 {
-			return flowsNew, fmt.Errorf("--new requires at least two requests in positional args")
+			return flowsActionNew, fmt.Errorf("--new requires at least two requests in positional args")
 		}
-		return flowsNew, nil
+		return flowsActionNew, nil
 	} else if f.Changed("get") {
 		if len(posArgs) < 1 {
-			return flowsGet, fmt.Errorf("missing name of FLOW to get from")
+			return flowsActionGet, fmt.Errorf("missing name of FLOW to get from")
 		}
 		if len(posArgs) > 1 {
-			return flowsGet, fmt.Errorf("unknown positional argument %q", posArgs[1])
+			return flowsActionGet, fmt.Errorf("unknown positional argument %q", posArgs[1])
 		}
-		return flowsGet, nil
+		return flowsActionGet, nil
 	} else if flowsSetFlagIsPresent(cmd) {
 		if len(posArgs) < 1 {
-			return flowsEdit, fmt.Errorf("missing name of FLOW to update")
+			return flowsActionEdit, fmt.Errorf("missing name of FLOW to update")
 		}
 		if len(posArgs) > 1 {
-			return flowsEdit, fmt.Errorf("unknown positional argument %q", posArgs[1])
+			return flowsActionEdit, fmt.Errorf("unknown positional argument %q", posArgs[1])
 		}
-		return flowsEdit, nil
+		return flowsActionEdit, nil
 	}
 
 	if len(posArgs) == 0 {
-		return flowsList, nil
+		return flowsActionList, nil
 	} else if len(posArgs) == 1 {
-		return flowsShow, nil
+		return flowsActionShow, nil
 	} else {
-		return flowsList, fmt.Errorf("unknown positional argument %q", posArgs[1])
+		return flowsActionList, fmt.Errorf("unknown positional argument %q", posArgs[1])
 	}
 }
 
@@ -682,12 +682,12 @@ func flowsSetFlagIsPresent(cmd *cobra.Command) bool {
 type flowAction int
 
 const (
-	flowsList flowAction = iota
-	flowsShow
-	flowsNew
-	flowsDelete
-	flowsGet
-	flowsEdit
+	flowsActionList flowAction = iota
+	flowsActionShow
+	flowsActionNew
+	flowsActionDelete
+	flowsActionGet
+	flowsActionEdit
 )
 
 // probs overengineered given there is ONE flow attribute constant other than

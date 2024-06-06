@@ -10,33 +10,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	reservedDefaultEnvName = "<DEFAULT>"
-)
-
-type varsAction int
-
-const (
-	varsActionList varsAction = iota
-	varsActionGet
-	varsActionSet
-	varsActionDelete
-)
-
-func init() {
-	varsCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath)
-	varsCmd.PersistentFlags().StringVarP(&flags.Delete, "delete", "D", "", "Delete the variable `VAR`")
-	varsCmd.PersistentFlags().StringVarP(&flags.Env, "env", "e", "", "Run the command against the environment `ENV` instead of the current one. Use --default instead to specify the default environment.")
-	varsCmd.PersistentFlags().BoolVarP(&flags.BDefault, "default", "", false, "Run the command against the default environment instead of the current one.")
-	varsCmd.PersistentFlags().BoolVarP(&flags.BCurrent, "current", "", false, "Apply only to current environment. This is the same as typing --env followed by the name of the current environment.")
-	varsCmd.PersistentFlags().BoolVarP(&flags.BAll, "all", "a", false, "Used with -D. Delete the variable from all environments. This is the only way to effectively specify '--default' while deleting; it is a separate flag to indicate that the variable will indeed be erased everywhere, not just in the default environment.")
-
-	// mark the env and default flags as mutually exclusive
-	varsCmd.MarkFlagsMutuallyExclusive("env", "default", "all", "current")
-
-	rootCmd.AddCommand(varsCmd)
-}
-
 var varsCmd = &cobra.Command{
 	Use: "vars [VAR [VALUE]]",
 	Annotations: map[string]string{
@@ -58,118 +31,96 @@ var varsCmd = &cobra.Command{
 		"supplemented with those from the default environment for vars that are not defined in the specific one. If " +
 		"the current environment *is* the default environment, there is no distinction.",
 	Args: cobra.MaximumNArgs(2),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		opts := varOptions{
-			projFile:           flags.ProjectFile,
-			envOverride:        flags.Env,
-			envDefaultOverride: flags.BDefault,
-			envCurrentOverride: flags.BCurrent,
-			deleteVar:          flags.Delete != "",
-			envAll:             flags.BAll,
-		}
-		if opts.projFile == "" {
-			return fmt.Errorf("project file is set to empty string")
-		}
-
-		// TODO: refactor to follow same pattern as reqs, proj, flows, caps, etc.
-
-		var varName string
-		var varValue string
-		var err error
-		action, err := parseVarsActionFromFlags(cmd, args)
-		if err != nil {
+	RunE: func(cmd *cobra.Command, posArgs []string) error {
+		var args varsArgs
+		if err := parseVarsArgs(cmd, posArgs, &args); err != nil {
 			return err
-		}
-
-		// pick up args
-		switch action {
-		case varsActionList:
-			// nothing to do here
-		case varsActionGet:
-			varName = args[0]
-		case varsActionSet:
-			varName = args[0]
-			varValue = args[1]
-		case varsActionDelete:
-			varName = flags.Delete
 		}
 
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
 
-		switch action {
+		switch args.action {
 		case varsActionList:
-			return invokeVarList(io, opts)
+			return invokeVarList(io, args.projFile, args.env)
 		case varsActionGet:
-			return invokeVarGet(io, varName, opts)
+			return invokeVarGet(io, args.projFile, args.env, args.varName)
 		case varsActionSet:
-			return invokeVarSet(io, varName, varValue, opts)
+			return invokeVarSet(io, args.projFile, args.env, args.varName, args.value)
 		case varsActionDelete:
-			return invokeVarDelete(io, varName, opts)
+			return invokeVarDelete(io, args.projFile, args.env, args.varName)
 		default:
-			panic(fmt.Sprintf("unhandled var action %q", action))
+			panic(fmt.Sprintf("unhandled vars action %q", args.action))
 		}
 	},
 }
 
-type varOptions struct {
-	projFile           string
-	envOverride        string
-	envDefaultOverride bool
-	envCurrentOverride bool
-	envAll             bool
-	deleteVar          bool
+func init() {
+	varsCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath)
+	varsCmd.PersistentFlags().StringVarP(&flags.Delete, "delete", "D", "", "Delete the variable `VAR`")
+	varsCmd.PersistentFlags().StringVarP(&flags.Env, "env", "e", "", "Run the command against the environment `ENV` instead of the current one. Use --default instead to specify the default environment.")
+	varsCmd.PersistentFlags().BoolVarP(&flags.BDefault, "default", "", false, "Run the command against the default environment instead of the current one.")
+	varsCmd.PersistentFlags().BoolVarP(&flags.BCurrent, "current", "", false, "Apply only to current environment. This is the same as typing --env followed by the name of the current environment.")
+	varsCmd.PersistentFlags().BoolVarP(&flags.BAll, "all", "a", false, "Used with -D. Delete the variable from all environments. This is the only way to effectively specify '--default' while deleting; it is a separate flag to indicate that the variable will indeed be erased everywhere, not just in the default environment.")
+
+	// mark the env and default flags as mutually exclusive
+	varsCmd.MarkFlagsMutuallyExclusive("env", "default", "all", "current")
+
+	rootCmd.AddCommand(varsCmd)
 }
 
-func invokeVarSet(_ cmdio.IO, varName, value string, opts varOptions) error {
+func invokeVarSet(io cmdio.IO, projFile string, env envSelection, varName, value string) error {
 	// dont even bother to load if the var name is invalid
 	varName, err := morc.ParseVarName(strings.ToUpper(varName))
 	if err != nil {
 		return err
 	}
 
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
 
-	if opts.envDefaultOverride {
+	if env.useDefault {
 		p.Vars.SetIn(varName, value, "")
-	} else if opts.envOverride != "" {
-		p.Vars.SetIn(varName, value, opts.envOverride)
-	} else if opts.envCurrentOverride {
+		io.PrintLoudf("Set ${%s} to %q in default environment\n", varName, value)
+	} else if env.useName != "" {
+		p.Vars.SetIn(varName, value, env.useName)
+		io.PrintLoudf("Set ${%s} to %q in environment %q\n", varName, value, env.useName)
+	} else if env.useCurrent {
 		p.Vars.SetIn(varName, value, p.Vars.Environment)
+		io.PrintLoudf("Set ${%s} to %q in current environment\n", varName, value)
 	} else {
 		p.Vars.Set(varName, value)
-
+		io.PrintLoudf("Set ${%s} to %q\n", varName, value)
 	}
 
 	return p.PersistToDisk(false)
 }
 
-func invokeVarGet(io cmdio.IO, varName string, opts varOptions) error {
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+func invokeVarGet(io cmdio.IO, projFile string, env envSelection, varName string) error {
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
 
 	var val string
-	if opts.envDefaultOverride {
+	if env.useDefault {
 		if !p.Vars.IsDefinedIn(varName, "") {
 			io.PrintErrf("%q is not defined in default environment\n", varName)
 			return nil
 		}
 
 		val = p.Vars.GetFrom(varName, "")
-	} else if opts.envOverride != "" {
-		if !p.Vars.IsDefinedIn(varName, opts.envOverride) {
-			io.PrintErrf("%q is not defined in environment %q\n", varName, opts.envOverride)
+	} else if env.useName != "" {
+		if !p.Vars.IsDefinedIn(varName, env.useName) {
+			io.PrintErrf("%q is not defined in environment %q\n", varName, env.useName)
 			return nil
 		}
 
-		val = p.Vars.GetFrom(varName, opts.envOverride)
-	} else if opts.envCurrentOverride {
+		val = p.Vars.GetFrom(varName, env.useName)
+	} else if env.useCurrent {
 		if !p.Vars.IsDefinedIn(varName, p.Vars.Environment) {
 			io.PrintErrf("%q is not defined in current environment (%q)\n", varName, p.Vars.Environment)
 			return nil
@@ -190,26 +141,32 @@ func invokeVarGet(io cmdio.IO, varName string, opts varOptions) error {
 	return nil
 }
 
-func invokeVarDelete(_ cmdio.IO, varName string, opts varOptions) error {
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName string) error {
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
 
 	// are we looking to delete from a specific environment?
-	if opts.envDefaultOverride { // will never be true as user must specify --all to get this behavior
-		return fmt.Errorf("--default option cannot be set when deleting a variable")
+	if env.useDefault {
+		// should never happen as user must specify --all to get this behavior
+		return fmt.Errorf("cannot delete from default environment by specifying useDefault; set all=true instead")
 	}
 
 	// is the 'no default in --env' rule being bypassed by doing --current? reject if we are in the default env
-	if opts.envCurrentOverride && p.Vars.Environment == "" {
-		return fmt.Errorf("--current option not supported for deletion from default env")
+	if env.useCurrent && p.Vars.Environment == "" {
+		return fmt.Errorf("cannot delete from current env when current env is default env; set all=true instead")
 	}
 
-	if opts.envAll {
+	if env.useAll {
 		// easy, just delete from all environments
 		p.Vars.Remove(varName)
-		return p.PersistToDisk(false)
+		if err := p.PersistToDisk(false); err != nil {
+			return err
+		}
+
+		io.PrintLoudf("Deleted ${%s} from all environments\n", varName)
+		return nil
 	}
 
 	// is the user currently in the default environment *and* at least one other
@@ -219,23 +176,32 @@ func invokeVarDelete(_ cmdio.IO, varName string, opts varOptions) error {
 		otherEnvs := p.Vars.NonDefaultEnvsWith(varName)
 
 		if len(otherEnvs) > 0 {
-			return fmt.Errorf("current env is default and %q is defined in other envs: %s\nUse --all to delete from all environments", varName, strings.Join(otherEnvs, ", "))
+			return fmt.Errorf("current env is default and %q is defined in other envs: %s\nSet --all to delete from all environments", varName, strings.Join(otherEnvs, ", "))
 		}
 	}
 
-	if opts.envOverride != "" && !strings.EqualFold(p.Vars.Environment, strings.ToUpper(opts.envOverride)) {
-		p.Vars.UnsetIn(opts.envOverride, varName)
-	} else if opts.envCurrentOverride {
+	if env.useName != "" && !strings.EqualFold(p.Vars.Environment, env.useName) {
+		p.Vars.UnsetIn(env.useName, varName)
+	} else if env.useCurrent {
 		p.Vars.UnsetIn(p.Vars.Environment, varName)
 	} else {
 		p.Vars.Unset(varName)
 	}
 
-	return p.PersistToDisk(false)
+	if err := p.PersistToDisk(false); err != nil {
+		return err
+	}
+
+	fromMsg := ""
+	if env.IsSpecified() {
+		fromMsg = fmt.Sprintf(" from %s", env)
+	}
+	io.PrintLoudf("Deleted ${%s}%s\n", varName, fromMsg)
+	return nil
 }
 
-func invokeVarList(io cmdio.IO, opts varOptions) error {
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+func invokeVarList(io cmdio.IO, projFile string, env envSelection) error {
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -243,22 +209,24 @@ func invokeVarList(io cmdio.IO, opts varOptions) error {
 	var vars []string
 
 	var targetEnv string
-	inSpecificEnv := opts.envOverride != "" || opts.envDefaultOverride || opts.envCurrentOverride
 
 	// are we looking to get from a specific environment?
-	if inSpecificEnv {
+	if env.IsSpecified() {
 		// we want a specific environment only.
 
-		// either envDefaultOverride is set, meaning we should use the default,
-		// so envOverride will be empty. Or, envOverride will never be empty if
-		// envDefaultOverride is not set.
-		targetEnv = opts.envOverride
+		// either env.useDefault is set, meaning we should use the default,
+		// so env.useName will be empty. Or, env.useName will never be empty if
+		// env.useDefault is not set.
+		targetEnv = env.useName
 
-		// ...unless we have a current env override set, in which case targetEnv
+		// ...unless we have env.useCurrnet set, in which case targetEnv
 		// is simply the current one.
-		if opts.envCurrentOverride {
+		if env.useCurrent {
 			targetEnv = p.Vars.Environment
 		}
+
+		// TODO: bug? we never checked for env.useDefault here. Be shore to
+		// cover in tests
 		vars = p.Vars.DefinedIn(targetEnv)
 	} else {
 		vars = p.Vars.All()
@@ -272,7 +240,7 @@ func invokeVarList(io cmdio.IO, opts varOptions) error {
 	} else {
 		var v string
 		for _, name := range vars {
-			if inSpecificEnv {
+			if env.IsSpecified() {
 				v = p.Vars.GetFrom(name, targetEnv)
 			} else {
 				v = p.Vars.Get(name)
@@ -284,7 +252,64 @@ func invokeVarList(io cmdio.IO, opts varOptions) error {
 	return nil
 }
 
+type varsArgs struct {
+	projFile string
+	action   varsAction
+	env      envSelection
+	varName  string
+	value    string
+}
+
+func parseVarsArgs(cmd *cobra.Command, posArgs []string, args *varsArgs) error {
+	args.projFile = flags.ProjectFile
+	if args.projFile == "" {
+		return fmt.Errorf("project file cannot be set to empty string")
+	}
+
+	var err error
+
+	args.action, err = parseVarsActionFromFlags(cmd, posArgs)
+	if err != nil {
+		return err
+	}
+
+	// all actions allow for environment selection so grab that now
+	if flags.Env != "" {
+		args.env.useName = flags.Env
+	} else if flags.BDefault {
+		// --delete doesn't allow this flag, but we already checked in action
+		// parsing.
+		args.env.useDefault = true
+	} else if flags.BCurrent {
+		args.env.useCurrent = true
+	}
+
+	// do action-specific arg and flag parsing
+	switch args.action {
+	case varsActionList:
+		// nothing to do here
+	case varsActionGet:
+		args.varName = posArgs[0]
+	case varsActionSet:
+		args.varName = posArgs[0]
+		args.value = posArgs[1]
+	case varsActionDelete:
+		args.varName = flags.Delete
+		args.env.useAll = flags.BAll
+	default:
+		panic(fmt.Sprintf("unhandled vars action %q", args.action))
+	}
+
+	return nil
+}
+
 func parseVarsActionFromFlags(cmd *cobra.Command, posArgs []string) (varsAction, error) {
+	// mutual exclusions enforced by cobra (and therefore we do not check them here):
+	// * --env, --default, --all, --current
+	//
+	// we do NOT enforce on --delete and --default at the cobra level so we can
+	// return a custom error message.
+
 	f := cmd.Flags()
 
 	if f.Changed("delete") {
@@ -332,3 +357,12 @@ func parseVarsActionFromFlags(cmd *cobra.Command, posArgs []string) (varsAction,
 
 	return varsActionList, fmt.Errorf("unknown positional argument %q", posArgs[2])
 }
+
+type varsAction int
+
+const (
+	varsActionList varsAction = iota
+	varsActionGet
+	varsActionSet
+	varsActionDelete
+)

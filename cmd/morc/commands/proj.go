@@ -34,13 +34,13 @@ var projCmd = &cobra.Command{
 		io := cmdio.From(cmd)
 
 		switch opts.action {
-		case projInfo:
+		case projActionInfo:
 			return invokeProjShow(io, opts.projFile)
-		case projGet:
+		case projActionGet:
 			return invokeProjGet(io, opts.projFile, opts.getItem)
-		case projNew:
+		case projActionNew:
 			return invokeProjNew(io, opts.projFile, opts.sets)
-		case projEdit:
+		case projActionEdit:
 			return invokeProjEdit(io, opts.projFile, opts.sets)
 		default:
 			panic(fmt.Sprintf("unhandled proj action %q", opts.action))
@@ -387,19 +387,19 @@ func parseProjArgs(cmd *cobra.Command, _ []string, args *projArgs) error {
 
 	// do action-specific arg and flag parsing
 	switch args.action {
-	case projInfo:
+	case projActionInfo:
 		// no-op; no further checks to do
-	case projGet:
+	case projActionGet:
 		// parse the get from the string
 		args.getItem, err = parseProjAttrKey(flags.Get)
 		if err != nil {
 			return err
 		}
-	case projNew:
+	case projActionNew:
 		if err := parseProjSetFlags(cmd, &args.sets); err != nil {
 			return err
 		}
-	case projEdit:
+	case projActionEdit:
 		if err := parseProjSetFlags(cmd, &args.sets); err != nil {
 			return err
 		}
@@ -419,13 +419,13 @@ func parseProjActionFromFlags() (projAction, error) {
 	// * No-args.
 
 	if flags.Get != "" {
-		return projGet, nil
+		return projActionGet, nil
 	} else if flags.BNew {
-		return projNew, nil
+		return projActionNew, nil
 	} else if projSetFlagIsPresent() {
-		return projEdit, nil
+		return projActionEdit, nil
 	}
-	return projInfo, nil
+	return projActionInfo, nil
 }
 
 func parseProjSetFlags(cmd *cobra.Command, attrs *projAttrValues) error {
@@ -475,10 +475,10 @@ func projSetFlagIsPresent() bool {
 type projAction int
 
 const (
-	projInfo projAction = iota
-	projGet
-	projNew
-	projEdit
+	projActionInfo projAction = iota
+	projActionGet
+	projActionNew
+	projActionEdit
 )
 
 type projKey string

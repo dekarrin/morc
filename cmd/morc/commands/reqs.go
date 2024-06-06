@@ -62,17 +62,17 @@ var reqsCmd = &cobra.Command{
 		io := cmdio.From(cmd)
 
 		switch args.action {
-		case reqsList:
+		case reqsActionList:
 			return invokeReqsList(io, args.projFile)
-		case reqsShow:
+		case reqsActionShow:
 			return invokeReqsShow(io, args.projFile, args.req)
-		case reqsDelete:
+		case reqsActionDelete:
 			return invokeReqsDelete(io, args.projFile, args.req, args.force)
-		case reqsGet:
+		case reqsActionGet:
 			return invokeReqsGet(io, args.projFile, args.req, args.getItem)
-		case reqsNew:
+		case reqsActionNew:
 			return invokeReqsNew(io, args.projFile, args.req, args.sets)
-		case reqsEdit:
+		case reqsActionEdit:
 			return invokeReqsEdit(io, args.projFile, args.req, args.sets)
 		default:
 			panic(fmt.Sprintf("unhandled reqs action %q", args.action))
@@ -609,17 +609,17 @@ func parseReqsArgs(cmd *cobra.Command, posArgs []string, args *reqsArgs) error {
 
 	// do action-specific arg and flag parsing
 	switch args.action {
-	case reqsList:
+	case reqsActionList:
 		// nothing else to do
-	case reqsShow:
+	case reqsActionShow:
 		// use arg 1 as the req name
 		args.req = posArgs[0]
-	case reqsDelete:
+	case reqsActionDelete:
 		// special case of req name set from a CLI flag rather than pos arg.
 		args.req = flags.Delete
 
 		args.force = flags.BForce
-	case reqsGet:
+	case reqsActionGet:
 		// use arg 1 as the req name
 		args.req = posArgs[0]
 
@@ -633,7 +633,7 @@ func parseReqsArgs(cmd *cobra.Command, posArgs []string, args *reqsArgs) error {
 		} else {
 			args.getItem = reqKey{header: flags.GetHeader}
 		}
-	case reqsNew:
+	case reqsActionNew:
 		// above action parsing already checked that invalid set opts will not
 		// be present so we can just call parseReqsSetFlags and then use
 		// --new argument to set the new request name.
@@ -644,7 +644,7 @@ func parseReqsArgs(cmd *cobra.Command, posArgs []string, args *reqsArgs) error {
 		// set req name from the flag
 		args.req = flags.New
 		args.sets.name = optional[string]{set: true, v: flags.New}
-	case reqsEdit:
+	case reqsActionEdit:
 		// use arg 1 as the req name
 		args.req = posArgs[0]
 
@@ -670,43 +670,43 @@ func parseReqsActionFromFlags(cmd *cobra.Command, posArgs []string) (reqsAction,
 
 	// make sure user isn't invalidly using -f because cobra is not enforcing this
 	if flags.BForce && flags.Delete == "" {
-		return reqsEdit, fmt.Errorf("--force/-f can only be used with --delete/-D")
+		return reqsActionEdit, fmt.Errorf("--force/-f can only be used with --delete/-D")
 	}
 
 	if flags.Delete != "" {
 		if len(posArgs) > 0 {
 			return reqsAction(0), fmt.Errorf("unknown positional argument %q", posArgs[0])
 		}
-		return reqsDelete, nil
+		return reqsActionDelete, nil
 	} else if flags.New != "" {
 		if len(posArgs) > 0 {
 			return reqsAction(0), fmt.Errorf("unknown positional argument %q", posArgs[0])
 		}
-		return reqsNew, nil
+		return reqsActionNew, nil
 	} else if flags.Get != "" || flags.GetHeader != "" {
 		if len(posArgs) < 1 {
-			return reqsGet, fmt.Errorf("missing name of REQ to get from")
+			return reqsActionGet, fmt.Errorf("missing name of REQ to get from")
 		}
 		if len(posArgs) > 1 {
-			return reqsGet, fmt.Errorf("unknown positional argument %q", posArgs[1])
+			return reqsActionGet, fmt.Errorf("unknown positional argument %q", posArgs[1])
 		}
-		return reqsGet, nil
+		return reqsActionGet, nil
 	} else if reqsSetFlagIsPresent(cmd) {
 		if len(posArgs) < 1 {
-			return reqsEdit, fmt.Errorf("missing name of REQ to update")
+			return reqsActionEdit, fmt.Errorf("missing name of REQ to update")
 		}
 		if len(posArgs) > 1 {
-			return reqsEdit, fmt.Errorf("unknown positional argument %q", posArgs[1])
+			return reqsActionEdit, fmt.Errorf("unknown positional argument %q", posArgs[1])
 		}
-		return reqsEdit, nil
+		return reqsActionEdit, nil
 	}
 
 	if len(posArgs) == 0 {
-		return reqsList, nil
+		return reqsActionList, nil
 	} else if len(posArgs) == 1 {
-		return reqsShow, nil
+		return reqsActionShow, nil
 	} else {
-		return reqsList, fmt.Errorf("unknown positional argument %q", posArgs[1])
+		return reqsActionList, fmt.Errorf("unknown positional argument %q", posArgs[1])
 	}
 }
 
@@ -798,12 +798,12 @@ func reqsSetFlagIsPresent(cmd *cobra.Command) bool {
 type reqsAction int
 
 const (
-	reqsList reqsAction = iota
-	reqsShow
-	reqsNew
-	reqsDelete
-	reqsGet
-	reqsEdit
+	reqsActionList reqsAction = iota
+	reqsActionShow
+	reqsActionNew
+	reqsActionDelete
+	reqsActionGet
+	reqsActionEdit
 )
 
 type reqKey struct {

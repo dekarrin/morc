@@ -10,23 +10,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func init() {
-	sendCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
-	sendCmd.PersistentFlags().StringArrayVarP(&flags.Vars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Overrides any value currently in the store. The argument to this flag must be in `VAR=VALUE` format.")
-	sendCmd.PersistentFlags().BoolVarP(&flags.BInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
-
-	addRequestOutputFlags(sendCmd)
-
-	rootCmd.AddCommand(sendCmd)
-}
-
-type sendOptions struct {
-	projFile    string
-	oneTimeVars map[string]string
-	outputCtrl  morc.OutputControl
-	skipVerify  bool
-}
-
 var sendCmd = &cobra.Command{
 	Use: "send REQ",
 	Annotations: map[string]string{
@@ -39,9 +22,9 @@ var sendCmd = &cobra.Command{
 		"captured from the response is automatically stored to their respective variables.",
 	Args:    cobra.ExactArgs(1),
 	GroupID: "sending",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		opts, err := sendFlagsToOptions()
-		if err != nil {
+	RunE: func(cmd *cobra.Command, posArgs []string) error {
+		var args sendArgs
+		if err := parseSendArgs(posArgs, &args); err != nil {
 			return err
 		}
 
@@ -49,53 +32,24 @@ var sendCmd = &cobra.Command{
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
 
-		return invokeSend(io, args[0], opts)
+		return invokeSend(io, args.projFile, args.req, args.oneTimeVars, args.skipVerify, args.outputCtrl)
 	},
 }
 
-func sendFlagsToOptions() (sendOptions, error) {
-	opts := sendOptions{}
+func init() {
+	sendCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
+	sendCmd.PersistentFlags().StringArrayVarP(&flags.Vars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Overrides any value currently in the store. The argument to this flag must be in `VAR=VALUE` format.")
+	sendCmd.PersistentFlags().BoolVarP(&flags.BInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
 
-	opts.projFile = flags.ProjectFile
-	if opts.projFile == "" {
-		return opts, fmt.Errorf("project file is set to empty string")
-	}
+	addRequestOutputFlags(sendCmd)
 
-	var err error
-	opts.outputCtrl, err = gatherRequestOutputFlags()
-	if err != nil {
-		return opts, err
-	}
-
-	// check vars
-	if len(flags.Vars) > 0 {
-		oneTimeVars := make(map[string]string)
-		for idx, v := range flags.Vars {
-			parts := strings.SplitN(v, "=", 2)
-			if len(parts) != 2 {
-				return opts, fmt.Errorf("var #%d (%q) is not in format key=value", idx+1, v)
-			}
-
-			varName, err := morc.ParseVarName(strings.ToUpper(parts[0]))
-			if err != nil {
-				return opts, fmt.Errorf("var #%d (%q): %w", idx+1, v, err)
-			}
-			oneTimeVars[varName] = parts[1]
-		}
-		opts.oneTimeVars = oneTimeVars
-	}
-
-	if flags.BInsecure {
-		opts.skipVerify = true
-	}
-
-	return opts, nil
+	rootCmd.AddCommand(sendCmd)
 }
 
 // invokeRequest receives named vars and checked/defaulted requestOptions.
-func invokeSend(io cmdio.IO, reqName string, opts sendOptions) error {
+func invokeSend(io cmdio.IO, projFile, reqName string, varOverrides map[string]string, skipVerify bool, oc morc.OutputControl) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(opts.projFile, true)
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -109,9 +63,57 @@ func invokeSend(io cmdio.IO, reqName string, opts sendOptions) error {
 		return fmt.Errorf("no request template %s", reqName)
 	}
 
-	opts.outputCtrl.Writer = io.Out
-	_, err = sendTemplate(&p, tmpl, p.Vars.MergedSet(opts.oneTimeVars), opts.skipVerify, opts.outputCtrl)
+	oc.Writer = io.Out
+	_, err = sendTemplate(&p, tmpl, p.Vars.MergedSet(varOverrides), skipVerify, oc)
 	return err
+}
+
+type sendArgs struct {
+	projFile    string
+	req         string
+	oneTimeVars map[string]string
+	outputCtrl  morc.OutputControl
+	skipVerify  bool
+}
+
+func parseSendArgs(posArgs []string, args *sendArgs) error {
+	// send is a single-action command, so we will only be gathering pos args
+	// and flags.
+	args.projFile = flags.ProjectFile
+	if args.projFile == "" {
+		return fmt.Errorf("project file cannot be set to empty string")
+	}
+
+	var err error
+	args.outputCtrl, err = gatherRequestOutputFlags()
+	if err != nil {
+		return err
+	}
+
+	if len(flags.Vars) > 0 {
+		oneTimeVars := make(map[string]string)
+		for idx, v := range flags.Vars {
+			parts := strings.SplitN(v, "=", 2)
+			if len(parts) != 2 {
+				return fmt.Errorf("var #%d (%q) is not in format key=value", idx+1, v)
+			}
+
+			varName, err := morc.ParseVarName(strings.ToUpper(parts[0]))
+			if err != nil {
+				return fmt.Errorf("var #%d (%q): %w", idx+1, v, err)
+			}
+			oneTimeVars[varName] = parts[1]
+		}
+		args.oneTimeVars = oneTimeVars
+	}
+
+	if flags.BInsecure {
+		args.skipVerify = true
+	}
+
+	args.req = posArgs[0]
+
+	return nil
 }
 
 func sendTemplate(p *morc.Project, tmpl morc.RequestTemplate, vars map[string]string, skipVerify bool, oc morc.OutputControl) (morc.SendResult, error) {

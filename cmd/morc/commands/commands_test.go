@@ -19,9 +19,13 @@ func assert_projectInFileMatches(assert *assert.Assertions, expected morc.Projec
 		return false
 	}
 
-	// ignore the project file path
+	// ignore project file paths
 	expected.Config.ProjFile = ""
+	expected.Config.HistFile = ""
+	expected.Config.SeshFile = ""
 	updatedProj.Config.ProjFile = ""
+	updatedProj.Config.HistFile = ""
+	updatedProj.Config.SeshFile = ""
 	return assert.Equal(expected, updatedProj, "project in file does not match expected")
 }
 
@@ -54,6 +58,7 @@ func runTestCommand(cmd *cobra.Command, projFilePath string, args []string) (std
 
 func createTestProjectFiles(t *testing.T, p morc.Project) string {
 	dir := t.TempDir()
+
 	projFilePath := filepath.Join(dir, "project.json")
 	f, err := os.Create(projFilePath)
 	if err != nil {
@@ -68,13 +73,71 @@ func createTestProjectFiles(t *testing.T, p morc.Project) string {
 		t.Fatal(err)
 		return ""
 	}
+	defer f.Close()
 	if err := p.Dump(f); err != nil {
 		t.Fatal(err)
 		return ""
 	}
-	defer f.Close()
+
+	// next do hist file, if one is given
+	if p.Config.HistFile != "" {
+		if !strings.HasPrefix(p.Config.HistFile, morc.ProjDirVar) {
+			t.Fatal("hist file path must start with " + morc.ProjDirVar + " if present in tests")
+			return ""
+		}
+
+		relativePath := strings.TrimPrefix(p.Config.HistFile, morc.ProjDirVar)
+		histFilePath := filepath.Join(dir, relativePath)
+		hf, err := os.Create(histFilePath)
+		if err != nil {
+			t.Fatal(err)
+			return ""
+		}
+		defer hf.Close()
+
+		if err := p.DumpHistory(hf); err != nil {
+			t.Fatal(err)
+			return ""
+		}
+	}
+
+	// next do sesh file, if one is given
+	if p.Config.SeshFile != "" {
+		if !strings.HasPrefix(p.Config.SeshFile, morc.ProjDirVar) {
+			t.Fatal("session file path must start with " + morc.ProjDirVar + " if present in tests")
+			return ""
+		}
+
+		relativePath := strings.TrimPrefix(p.Config.SeshFile, morc.ProjDirVar)
+		seshFilePath := filepath.Join(dir, relativePath)
+		sf, err := os.Create(seshFilePath)
+		if err != nil {
+			t.Fatal(err)
+			return ""
+		}
+		defer sf.Close()
+
+		if err := p.Session.Dump(sf); err != nil {
+			t.Fatal(err)
+			return ""
+		}
+	}
 
 	return projFilePath
+}
+
+func testVarStore(curEnv string, vars map[string]map[string]string) morc.VarStore {
+	vs := morc.NewVarStore()
+
+	for env, envVars := range vars {
+		for k, v := range envVars {
+			vs.SetIn(k, v, env)
+		}
+	}
+
+	vs.Environment = curEnv
+
+	return vs
 }
 
 func testReq(n int) string {

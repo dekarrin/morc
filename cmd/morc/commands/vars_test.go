@@ -20,12 +20,13 @@ func Test_Vars_List(t *testing.T) {
 	}{
 		{
 			name:               "empty project",
-			p:                  morc.Project{},
 			args:               []string{"vars"},
+			p:                  morc.Project{},
 			expectStdoutOutput: "(none)\n",
 		},
 		{
 			name: "vars in default env",
+			args: []string{"vars"},
 			p: morc.Project{
 				Vars: testVarStore("", map[string]map[string]string{
 					"": {
@@ -34,11 +35,11 @@ func Test_Vars_List(t *testing.T) {
 					},
 				}),
 			},
-			args:               []string{"vars"},
 			expectStdoutOutput: "${VAR1} = \"1\"\n${VAR2} = \"something\"\n",
 		},
 		{
 			name: "vars with wrong case printed as uppercase",
+			args: []string{"vars"},
 			p: morc.Project{
 				Vars: testVarStore("", map[string]map[string]string{
 					"": {
@@ -47,11 +48,11 @@ func Test_Vars_List(t *testing.T) {
 					},
 				}),
 			},
-			args:               []string{"vars"},
 			expectStdoutOutput: "${VAR1} = \"1\"\n${VAR2} = \"something\"\n",
 		},
 		{
 			name: "vars in environment print correctly",
+			args: []string{"vars"},
 			p: morc.Project{
 				Vars: testVarStore("PROD", map[string]map[string]string{
 					"": {
@@ -64,11 +65,11 @@ func Test_Vars_List(t *testing.T) {
 					},
 				}),
 			},
-			args:               []string{"vars"},
 			expectStdoutOutput: "${HOST} = \"example.com\"\n${SCHEME} = \"https\"\n",
 		},
 		{
 			name: "vars in default environment print correctly",
+			args: []string{"vars"},
 			p: morc.Project{
 				Vars: testVarStore("", map[string]map[string]string{
 					"": {
@@ -81,11 +82,11 @@ func Test_Vars_List(t *testing.T) {
 					},
 				}),
 			},
-			args:               []string{"vars"},
 			expectStdoutOutput: "${HOST} = \"internal-test.example.com\"\n${SCHEME} = \"http\"\n",
 		},
 		{
 			name: "missing vars filled in with defaults",
+			args: []string{"vars"},
 			p: morc.Project{
 				Vars: testVarStore("PROD", map[string]map[string]string{
 					"": {
@@ -99,11 +100,11 @@ func Test_Vars_List(t *testing.T) {
 					},
 				}),
 			},
-			args:               []string{"vars"},
 			expectStdoutOutput: "${EXTRA} = \"data\"\n${HOST} = \"example.com\"\n${SCHEME} = \"https\"\n",
 		},
 		{
 			name: "use --current to list only current environment vars (from non-default)",
+			args: []string{"vars", "--current"},
 			p: morc.Project{
 				Vars: testVarStore("PROD", map[string]map[string]string{
 					"": {
@@ -117,11 +118,11 @@ func Test_Vars_List(t *testing.T) {
 					},
 				}),
 			},
-			args:               []string{"vars", "--current"},
 			expectStdoutOutput: "${HOST} = \"example.com\"\n${SCHEME} = \"https\"\n",
 		},
 		{
 			name: "use --current to list only current environment vars (from default)",
+			args: []string{"vars", "--current"},
 			p: morc.Project{
 				Vars: testVarStore("", map[string]map[string]string{
 					"": {
@@ -135,11 +136,11 @@ func Test_Vars_List(t *testing.T) {
 					},
 				}),
 			},
-			args:               []string{"vars", "--current"},
 			expectStdoutOutput: "${EXTRA} = \"data\"\n${HOST} = \"internal-test.example.com\"\n${SCHEME} = \"http\"\n",
 		},
 		{
 			name: "use --env to list only specific environment vars (from same)",
+			args: []string{"vars", "--env", "PROD"},
 			p: morc.Project{
 				Vars: testVarStore("PROD", map[string]map[string]string{
 					"": {
@@ -153,11 +154,11 @@ func Test_Vars_List(t *testing.T) {
 					},
 				}),
 			},
-			args:               []string{"vars", "--env", "PROD"},
 			expectStdoutOutput: "${HOST} = \"example.com\"\n${SCHEME} = \"https\"\n",
 		},
 		{
 			name: "use --env to list only specific environment vars (from default)",
+			args: []string{"vars", "--env", "PROD"},
 			p: morc.Project{
 				Vars: testVarStore("", map[string]map[string]string{
 					"": {
@@ -171,11 +172,11 @@ func Test_Vars_List(t *testing.T) {
 					},
 				}),
 			},
-			args:               []string{"vars", "--env", "PROD"},
 			expectStdoutOutput: "${HOST} = \"example.com\"\n${SCHEME} = \"https\"\n",
 		},
 		{
 			name: "use --env to list only specific environment vars (from another)",
+			args: []string{"vars", "--env", "PROD"},
 			p: morc.Project{
 				Vars: testVarStore("DEBUG", map[string]map[string]string{
 					"": {
@@ -193,11 +194,33 @@ func Test_Vars_List(t *testing.T) {
 					},
 				}),
 			},
-			args:               []string{"vars", "--env", "PROD"},
 			expectStdoutOutput: "${HOST} = \"example.com\"\n${SCHEME} = \"https\"\n",
 		},
 		{
 			name: "use --default to list only default environment values (from another)",
+			args: []string{"vars", "--default"},
+			p: morc.Project{
+				Vars: testVarStore("PROD", map[string]map[string]string{
+					"": {
+						"SCHEME": "http",
+						"HOST":   "internal-test.example.com",
+						"EXTRA":  "data",
+					},
+					"PROD": {
+						"SCHEME": "https",
+						"HOST":   "example.com",
+					},
+					"DEBUG": {
+						"SCHEME": "invalid",
+						"HOST":   "invalid.example.com",
+					},
+				}),
+			},
+			expectStdoutOutput: "${EXTRA} = \"data\"\n${HOST} = \"internal-test.example.com\"\n${SCHEME} = \"http\"\n",
+		},
+		{
+			name: "use --default to list only default environment values (from default)",
+			args: []string{"vars", "--default"},
 			p: morc.Project{
 				Vars: testVarStore("", map[string]map[string]string{
 					"": {
@@ -210,13 +233,12 @@ func Test_Vars_List(t *testing.T) {
 						"HOST":   "example.com",
 					},
 					"DEBUG": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
+						"SCHEME": "invalid",
+						"HOST":   "invalid.example.com",
 					},
 				}),
 			},
-			args:               []string{"vars", "--env", "PROD"},
-			expectStdoutOutput: "${HOST} = \"example.com\"\n${SCHEME} = \"https\"\n",
+			expectStdoutOutput: "${EXTRA} = \"data\"\n${HOST} = \"internal-test.example.com\"\n${SCHEME} = \"http\"\n",
 		},
 	}
 

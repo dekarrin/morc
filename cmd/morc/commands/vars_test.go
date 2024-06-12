@@ -274,6 +274,122 @@ func Test_Vars_List(t *testing.T) {
 	}
 }
 
+func Test_Vars_Delete(t *testing.T) {
+	testCases := []struct {
+		name               string
+		args               []string // DO NOT INCLUDE -F; it is automatically set to a project file
+		p                  morc.Project
+		expectP            morc.Project
+		expectErr          string // set if command.Execute expected to fail, with a string that would be in the error message
+		expectStderrOutput string // set with expected output to stderr
+		expectStdoutOutput string // set with expected output to stdout
+	}{
+		{
+			name:      "empty project",
+			args:      []string{"vars", "-D", "VAR1"},
+			p:         morc.Project{},
+			expectErr: "${VAR1} does not exist",
+		},
+		{
+			name: "non-empty project, var not present in current (default)",
+			args: []string{"vars", "-D", "VAR1"},
+			p: morc.Project{
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {
+						"SCHEME": "http",
+						"HOST":   "internal-test.example.com",
+						"EXTRA":  "data",
+					},
+					"PROD": {
+						"SCHEME": "https",
+						"HOST":   "example.com",
+					},
+					"DEBUG": {
+						"SCHEME": "invalid",
+						"HOST":   "invalid.example.com",
+					},
+				}),
+			},
+			expectErr: "${VAR1} does not exist",
+		},
+		{
+			name: "non-empty project, var not present in current (non-default), is present in default",
+			args: []string{"vars", "-D", "EXTRA"},
+			p: morc.Project{
+				Vars: testVarStore("PROD", map[string]map[string]string{
+					"": {
+						"SCHEME": "http",
+						"HOST":   "internal-test.example.com",
+						"EXTRA":  "data",
+					},
+					"PROD": {
+						"SCHEME": "https",
+						"HOST":   "example.com",
+					},
+					"DEBUG": {
+						"SCHEME": "invalid",
+						"HOST":   "invalid.example.com",
+					},
+				}),
+			},
+			expectErr: "${EXTRA} is not defined in current env PROD; value is via default env",
+		},
+		{
+			name: "non-empty project, var not present in current (non-default), is not present in default",
+			args: []string{"vars", "-D", "VAR"},
+			p: morc.Project{
+				Vars: testVarStore("PROD", map[string]map[string]string{
+					"": {
+						"SCHEME": "http",
+						"HOST":   "internal-test.example.com",
+						"EXTRA":  "data",
+					},
+					"PROD": {
+						"SCHEME": "https",
+						"HOST":   "example.com",
+					},
+					"DEBUG": {
+						"SCHEME": "invalid",
+						"HOST":   "invalid.example.com",
+					},
+				}),
+			},
+			expectErr: "${VAR} does not exist",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+			resetVarsFlags()
+
+			// create project and dump config to a temp dir
+			projFilePath := createTestProjectFiles(t, tc.p)
+			// set up the root command and run
+			output, outputErr, err := runTestCommand(varsCmd, projFilePath, tc.args)
+
+			// assert and check stdout and stderr
+			if err != nil {
+				if tc.expectErr == "" {
+					t.Fatalf("unexpected returned error: %v", err)
+					return
+				}
+				if !strings.Contains(err.Error(), tc.expectErr) {
+					t.Fatalf("expected returned error to contain %q, got %q", tc.expectErr, err)
+				}
+				return
+			}
+
+			// assertions
+
+			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
+			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
+
+			assert_projectInFileMatches(assert, tc.expectP, projFilePath)
+		})
+	}
+}
+
 func resetVarsFlags() {
 	flags.ProjectFile = ""
 	flags.Delete = ""

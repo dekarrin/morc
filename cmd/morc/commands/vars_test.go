@@ -291,7 +291,7 @@ func Test_Vars_Delete(t *testing.T) {
 			expectErr: "${VAR1} does not exist",
 		},
 		{
-			name: "non-empty project, var not present in current (default)",
+			name: "var not present in current (default)",
 			args: []string{"vars", "-D", "VAR1"},
 			p: morc.Project{
 				Vars: testVarStore("", map[string]map[string]string{
@@ -313,7 +313,68 @@ func Test_Vars_Delete(t *testing.T) {
 			expectErr: "${VAR1} does not exist",
 		},
 		{
-			name: "non-empty project, var not present in current (non-default), is present in default",
+			name: "var is present in current (default) and no others",
+			args: []string{"vars", "-D", "EXTRA"},
+			p: morc.Project{
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {
+						"SCHEME": "http",
+						"HOST":   "internal-test.example.com",
+						"EXTRA":  "data",
+					},
+					"PROD": {
+						"SCHEME": "https",
+						"HOST":   "example.com",
+					},
+					"DEBUG": {
+						"SCHEME": "invalid",
+						"HOST":   "invalid.example.com",
+					},
+				}),
+			},
+			expectP: morc.Project{
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {
+						"SCHEME": "http",
+						"HOST":   "internal-test.example.com",
+					},
+					"PROD": {
+						"SCHEME": "https",
+						"HOST":   "example.com",
+					},
+					"DEBUG": {
+						"SCHEME": "invalid",
+						"HOST":   "invalid.example.com",
+					},
+				}),
+			},
+			expectStdoutOutput: "Deleted ${EXTRA}\n",
+		},
+		{
+			name: "var is present in current (default) and one other",
+			args: []string{"vars", "-D", "EXTRA"},
+			p: morc.Project{
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {
+						"SCHEME": "http",
+						"HOST":   "internal-test.example.com",
+						"EXTRA":  "data",
+					},
+					"PROD": {
+						"SCHEME": "https",
+						"HOST":   "example.com",
+						"EXTRA":  "something",
+					},
+					"DEBUG": {
+						"SCHEME": "invalid",
+						"HOST":   "invalid.example.com",
+					},
+				}),
+			},
+			expectErr: "${EXTRA} is also defined in non-default envs: PROD\nSet --all to delete from all",
+		},
+		{
+			name: "var not present in current (non-default), is present in default",
 			args: []string{"vars", "-D", "EXTRA"},
 			p: morc.Project{
 				Vars: testVarStore("PROD", map[string]map[string]string{
@@ -332,10 +393,12 @@ func Test_Vars_Delete(t *testing.T) {
 					},
 				}),
 			},
+			// TODO: normally, this must allow deletion if it can; if not in current, but in default, AND in no others,
+			// it should delete it from the default. THIS behavior should be selected only by --current or --env=current.
 			expectErr: "${EXTRA} is not defined in current env PROD; value is via default env",
 		},
 		{
-			name: "non-empty project, var not present in current (non-default), is not present in default",
+			name: "var not present in current (non-default), not present in default",
 			args: []string{"vars", "-D", "VAR"},
 			p: morc.Project{
 				Vars: testVarStore("PROD", map[string]map[string]string{
@@ -356,6 +419,75 @@ func Test_Vars_Delete(t *testing.T) {
 			},
 			expectErr: "${VAR} does not exist",
 		},
+		{
+			name: "var is present in current (non-default), is present in default",
+			args: []string{"vars", "-D", "HOST"},
+			p: morc.Project{
+				Vars: testVarStore("PROD", map[string]map[string]string{
+					"": {
+						"SCHEME": "http",
+						"HOST":   "internal-test.example.com",
+						"EXTRA":  "data",
+					},
+					"PROD": {
+						"SCHEME": "https",
+						"HOST":   "example.com",
+					},
+					"DEBUG": {
+						"SCHEME": "invalid",
+						"HOST":   "invalid.example.com",
+					},
+				}),
+			},
+			expectP: morc.Project{
+				Vars: testVarStore("PROD", map[string]map[string]string{
+					"": {
+						"SCHEME": "http",
+						"HOST":   "internal-test.example.com",
+						"EXTRA":  "data",
+					},
+					"PROD": {
+						"SCHEME": "https",
+					},
+					"DEBUG": {
+						"SCHEME": "invalid",
+						"HOST":   "invalid.example.com",
+					},
+				}),
+			},
+			expectStdoutOutput: "Deleted ${HOST}\n",
+		},
+
+		// after this, we need test cases for explicit env selection:
+		// * --env=non-default
+		//   * current env is the same
+		//     * var is present in current env
+		//     * var is not present in current env
+		//       * var is present in default
+		//       * var is not present in default
+		//   * current env is another non-default
+		//     * var is present in other env
+		//     * var is not present in other env
+		//       * var is present in default
+		//       * var is not present in default
+		//   * current env is default
+		//     * var is present in other env
+		//     * var is not present in other env
+		//       * var is present in default
+		//       * var is not present in default
+		// * --env=default - ALWAYS FAIL
+		// * --current
+		//   * current env is default
+		//     * var is present in no other envs - SUCCEED
+		//     * var is present in another env - FAIL
+		//   * current env is non-default
+		//     * var is present - S
+		//     * var is not present
+		//       * var is in default
+		//         * var is in no OTHER envs - SUCCEED and update prior non env selection tests AND --env=current that have TODO to fix their cases
+		//         * var IS in other envs - FAIL
+		//       * var not in default - F
+		// * --all cases
 	}
 
 	for _, tc := range testCases {

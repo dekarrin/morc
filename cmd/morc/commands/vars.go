@@ -180,7 +180,7 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 		otherEnvs := p.Vars.NonDefaultEnvsWith(varName)
 
 		if len(otherEnvs) > 0 {
-			return fmt.Errorf("current env is default and %q is defined in other envs: %s\nSet --all to delete from all environments", varName, strings.Join(otherEnvs, ", "))
+			return fmt.Errorf("${%s} is also defined in non-default envs: %s\nSet --all to delete from all environments", varName, strings.Join(otherEnvs, ", "))
 		}
 	}
 

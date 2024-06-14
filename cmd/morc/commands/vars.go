@@ -7,6 +7,7 @@ import (
 
 	"github.com/dekarrin/morc"
 	"github.com/dekarrin/morc/cmd/morc/cmdio"
+	"github.com/dekarrin/morc/internal/sliceops"
 	"github.com/spf13/cobra"
 )
 
@@ -194,16 +195,27 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 		if !p.Vars.IsDefinedIn(varName, p.Vars.Environment) {
 			return fmt.Errorf("${%s} does not exist in current environment", varName)
 		}
+
+		// if it exists in default only and not in current, we will not delete
+		// bc user explicitly asked for deletion from current only
+		if p.Vars.IsDefinedIn(varName, "") && !p.Vars.IsDefinedIn(varName, p.Vars.Environment) {
+			return fmt.Errorf("${%s} is not defined in current env %s; value is via default env", varName, strings.ToUpper(p.Vars.Environment))
+		}
 		p.Vars.UnsetIn(p.Vars.Environment, varName)
 	} else {
 		if !p.Vars.IsDefined(varName) {
 			return fmt.Errorf("${%s} does not exist", varName)
 		}
 
-		// if it exists in default only and not in current, we will not delete
-		// unless done so with --all
-		if p.Vars.IsDefinedIn(varName, "") && !p.Vars.IsDefinedIn(varName, p.Vars.Environment) {
-			return fmt.Errorf("${%s} is not defined in current env %s; value is via default env", varName, strings.ToUpper(p.Vars.Environment))
+		// if it exists in default only and at least one other env, we will not
+		// delete unless --all is given
+		nonDefaultEnvs := p.Vars.NonDefaultEnvsWith(varName)
+		otherEnvs := sliceops.Filter(nonDefaultEnvs, func(s string) bool {
+			return !strings.EqualFold(s, p.Vars.Environment)
+		})
+
+		if len(otherEnvs) > 0 {
+			return fmt.Errorf("${%s} is defined via default  defined in current env %s; value is via default env", varName, strings.ToUpper(p.Vars.Environment))
 		}
 		p.Vars.Unset(varName)
 	}

@@ -374,7 +374,30 @@ func Test_Vars_Delete(t *testing.T) {
 			expectErr: "${EXTRA} is also defined in non-default envs: PROD\nSet --all to delete from all",
 		},
 		{
-			name: "var not present in current (non-default), is present in default",
+			name: "var not present in current (non-default), is present in default, is present in others",
+			args: []string{"vars", "-D", "EXTRA"},
+			p: morc.Project{
+				Vars: testVarStore("PROD", map[string]map[string]string{
+					"": {
+						"SCHEME": "http",
+						"HOST":   "internal-test.example.com",
+						"EXTRA":  "data",
+					},
+					"PROD": {
+						"SCHEME": "https",
+						"HOST":   "example.com",
+					},
+					"DEBUG": {
+						"SCHEME": "invalid",
+						"HOST":   "invalid.example.com",
+						"EXTRA":  "something",
+					},
+				}),
+			},
+			expectErr: "${EXTRA} is defined via default env and other non-default envs: DEBUG\nSet --all to delete from all",
+		},
+		{
+			name: "var not present in current (non-default), is present in default, not present in others",
 			args: []string{"vars", "-D", "EXTRA"},
 			p: morc.Project{
 				Vars: testVarStore("PROD", map[string]map[string]string{
@@ -393,9 +416,23 @@ func Test_Vars_Delete(t *testing.T) {
 					},
 				}),
 			},
-			// TODO: normally, this must allow deletion if it can; if not in current, but in default, AND in no others,
-			// it should delete it from the default. THIS behavior should be selected only by --current or --env=current.
-			expectErr: "${EXTRA} is not defined in current env PROD; value is via default env",
+			expectP: morc.Project{
+				Vars: testVarStore("PROD", map[string]map[string]string{
+					"": {
+						"SCHEME": "http",
+						"HOST":   "internal-test.example.com",
+					},
+					"PROD": {
+						"SCHEME": "https",
+						"HOST":   "example.com",
+					},
+					"DEBUG": {
+						"SCHEME": "invalid",
+						"HOST":   "invalid.example.com",
+					},
+				}),
+			},
+			expectStderrOutput: "Deleted ${EXTRA} from default env\n",
 		},
 		{
 			name: "var not present in current (non-default), not present in default",
@@ -456,6 +493,30 @@ func Test_Vars_Delete(t *testing.T) {
 				}),
 			},
 			expectStdoutOutput: "Deleted ${HOST}\n",
+		},
+		{
+			name: "--current, var not present in current (non-default), is present in default",
+			args: []string{"vars", "-D", "EXTRA", "--current"},
+			p: morc.Project{
+				Vars: testVarStore("PROD", map[string]map[string]string{
+					"": {
+						"SCHEME": "http",
+						"HOST":   "internal-test.example.com",
+						"EXTRA":  "data",
+					},
+					"PROD": {
+						"SCHEME": "https",
+						"HOST":   "example.com",
+					},
+					"DEBUG": {
+						"SCHEME": "invalid",
+						"HOST":   "invalid.example.com",
+					},
+				}),
+			},
+			// TODO: normally, this must allow deletion if it can; if not in current, but in default, AND in no others,
+			// it should delete it from the default. THIS behavior should be selected only by --current or --env=current.
+			expectErr: "${EXTRA} is not defined in current env; value is via default env",
 		},
 
 		// after this, we need test cases for explicit env selection:

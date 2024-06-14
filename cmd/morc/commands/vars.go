@@ -207,17 +207,29 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 			return fmt.Errorf("${%s} does not exist", varName)
 		}
 
-		// if it exists in default only and at least one other env, we will not
-		// delete unless --all is given
-		nonDefaultEnvs := p.Vars.NonDefaultEnvsWith(varName)
-		otherEnvs := sliceops.Filter(nonDefaultEnvs, func(s string) bool {
-			return !strings.EqualFold(s, p.Vars.Environment)
-		})
+		if p.Vars.IsDefinedIn(varName, "") && !p.Vars.IsDefinedIn(varName, p.Vars.Environment) {
+			// it exists in default and not the current env.
 
-		if len(otherEnvs) > 0 {
-			return fmt.Errorf("${%s} is defined via default  defined in current env %s; value is via default env", varName, strings.ToUpper(p.Vars.Environment))
+			// if it exists in default only and at least one other env, we will not
+			// delete unless --all is given
+			nonDefaultEnvs := p.Vars.NonDefaultEnvsWith(varName)
+			otherEnvs := sliceops.Filter(nonDefaultEnvs, func(s string) bool {
+				return !strings.EqualFold(s, p.Vars.Environment)
+			})
+
+			if len(otherEnvs) > 0 {
+				return fmt.Errorf("cannot remove ${%s}\nValue is via default env and var is defined in envs: %s\nSet --all to delete from all environments", varName, strings.Join(otherEnvs, ", "))
+			}
+
+			// default env deletion
+			p.Vars.Remove(varName)
+
+			// set env selector so output is correct
+			env.useDefault = true
+		} else {
+			// normal deletion
+			p.Vars.Unset(varName)
 		}
-		p.Vars.Unset(varName)
 	}
 
 	if err := p.PersistToDisk(false); err != nil {

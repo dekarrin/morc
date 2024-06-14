@@ -394,7 +394,7 @@ func Test_Vars_Delete(t *testing.T) {
 					},
 				}),
 			},
-			expectErr: "${EXTRA} is defined via default env and other non-default envs: DEBUG\nSet --all to delete from all",
+			expectErr: "cannot remove ${EXTRA}\nValue is via default env and var is defined in envs: DEBUG\nSet --all to delete from all",
 		},
 		{
 			name: "var not present in current (non-default), is present in default, not present in others",
@@ -432,7 +432,7 @@ func Test_Vars_Delete(t *testing.T) {
 					},
 				}),
 			},
-			expectStderrOutput: "Deleted ${EXTRA} from default env\n",
+			expectStdoutOutput: "Deleted ${EXTRA} from the default environment\n",
 		},
 		{
 			name: "var not present in current (non-default), not present in default",
@@ -514,8 +514,6 @@ func Test_Vars_Delete(t *testing.T) {
 					},
 				}),
 			},
-			// TODO: normally, this must allow deletion if it can; if not in current, but in default, AND in no others,
-			// it should delete it from the default. THIS behavior should be selected only by --current or --env=current.
 			expectErr: "${EXTRA} is not defined in current env; value is via default env",
 		},
 

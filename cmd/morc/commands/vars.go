@@ -11,13 +11,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// TODO: help output must be updated after #36.
 var varsCmd = &cobra.Command{
 	Use: "vars [VAR [VALUE]]",
 	Annotations: map[string]string{
 		annotationKeyHelpUsages: "" +
 			"vars [-e ENV | --current | --default]\n" +
-			"vars --delete VAR [-e ENV | --current | --all]\n" +
-			"vars VAR [-e ENV | --current | --default]\n" +
+			"vars --delete VAR [-e ENV | --current | --default | --all]\n" +
+			"vars VAR [-e ENV | --current | --default | --all]\n" +
 			"vars VAR VALUE [-e ENV | --current | --default]",
 	},
 	GroupID: "project",
@@ -153,10 +154,6 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 	}
 
 	// are we looking to delete from a specific environment?
-	if env.useDefault {
-		// should never happen as user must specify --all to get this behavior
-		return fmt.Errorf("cannot delete from default environment by specifying useDefault; set all=true instead")
-	}
 
 	// is the 'no default in --env' rule being bypassed by doing --current? reject if var is present in any other env
 	if env.useCurrent && p.Vars.Environment == "" {
@@ -193,7 +190,19 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 		}
 	}
 
-	if env.useName != "" {
+	if env.useDefault {
+		if !p.Vars.IsDefinedIn(varName, "") {
+			return fmt.Errorf("${%s} does not exist in default env", varName)
+		}
+
+		// otherwise, we can delete ONLY if the var is not defined in any other env
+		nonDefaultEnvs := p.Vars.NonDefaultEnvsWith(varName)
+		if len(nonDefaultEnvs) > 0 {
+			return fmt.Errorf("cannot remove ${%s} from default env\nValue is also defined in envs: %s\nSet --all to delete from all environments", varName, strings.Join(nonDefaultEnvs, ", "))
+		}
+
+		p.Vars.Remove(varName)
+	} else if env.useName != "" {
 		if !p.Vars.IsDefinedIn(varName, env.useName) {
 			// if it is not defined in the given env, we are not going to delete it
 			// but we will perform some checks to give better error reporting
@@ -380,9 +389,6 @@ func parseVarsActionFromFlags(cmd *cobra.Command, posArgs []string) (varsAction,
 			return varsActionDelete, fmt.Errorf("unknown positional argument %q", posArgs[1])
 		}
 
-		if f.Changed("default") {
-			return varsActionDelete, fmt.Errorf("cannot specify --default with --delete/-D; use --all to delete from all envs")
-		}
 		if flags.Env == reservedDefaultEnvName {
 			return varsActionDelete, fmt.Errorf("cannot specify reserved env name %q; use --default or --all to specify the default env", reservedDefaultEnvName)
 		}

@@ -154,9 +154,12 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 		return fmt.Errorf("cannot delete from default environment by specifying useDefault; set all=true instead")
 	}
 
-	// is the 'no default in --env' rule being bypassed by doing --current? reject if we are in the default env
+	// is the 'no default in --env' rule being bypassed by doing --current? reject if var is present in any other env
 	if env.useCurrent && p.Vars.Environment == "" {
-		return fmt.Errorf("cannot delete from current env when current env is default env; set all=true instead")
+		otherEnvs := p.Vars.NonDefaultEnvsWith(varName)
+		if len(otherEnvs) > 0 {
+			return fmt.Errorf("cannot remove ${%s} from current env (default env)\nValue is also defined in envs: %s\nSet --all to delete from all environments", varName, strings.Join(otherEnvs, ", "))
+		}
 	}
 
 	if env.useAll {
@@ -193,15 +196,17 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 		p.Vars.UnsetIn(env.useName, varName)
 	} else if env.useCurrent {
 		if !p.Vars.IsDefinedIn(varName, p.Vars.Environment) {
+
+			// if it exists in default only and not in current, we will not delete
+			// bc user explicitly asked for deletion from current only
+			if p.Vars.IsDefinedIn(varName, "") {
+				return fmt.Errorf("${%s} is not defined in current env; value is via default env", varName)
+			}
+
 			return fmt.Errorf("${%s} does not exist in current environment", varName)
 		}
 
-		// if it exists in default only and not in current, we will not delete
-		// bc user explicitly asked for deletion from current only
-		if p.Vars.IsDefinedIn(varName, "") && !p.Vars.IsDefinedIn(varName, p.Vars.Environment) {
-			return fmt.Errorf("${%s} is not defined in current env %s; value is via default env", varName, strings.ToUpper(p.Vars.Environment))
-		}
-		p.Vars.UnsetIn(p.Vars.Environment, varName)
+		p.Vars.UnsetIn(varName, p.Vars.Environment)
 	} else {
 		if !p.Vars.IsDefined(varName) {
 			return fmt.Errorf("${%s} does not exist", varName)

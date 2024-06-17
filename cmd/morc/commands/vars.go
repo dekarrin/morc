@@ -142,6 +142,10 @@ func invokeVarGet(io cmdio.IO, projFile string, env envSelection, varName string
 	return nil
 }
 
+// TODO: standardize env vs environment in output.
+// TODO: once unit tests are in place, refactor this whole damn func, glub. it's
+// incredibly difficult to follow. Change to use an if-case for each of the env
+// selection possibilities and key off of that.
 func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName string) error {
 	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
@@ -177,10 +181,11 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 		return nil
 	}
 
-	// is the user currently in the default environment *and* at least one other
+	// is the user currently in the default environment AND not specifying an
+	// env AND at least one other
 	// env with the to-be-deleted var is defined? if so, opts.envAll is required
 	// and they should have provided that if this is what they really want
-	if p.Vars.Environment == "" {
+	if !env.IsSpecified() && p.Vars.Environment == "" {
 		otherEnvs := p.Vars.NonDefaultEnvsWith(varName)
 
 		if len(otherEnvs) > 0 {
@@ -188,12 +193,21 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 		}
 	}
 
-	if env.useName != "" && !strings.EqualFold(p.Vars.Environment, env.useName) {
-		// it is some env other than the current one
+	if env.useName != "" {
 		if !p.Vars.IsDefinedIn(varName, env.useName) {
-			return fmt.Errorf("${%s} does not exist in environment %q", varName, env.useName)
+			// if it is not defined in the given env, we are not going to delete it
+			// but we will perform some checks to give better error reporting
+
+			// if it exists in default only we will not delete
+			// bc user explicitly asked for deletion from specific one only glub
+			if p.Vars.IsDefinedIn(varName, "") {
+				return fmt.Errorf("${%s} is not defined in env %s; value is via default env", varName, env.useName)
+			}
+
+			return fmt.Errorf("${%s} does not exist in env %s", varName, env.useName)
 		}
-		p.Vars.UnsetIn(env.useName, varName)
+
+		p.Vars.UnsetIn(varName, env.useName)
 	} else if env.useCurrent {
 		if !p.Vars.IsDefinedIn(varName, p.Vars.Environment) {
 

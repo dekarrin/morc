@@ -384,7 +384,10 @@ func parseVarsActionFromFlags(cmd *cobra.Command, posArgs []string) (varsAction,
 			return varsActionDelete, fmt.Errorf("cannot specify --default with --delete/-D; use --all to delete from all envs")
 		}
 		if flags.Env == reservedDefaultEnvName {
-			return varsActionDelete, fmt.Errorf("cannot use reserved environment name %q; use --all to delete from all envs (including default)", reservedDefaultEnvName)
+			return varsActionDelete, fmt.Errorf("cannot specify reserved env name %q; use --default or --all to specify the default env", reservedDefaultEnvName)
+		}
+		if f.Changed("env") && flags.Env == "" {
+			return varsActionDelete, fmt.Errorf("cannot specify env \"\"; use --default or --all to specify the default env")
 		}
 		return varsActionDelete, nil
 	}

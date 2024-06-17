@@ -883,11 +883,73 @@ func Test_Vars_Delete(t *testing.T) {
 			},
 			expectErr: "${PASSWORD} does not exist in env PROD",
 		},
+		{
+			name: "--env=default ERRORS",
+			args: []string{"vars", "-D", "EXTRA", "--env", reservedDefaultEnvName},
+			p: morc.Project{
+				Vars: testVarStore("DEBUG", map[string]map[string]string{
+					"": {
+						"SCHEME": "http",
+						"HOST":   "internal-test.example.com",
+						"EXTRA":  "data",
+					},
+					"PROD": {
+						"SCHEME": "https",
+						"HOST":   "example.com",
+					},
+					"DEBUG": {
+						"SCHEME": "invalid",
+						"HOST":   "invalid.example.com",
+					},
+				}),
+			},
+			expectErr: "cannot specify reserved env name \"<DEFAULT>\"; use --default or --all to specify the default env",
+		},
+		{
+			name: "--env='' ERRORS",
+			args: []string{"vars", "-D", "PASSWORD", "--env", ""},
+			p: morc.Project{
+				Vars: testVarStore("DEBUG", map[string]map[string]string{
+					"": {
+						"SCHEME": "http",
+						"HOST":   "internal-test.example.com",
+						"EXTRA":  "data",
+					},
+					"PROD": {
+						"SCHEME": "https",
+						"HOST":   "example.com",
+					},
+					"DEBUG": {
+						"SCHEME": "invalid",
+						"HOST":   "invalid.example.com",
+					},
+				}),
+			},
+			expectErr: "cannot specify env \"\"; use --default or --all to specify the default env",
+		},
 
 		// after this, we need test cases for explicit env selection:
-		// * --env=default - ALWAYS FAILS, you don't get to specify this. Use --default or --all.
 		// * --default IS ALLOWED AS LONG AS A DELETE FROM DEFAULT WOULD BE VALID.
+		//   * var is not present
+		//   * var is present
+		//     * var is present in others FAIL; --all required.
+		//     * var is not present in others.
 		// * --all cases
+		//  * current=default
+		//    * var is present in current
+		//      * var is present in no others
+		//      * var is present in at least one other
+		//    * var is not present in current
+		//  * current=non-default
+		//    * var is present in current (and therefore default)
+		//      * var is present in others
+		//      * var is not present in others
+		//    * var is not present in current
+		//      * var is present in default
+		//        * var is present in others
+		//        * var is not present in others
+		//  * var is present in current (default) and one other
+		//  * var not present in current (non-default), is present in default, is present in others
 	}
 
 	for _, tc := range testCases {
@@ -923,6 +985,78 @@ func Test_Vars_Delete(t *testing.T) {
 		})
 	}
 }
+
+// GET cases
+// * unspecified env
+//   * current is default
+//     * current has var - VALUE
+//     * current does not have var - NO VALUE
+//   * current is non-default
+//     * current has own var def - VALUE
+//     * current does not define var
+//       * default does - VALUE
+//       * default does not -NO VALUE
+// * specify --current
+//   * current is default
+//     * current has var - VALUE
+//     * current does not have var - NO VALUE
+//   * current is non-default
+//     * current has own var def - VALUE
+//     * current does not define var
+//       * default does - NO VALUE, IT IS VIA DEFAULT
+//       * default does not - NO VALUE
+// * specify --env
+//   * current is default
+//     * specified env has var - VALUE
+//     * specified env has no var
+//       * default does - NO VALUE, IT IS VIA DEFAULT
+//       * default does not - NO VALUE
+//   * current is non-default
+//     * specified env has var - VALUE
+//     * specified env has no var
+//       * default does - NO VALUE, IT IS VIA DEFAULT
+//       * default does not - NO VALUE
+// * specifiy --default
+//   * current is default
+//     * default has value - VALUE
+//     * default has no value - NO VALUE
+//   * current is non-default
+//     * default has value - VALUE
+//     * default has no value - NO VALUE
+// * specify --all - list all values by env.
+
+// SET cases
+// * unspecified env
+//   * current is default
+//     * var already existed in default and no others - it is updated
+//     * var already existed in default and others - it is updated ONLY in default
+//     * var did not exist in default - it is set in default only
+//   * current is non-default
+//     * var exists in default
+//       * var exists in other non-default - var is set in current only.
+//       * var exists in no other non-default - var is set in current only.
+//     * var does not exist in default - var is set in current and to BLANK in default.
+// * specify --current
+//   * current is default
+//     * var already existed in default - PASS
+//     * var did not exist in default - PASS
+//   * current is non-default
+//     * var exists in default - var is set in current only
+//     * var does not exist in default - var is set in current AND in default as blank.
+// * specify --env
+//   * current is default
+//     * var already existed in default - var is set in specified only
+//     * var did not exist in default - var is set in specified AND in default as blank
+//   * current is non-default
+//     * var exists in default - var is set in specified only
+//     * var does not exist in default - var is set in specified AND in default as blank
+// * specify --default
+//   * current is default
+//     * var already existed in default - PASS
+//     * var did not exist in default - PASS
+//   * current is non-default
+//     * var exists in default - var is set in default only
+//     * var does not exist in default - var is set in default only
 
 func resetVarsFlags() {
 	flags.ProjectFile = ""

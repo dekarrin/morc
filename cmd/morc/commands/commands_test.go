@@ -140,6 +140,12 @@ func testVarStore(curEnv string, vars map[string]map[string]string) morc.VarStor
 	return vs
 }
 
+func testProject_vars(curEnv string, vars map[string]map[string]string) morc.Project {
+	return morc.Project{
+		Vars: testVarStore(curEnv, vars),
+	}
+}
+
 func testReq(n int) string {
 	return fmt.Sprintf(testRequestBaseName+"%d", n)
 }

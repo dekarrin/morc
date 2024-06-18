@@ -9,6 +9,84 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var (
+	test_3EnvVarsMap = map[string]map[string]string{
+		"": {
+			"SCHEME": "http",
+			"HOST":   "internal-test.example.com",
+			"EXTRA":  "data",
+		},
+		"PROD": {
+			"SCHEME": "https",
+			"HOST":   "example.com",
+		},
+		"DEBUG": {
+			"SCHEME": "invalid",
+			"HOST":   "invalid.example.com",
+		},
+	}
+
+	test_3EnvVarsMap_debugHasExtra = map[string]map[string]string{
+		"": {
+			"SCHEME": "http",
+			"HOST":   "internal-test.example.com",
+			"EXTRA":  "data",
+		},
+		"PROD": {
+			"SCHEME": "https",
+			"HOST":   "example.com",
+		},
+		"DEBUG": {
+			"SCHEME": "invalid",
+			"HOST":   "invalid.example.com",
+			"EXTRA":  "something",
+		},
+	}
+
+	test_3EnvVarsMap_prodNoHost = map[string]map[string]string{
+		"": {
+			"SCHEME": "http",
+			"HOST":   "internal-test.example.com",
+			"EXTRA":  "data",
+		},
+		"PROD": {
+			"SCHEME": "https",
+		},
+		"DEBUG": {
+			"SCHEME": "invalid",
+			"HOST":   "invalid.example.com",
+		},
+	}
+
+	test_3EnvVarsMap_noExtra = map[string]map[string]string{
+		"": {
+			"SCHEME": "http",
+			"HOST":   "internal-test.example.com",
+		},
+		"PROD": {
+			"SCHEME": "https",
+			"HOST":   "example.com",
+		},
+		"DEBUG": {
+			"SCHEME": "invalid",
+			"HOST":   "invalid.example.com",
+		},
+	}
+
+	test_3EnvVarsMap_noHost = map[string]map[string]string{
+		"": {
+			"SCHEME": "http",
+			"EXTRA":  "data",
+		},
+		"PROD": {
+			"SCHEME": "https",
+		},
+		"DEBUG": {
+			"SCHEME": "invalid",
+		},
+	}
+)
+
 func Test_Vars_List(t *testing.T) {
 
 	testCases := []struct {
@@ -179,21 +257,7 @@ func Test_Vars_List(t *testing.T) {
 			name: "use --env to list only specific environment vars (from another)",
 			args: []string{"vars", "--env", "PROD"},
 			p: morc.Project{
-				Vars: testVarStore("DEBUG", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
+				Vars: testVarStore("DEBUG", test_3EnvVarsMap),
 			},
 			expectStdoutOutput: "${HOST} = \"example.com\"\n${SCHEME} = \"https\"\n",
 		},
@@ -201,21 +265,7 @@ func Test_Vars_List(t *testing.T) {
 			name: "use --default to list only default environment values (from another)",
 			args: []string{"vars", "--default"},
 			p: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
+				Vars: testVarStore("PROD", test_3EnvVarsMap),
 			},
 			expectStdoutOutput: "${EXTRA} = \"data\"\n${HOST} = \"internal-test.example.com\"\n${SCHEME} = \"http\"\n",
 		},
@@ -223,21 +273,7 @@ func Test_Vars_List(t *testing.T) {
 			name: "use --default to list only default environment values (from default)",
 			args: []string{"vars", "--default"},
 			p: morc.Project{
-				Vars: testVarStore("", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
+				Vars: testVarStore("", test_3EnvVarsMap),
 			},
 			expectStdoutOutput: "${EXTRA} = \"data\"\n${HOST} = \"internal-test.example.com\"\n${SCHEME} = \"http\"\n",
 		},
@@ -292,1095 +328,240 @@ func Test_Vars_Delete(t *testing.T) {
 			expectErr: "${VAR1} does not exist",
 		},
 		{
-			name: "var not present in current (default)",
-			args: []string{"vars", "-D", "VAR1"},
-			p: morc.Project{
-				Vars: testVarStore("", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:      "var not present in current (default)",
+			args:      []string{"vars", "-D", "VAR1"},
+			p:         testProject_vars("", test_3EnvVarsMap),
 			expectErr: "${VAR1} does not exist",
 		},
 		{
-			name: "var is present in current (default) and no others",
-			args: []string{"vars", "-D", "EXTRA"},
-			p: morc.Project{
-				Vars: testVarStore("", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
-			expectP: morc.Project{
-				Vars: testVarStore("", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:               "var is present in current (default) and no others",
+			args:               []string{"vars", "-D", "EXTRA"},
+			p:                  testProject_vars("", test_3EnvVarsMap),
+			expectP:            testProject_vars("", test_3EnvVarsMap_noExtra),
 			expectStdoutOutput: "Deleted ${EXTRA}\n",
 		},
 		{
-			name: "var is present in current (default) and one other",
-			args: []string{"vars", "-D", "EXTRA"},
-			p: morc.Project{
-				Vars: testVarStore("", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-						"EXTRA":  "something",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
-			expectErr: "${EXTRA} is also defined in non-default envs: PROD\nSet --all to delete from all",
+			name:      "var is present in current (default) and one other",
+			args:      []string{"vars", "-D", "EXTRA"},
+			p:         testProject_vars("", test_3EnvVarsMap_debugHasExtra),
+			expectErr: "${EXTRA} is also defined in non-default envs: DEBUG\nSet --all to delete from all",
 		},
 		{
-			name: "var not present in current (non-default), is present in default, is present in others",
-			args: []string{"vars", "-D", "EXTRA"},
-			p: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-						"EXTRA":  "something",
-					},
-				}),
-			},
+			name:      "var not present in current (non-default), is present in default, is present in others",
+			args:      []string{"vars", "-D", "EXTRA"},
+			p:         testProject_vars("PROD", test_3EnvVarsMap_debugHasExtra),
 			expectErr: "cannot remove ${EXTRA}\nValue is via default env and var is defined in envs: DEBUG\nSet --all to delete from all",
 		},
 		{
-			name: "var not present in current (non-default), is present in default, not present in others",
-			args: []string{"vars", "-D", "EXTRA"},
-			p: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
-			expectP: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:               "var not present in current (non-default), is present in default, not present in others",
+			args:               []string{"vars", "-D", "EXTRA"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap),
+			expectP:            testProject_vars("PROD", test_3EnvVarsMap_noExtra),
 			expectStdoutOutput: "Deleted ${EXTRA} from the default environment\n",
 		},
 		{
-			name: "var not present in current (non-default), not present in default",
-			args: []string{"vars", "-D", "VAR"},
-			p: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:      "var not present in current (non-default), not present in default",
+			args:      []string{"vars", "-D", "VAR"},
+			p:         testProject_vars("PROD", test_3EnvVarsMap),
 			expectErr: "${VAR} does not exist",
 		},
 		{
-			name: "var is present in current (non-default), is present in default",
-			args: []string{"vars", "-D", "HOST"},
-			p: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
-			expectP: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:               "var is present in current (non-default), is present in default",
+			args:               []string{"vars", "-D", "HOST"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap),
+			expectP:            testProject_vars("PROD", test_3EnvVarsMap_prodNoHost),
 			expectStdoutOutput: "Deleted ${HOST}\n",
 		},
 		{
-			name: "--current, var not present in current (non-default), is present in default",
-			args: []string{"vars", "-D", "EXTRA", "--current"},
-			p: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:      "--current, var not present in current (non-default), is present in default",
+			args:      []string{"vars", "-D", "EXTRA", "--current"},
+			p:         testProject_vars("PROD", test_3EnvVarsMap),
 			expectErr: "${EXTRA} is not defined in current env; value is via default env",
 		},
 		{
-			name: "--current, var not present in current (non-default), is not present in default",
-			args: []string{"vars", "-D", "PASSWORD", "--current"},
-			p: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:      "--current, var not present in current (non-default), is not present in default",
+			args:      []string{"vars", "-D", "PASSWORD", "--current"},
+			p:         testProject_vars("PROD", test_3EnvVarsMap),
 			expectErr: "${PASSWORD} does not exist in current env",
 		},
 		{
-			name: "--current, var is present in current (non-default)",
-			args: []string{"vars", "-D", "HOST", "--current"},
-			p: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
-			expectP: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:               "--current, var is present in current (non-default)",
+			args:               []string{"vars", "-D", "HOST", "--current"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap),
+			expectP:            testProject_vars("PROD", test_3EnvVarsMap_prodNoHost),
 			expectStdoutOutput: "Deleted ${HOST} from the current environment\n",
 		},
 		{
-			name: "--current, var is present in current (default) and no others",
-			args: []string{"vars", "-D", "EXTRA", "--current"},
-			p: morc.Project{
-				Vars: testVarStore("", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
-			expectP: morc.Project{
-				Vars: testVarStore("", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:               "--current, var is present in current (default) and no others",
+			args:               []string{"vars", "-D", "EXTRA", "--current"},
+			p:                  testProject_vars("", test_3EnvVarsMap),
+			expectP:            testProject_vars("", test_3EnvVarsMap_noExtra),
 			expectStdoutOutput: "Deleted ${EXTRA} from the current environment\n",
 		},
 		{
-			name: "--current, var is present in current (default) and others",
-			args: []string{"vars", "-D", "HOST", "--current"},
-			p: morc.Project{
-				Vars: testVarStore("", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:      "--current, var is present in current (default) and others",
+			args:      []string{"vars", "-D", "HOST", "--current"},
+			p:         testProject_vars("", test_3EnvVarsMap),
 			expectErr: "cannot remove ${HOST} from current env (default env)\nValue is also defined in envs: DEBUG, PROD\nSet --all to delete from all",
 		},
 		{
-			name: "--env=current, var is present in current",
-			args: []string{"vars", "-D", "HOST", "--env", "PROD"},
-			p: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
-			expectP: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:               "--env=current, var is present in current",
+			args:               []string{"vars", "-D", "HOST", "--env", "PROD"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap),
+			expectP:            testProject_vars("PROD", test_3EnvVarsMap_prodNoHost),
 			expectStdoutOutput: "Deleted ${HOST} from environment PROD\n",
 		},
 		{
-			name: "--env=current, var not present in current, is present in default",
-			args: []string{"vars", "-D", "EXTRA", "--env", "PROD"},
-			p: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:      "--env=current, var not present in current, is present in default",
+			args:      []string{"vars", "-D", "EXTRA", "--env", "PROD"},
+			p:         testProject_vars("PROD", test_3EnvVarsMap),
 			expectErr: "${EXTRA} is not defined in env PROD; value is via default env",
 		},
 		{
-			name: "--env=current, var not present in current, not present in default",
-			args: []string{"vars", "-D", "PASSWORD", "--env", "PROD"},
-			p: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:      "--env=current, var not present in current, not present in default",
+			args:      []string{"vars", "-D", "PASSWORD", "--env", "PROD"},
+			p:         testProject_vars("PROD", test_3EnvVarsMap),
 			expectErr: "${PASSWORD} does not exist in env PROD",
 		},
 		{
-			name: "--env=other, cur is default, var is present in other",
-			args: []string{"vars", "-D", "HOST", "--env", "PROD"},
-			p: morc.Project{
-				Vars: testVarStore("", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
-			expectP: morc.Project{
-				Vars: testVarStore("", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:               "--env=other, cur is default, var is present in other",
+			args:               []string{"vars", "-D", "HOST", "--env", "PROD"},
+			p:                  testProject_vars("", test_3EnvVarsMap),
+			expectP:            testProject_vars("", test_3EnvVarsMap_prodNoHost),
 			expectStdoutOutput: "Deleted ${HOST} from environment PROD\n",
 		},
 		{
-			name: "--env=other, cur is default, var not present in other, is present in default",
-			args: []string{"vars", "-D", "EXTRA", "--env", "PROD"},
-			p: morc.Project{
-				Vars: testVarStore("", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:      "--env=other, cur is default, var not present in other, is present in default",
+			args:      []string{"vars", "-D", "EXTRA", "--env", "PROD"},
+			p:         testProject_vars("", test_3EnvVarsMap),
 			expectErr: "${EXTRA} is not defined in env PROD; value is via default env",
 		},
 		{
-			name: "--env=other, cur is default, var not present in other, not present in default",
-			args: []string{"vars", "-D", "PASSWORD", "--env", "PROD"},
-			p: morc.Project{
-				Vars: testVarStore("", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:      "--env=other, cur is default, var not present in other, not present in default",
+			args:      []string{"vars", "-D", "PASSWORD", "--env", "PROD"},
+			p:         testProject_vars("", test_3EnvVarsMap),
 			expectErr: "${PASSWORD} does not exist in env PROD",
 		},
 		{
-			name: "--env=other, cur is non-default, var is present in other",
-			args: []string{"vars", "-D", "HOST", "--env", "PROD"},
-			p: morc.Project{
-				Vars: testVarStore("DEBUG", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
-			expectP: morc.Project{
-				Vars: testVarStore("DEBUG", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:               "--env=other, cur is non-default, var is present in other",
+			args:               []string{"vars", "-D", "HOST", "--env", "PROD"},
+			p:                  testProject_vars("DEBUG", test_3EnvVarsMap),
+			expectP:            testProject_vars("DEBUG", test_3EnvVarsMap_prodNoHost),
 			expectStdoutOutput: "Deleted ${HOST} from environment PROD\n",
 		},
 		{
-			name: "--env=other, cur is non-default, var not present in other, is present in default",
-			args: []string{"vars", "-D", "EXTRA", "--env", "PROD"},
-			p: morc.Project{
-				Vars: testVarStore("DEBUG", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:      "--env=other, cur is non-default, var not present in other, is present in default",
+			args:      []string{"vars", "-D", "EXTRA", "--env", "PROD"},
+			p:         testProject_vars("DEBUG", test_3EnvVarsMap),
 			expectErr: "${EXTRA} is not defined in env PROD; value is via default env",
 		},
 		{
-			name: "--env=other, cur is non-default, var not present in other, not present in default",
-			args: []string{"vars", "-D", "PASSWORD", "--env", "PROD"},
-			p: morc.Project{
-				Vars: testVarStore("DEBUG", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:      "--env=other, cur is non-default, var not present in other, not present in default",
+			args:      []string{"vars", "-D", "PASSWORD", "--env", "PROD"},
+			p:         testProject_vars("DEBUG", test_3EnvVarsMap),
 			expectErr: "${PASSWORD} does not exist in env PROD",
 		},
 		{
-			name: "--env=default ERRORS",
-			args: []string{"vars", "-D", "EXTRA", "--env", reservedDefaultEnvName},
-			p: morc.Project{
-				Vars: testVarStore("DEBUG", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:      "--env=default ERRORS",
+			args:      []string{"vars", "-D", "EXTRA", "--env", reservedDefaultEnvName},
+			p:         testProject_vars("DEBUG", test_3EnvVarsMap),
 			expectErr: "cannot specify reserved env name \"<DEFAULT>\"; use --default or --all to specify the default env",
 		},
 		{
-			name: "--env='' ERRORS",
-			args: []string{"vars", "-D", "PASSWORD", "--env", ""},
-			p: morc.Project{
-				Vars: testVarStore("DEBUG", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:      "--env='' ERRORS",
+			args:      []string{"vars", "-D", "PASSWORD", "--env", ""},
+			p:         testProject_vars("DEBUG", test_3EnvVarsMap),
 			expectErr: "cannot specify env \"\"; use --default or --all to specify the default env",
 		},
 		{
-			name: "--env='' ERRORS",
-			args: []string{"vars", "-D", "PASSWORD", "--env", ""},
-			p: morc.Project{
-				Vars: testVarStore("DEBUG", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:      "--env='' ERRORS",
+			args:      []string{"vars", "-D", "PASSWORD", "--env", ""},
+			p:         testProject_vars("DEBUG", test_3EnvVarsMap),
 			expectErr: "cannot specify env \"\"; use --default or --all to specify the default env",
 		},
 		{
-			name: "--env=other, cur is non-default, var is present in other",
-			args: []string{"vars", "-D", "HOST", "--env", "PROD"},
-			p: morc.Project{
-				Vars: testVarStore("DEBUG", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
-			expectP: morc.Project{
-				Vars: testVarStore("DEBUG", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
-			expectStdoutOutput: "Deleted ${HOST} from environment PROD\n",
-		},
-		{
-			name: "--default, current is default, var is present in default and no others",
-			args: []string{"vars", "-D", "EXTRA", "--default"},
-			p: morc.Project{
-				Vars: testVarStore("", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
-			expectP: morc.Project{
-				Vars: testVarStore("", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:               "--default, current is default, var is present in default and no others",
+			args:               []string{"vars", "-D", "EXTRA", "--default"},
+			p:                  testProject_vars("", test_3EnvVarsMap),
+			expectP:            testProject_vars("", test_3EnvVarsMap_noExtra),
 			expectStdoutOutput: "Deleted ${EXTRA} from the default environment\n",
 		},
 		{
-			name: "--default, current is non-default, var is present in default and no others",
-			args: []string{"vars", "-D", "EXTRA", "--default"},
-			p: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
-			expectP: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:               "--default, current is non-default, var is present in default and no others",
+			args:               []string{"vars", "-D", "EXTRA", "--default"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap),
+			expectP:            testProject_vars("PROD", test_3EnvVarsMap_noExtra),
 			expectStdoutOutput: "Deleted ${EXTRA} from the default environment\n",
 		},
 		{
-			name: "--default, current is default, var is present in default and others",
-			args: []string{"vars", "-D", "HOST", "--default"},
-			p: morc.Project{
-				Vars: testVarStore("", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:      "--default, current is default, var is present in default and others",
+			args:      []string{"vars", "-D", "HOST", "--default"},
+			p:         testProject_vars("", test_3EnvVarsMap),
 			expectErr: "cannot remove ${HOST} from default env\nValue is also defined in envs: DEBUG, PROD\nSet --all to delete from all",
 		},
 		{
-			name: "--default, current is non-default, var is present in default and others",
-			args: []string{"vars", "-D", "HOST", "--default"},
-			p: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:      "--default, current is non-default, var is present in default and others",
+			args:      []string{"vars", "-D", "HOST", "--default"},
+			p:         testProject_vars("PROD", test_3EnvVarsMap),
 			expectErr: "cannot remove ${HOST} from default env\nValue is also defined in envs: DEBUG, PROD\nSet --all to delete from all",
 		},
 		{
-			name: "--default, current is default, var is not present in default",
-			args: []string{"vars", "-D", "PASSWORD", "--default"},
-			p: morc.Project{
-				Vars: testVarStore("", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:      "--default, current is default, var is not present in default",
+			args:      []string{"vars", "-D", "PASSWORD", "--default"},
+			p:         testProject_vars("", test_3EnvVarsMap),
 			expectErr: "${PASSWORD} does not exist in default env",
 		},
 		{
-			name: "--default, current is non-default, var is not present in default",
-			args: []string{"vars", "-D", "PASSWORD", "--default"},
-			p: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:      "--default, current is non-default, var is not present in default",
+			args:      []string{"vars", "-D", "PASSWORD", "--default"},
+			p:         testProject_vars("PROD", test_3EnvVarsMap),
 			expectErr: "${PASSWORD} does not exist in default env",
 		},
 		{
-			name: "--all, current is default, var is not present in default",
-			args: []string{"vars", "-D", "PASSWORD", "--all"},
-			p: morc.Project{
-				Vars: testVarStore("", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:      "--all, current is default, var is not present in default",
+			args:      []string{"vars", "-D", "PASSWORD", "--all"},
+			p:         testProject_vars("", test_3EnvVarsMap),
 			expectErr: "${PASSWORD} does not exist in any environment",
 		},
 		{
-			name: "--all, current is default, var is present in default, no others",
-			args: []string{"vars", "-D", "EXTRA", "--all"},
-			p: morc.Project{
-				Vars: testVarStore("", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
-			expectP: morc.Project{
-				Vars: testVarStore("", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:               "--all, current is default, var is present in default, no others",
+			args:               []string{"vars", "-D", "EXTRA", "--all"},
+			p:                  testProject_vars("", test_3EnvVarsMap),
+			expectP:            testProject_vars("", test_3EnvVarsMap_noExtra),
 			expectStdoutOutput: "Deleted ${EXTRA} from all environments\n",
 		},
 		{
-			name: "--all, current is default, var is present in default and others",
-			args: []string{"vars", "-D", "HOST", "--all"},
-			p: morc.Project{
-				Vars: testVarStore("", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
-			expectP: morc.Project{
-				Vars: testVarStore("", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-					},
-				}),
-			},
+			name:               "--all, current is default, var is present in default and others",
+			args:               []string{"vars", "-D", "HOST", "--all"},
+			p:                  testProject_vars("", test_3EnvVarsMap),
+			expectP:            testProject_vars("", test_3EnvVarsMap_noHost),
 			expectStdoutOutput: "Deleted ${HOST} from all environments\n",
 		},
 		{
-			name: "--all, current is non-default, var is not present in current, not present in others",
-			args: []string{"vars", "-D", "PASSWORD", "--all"},
-			p: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:      "--all, current is non-default, var is not present in current, not present in others",
+			args:      []string{"vars", "-D", "PASSWORD", "--all"},
+			p:         testProject_vars("PROD", test_3EnvVarsMap),
 			expectErr: "${PASSWORD} does not exist in any environment",
 		},
 		{
-			name: "--all, current is non-default, var is not present in current, present in others",
-			args: []string{"vars", "-D", "EXTRA", "--all"},
-			p: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-						"EXTRA":  "data2",
-					},
-				}),
-			},
-			expectP: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:               "--all, current is non-default, var is not present in current, present in others",
+			args:               []string{"vars", "-D", "EXTRA", "--all"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap_debugHasExtra),
+			expectP:            testProject_vars("PROD", test_3EnvVarsMap_noExtra),
 			expectStdoutOutput: "Deleted ${EXTRA} from all environments\n",
 		},
 		{
-			name: "--all, current is non-default, var is present in current, no others",
-			args: []string{"vars", "-D", "EXTRA", "--all"},
-			p: morc.Project{
-				Vars: testVarStore("DEBUG", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data", // default will always be present if in another env
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-						"EXTRA":  "data2",
-					},
-				}),
-			},
-			expectP: morc.Project{
-				Vars: testVarStore("DEBUG", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
+			name:               "--all, current is non-default, var is present in current, no others",
+			args:               []string{"vars", "-D", "EXTRA", "--all"},
+			p:                  testProject_vars("DEBUG", test_3EnvVarsMap_debugHasExtra),
+			expectP:            testProject_vars("DEBUG", test_3EnvVarsMap_noExtra),
 			expectStdoutOutput: "Deleted ${EXTRA} from all environments\n",
 		},
 		{
-			name: "--all, current is non-default, var is present in current, and others",
-			args: []string{"vars", "-D", "HOST", "--all"},
-			p: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"HOST":   "internal-test.example.com",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-						"HOST":   "example.com",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-						"HOST":   "invalid.example.com",
-					},
-				}),
-			},
-			expectP: morc.Project{
-				Vars: testVarStore("PROD", map[string]map[string]string{
-					"": {
-						"SCHEME": "http",
-						"EXTRA":  "data",
-					},
-					"PROD": {
-						"SCHEME": "https",
-					},
-					"DEBUG": {
-						"SCHEME": "invalid",
-					},
-				}),
-			},
+			name:               "--all, current is non-default, var is present in current, and others",
+			args:               []string{"vars", "-D", "HOST", "--all"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap),
+			expectP:            testProject_vars("PROD", test_3EnvVarsMap_noHost),
 			expectStdoutOutput: "Deleted ${HOST} from all environments\n",
 		},
 	}

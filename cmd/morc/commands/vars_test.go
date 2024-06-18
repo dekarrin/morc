@@ -600,44 +600,120 @@ func Test_Vars_Delete(t *testing.T) {
 	}
 }
 
-// GET cases
-// * unspecified env
-//   * current is default
-//     * current has var - VALUE
-//     * current does not have var - NO VALUE
-//   * current is non-default
-//     * current has own var def - VALUE
-//     * current does not define var
-//       * default does - VALUE
-//       * default does not -NO VALUE
-// * specify --current
-//   * current is default
-//     * current has var - VALUE
-//     * current does not have var - NO VALUE
-//   * current is non-default
-//     * current has own var def - VALUE
-//     * current does not define var
-//       * default does - NO VALUE, IT IS VIA DEFAULT
-//       * default does not - NO VALUE
-// * specify --env
-//   * current is default
-//     * specified env has var - VALUE
-//     * specified env has no var
-//       * default does - NO VALUE, IT IS VIA DEFAULT
-//       * default does not - NO VALUE
-//   * current is non-default
-//     * specified env has var - VALUE
-//     * specified env has no var
-//       * default does - NO VALUE, IT IS VIA DEFAULT
-//       * default does not - NO VALUE
-// * specifiy --default
-//   * current is default
-//     * default has value - VALUE
-//     * default has no value - NO VALUE
-//   * current is non-default
-//     * default has value - VALUE
-//     * default has no value - NO VALUE
-// * specify --all - list all values by env.
+// TODO: undefined var should be an error.
+func Test_Vars_Get(t *testing.T) {
+	testCases := []struct {
+		name               string
+		args               []string // DO NOT INCLUDE -F; it is automatically set to a project file
+		p                  morc.Project
+		expectErr          string // set if command.Execute expected to fail, with a string that would be in the error message
+		expectStderrOutput string // set with expected output to stderr
+		expectStdoutOutput string // set with expected output to stdout
+	}{
+		{
+			name:               "empty project",
+			args:               []string{"vars", "VAR1"},
+			p:                  morc.Project{},
+			expectStderrOutput: "${VAR1} is not defined\n",
+		},
+		{
+			name:               "unspecified env, current=default, var is present",
+			args:               []string{"vars", "HOST"},
+			p:                  testProject_vars("", test_3EnvVarsMap),
+			expectStdoutOutput: test_3EnvVarsMap[""]["HOST"] + "\n",
+		},
+		{
+			name:               "unspecified env, current=default, var is not present",
+			args:               []string{"vars", "PASSWORD"},
+			p:                  testProject_vars("", test_3EnvVarsMap),
+			expectStderrOutput: "${PASSWORD} is not defined\n",
+		},
+		{
+			name:               "unspecified env, current=non-default, var present in env",
+			args:               []string{"vars", "HOST"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap),
+			expectStdoutOutput: test_3EnvVarsMap["PROD"]["HOST"] + "\n",
+		},
+		{
+			name:               "unspecified env, current=non-default, var not present in env, present in default",
+			args:               []string{"vars", "EXTRA"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap),
+			expectStdoutOutput: test_3EnvVarsMap[""]["EXTRA"] + "\n",
+		},
+		{
+			name:               "unspecified env, current=non-default, var not present in env or default",
+			args:               []string{"vars", "PASSWORD"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap),
+			expectStderrOutput: "${PASSWORD} is not defined\n",
+		},
+
+		// GET cases
+		// * specify --current
+		//   * current is default
+		//     * current has var - VALUE
+		//     * current does not have var - NO VALUE
+		//   * current is non-default
+		//     * current has own var def - VALUE
+		//     * current does not define var
+		//       * default does - NO VALUE, IT IS VIA DEFAULT
+		//       * default does not - NO VALUE
+		// * specify --env
+		//   * current is default
+		//     * specified env has var - VALUE
+		//     * specified env has no var
+		//       * default does - NO VALUE, IT IS VIA DEFAULT
+		//       * default does not - NO VALUE
+		//   * current is non-default
+		//     * specified env has var - VALUE
+		//     * specified env has no var
+		//       * default does - NO VALUE, IT IS VIA DEFAULT
+		//       * default does not - NO VALUE
+		// * specifiy --default
+		//   * current is default
+		//     * default has value - VALUE
+		//     * default has no value - NO VALUE
+		//   * current is non-default
+		//     * default has value - VALUE
+		//     * default has no value - NO VALUE
+		// * specify --all - list all values by env.
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+			resetVarsFlags()
+
+			// create project and dump config to a temp dir
+			projFilePath := createTestProjectFiles(t, tc.p)
+			// set up the root command and run
+			output, outputErr, err := runTestCommand(varsCmd, projFilePath, tc.args)
+
+			// assert and check stdout and stderr
+			if err != nil {
+				if tc.expectErr == "" {
+					t.Fatalf("unexpected returned error: %v", err)
+					return
+				}
+				if !strings.Contains(err.Error(), tc.expectErr) {
+					t.Fatalf("expected returned error to contain %q, got %q", tc.expectErr, err)
+				}
+				return
+			} else if tc.expectErr != "" {
+				t.Fatalf("expected error %q, got no error", tc.expectErr)
+			}
+
+			// assertions
+
+			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
+			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
+
+			assert_projectInFileMatches(assert, tc.p, projFilePath)
+		})
+	}
+}
+
+// TODO: should RLY have non-fs IO to begin with, and would be esp nice for
+// testing.
 
 // SET cases
 // * unspecified env

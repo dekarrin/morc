@@ -110,28 +110,28 @@ func invokeVarGet(io cmdio.IO, projFile string, env envSelection, varName string
 	var val string
 	if env.useDefault {
 		if !p.Vars.IsDefinedIn(varName, "") {
-			io.PrintErrf("%q is not defined in default environment\n", varName)
+			io.PrintErrf("${%s} is not defined in default environment\n", varName)
 			return nil
 		}
 
 		val = p.Vars.GetFrom(varName, "")
 	} else if env.useName != "" {
 		if !p.Vars.IsDefinedIn(varName, env.useName) {
-			io.PrintErrf("%q is not defined in environment %q\n", varName, env.useName)
+			io.PrintErrf("${%s} is not defined in environment %q\n", varName, env.useName)
 			return nil
 		}
 
 		val = p.Vars.GetFrom(varName, env.useName)
 	} else if env.useCurrent {
 		if !p.Vars.IsDefinedIn(varName, p.Vars.Environment) {
-			io.PrintErrf("%q is not defined in current environment (%q)\n", varName, p.Vars.Environment)
+			io.PrintErrf("${%s} is not defined in current environment (%q)\n", varName, p.Vars.Environment)
 			return nil
 		}
 
 		val = p.Vars.GetFrom(varName, p.Vars.Environment)
 	} else {
 		if !p.Vars.IsDefined(varName) {
-			io.PrintErrf("%q is not defined\n", varName)
+			io.PrintErrf("${%s} is not defined\n", varName)
 			return nil
 		}
 

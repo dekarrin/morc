@@ -474,12 +474,6 @@ func Test_Vars_Delete(t *testing.T) {
 			expectErr: "cannot specify env \"\"; use --default or --all to specify the default env",
 		},
 		{
-			name:      "--env='' ERRORS",
-			args:      []string{"vars", "-D", "PASSWORD", "--env", ""},
-			p:         testProject_vars("DEBUG", test_3EnvVarsMap),
-			expectErr: "cannot specify env \"\"; use --default or --all to specify the default env",
-		},
-		{
 			name:               "--default, current is default, var is present in default and no others",
 			args:               []string{"vars", "-D", "EXTRA", "--default"},
 			p:                  testProject_vars("", test_3EnvVarsMap),
@@ -610,72 +604,180 @@ func Test_Vars_Get(t *testing.T) {
 		expectStderrOutput string // set with expected output to stderr
 		expectStdoutOutput string // set with expected output to stdout
 	}{
+		// {
+		// 	name:               "empty project",
+		// 	args:               []string{"vars", "VAR1"},
+		// 	p:                  morc.Project{},
+		// 	expectStderrOutput: "${VAR1} is not defined\n",
+		// },
+		// {
+		// 	name:               "unspecified env, current=default, var is present",
+		// 	args:               []string{"vars", "HOST"},
+		// 	p:                  testProject_vars("", test_3EnvVarsMap),
+		// 	expectStdoutOutput: test_3EnvVarsMap[""]["HOST"] + "\n",
+		// },
+		// {
+		// 	name:               "unspecified env, current=default, var is not present",
+		// 	args:               []string{"vars", "PASSWORD"},
+		// 	p:                  testProject_vars("", test_3EnvVarsMap),
+		// 	expectStderrOutput: "${PASSWORD} is not defined\n",
+		// },
+		// {
+		// 	name:               "unspecified env, current=non-default, var present in env",
+		// 	args:               []string{"vars", "HOST"},
+		// 	p:                  testProject_vars("PROD", test_3EnvVarsMap),
+		// 	expectStdoutOutput: test_3EnvVarsMap["PROD"]["HOST"] + "\n",
+		// },
+		// {
+		// 	name:               "unspecified env, current=non-default, var not present in env, present in default",
+		// 	args:               []string{"vars", "EXTRA"},
+		// 	p:                  testProject_vars("PROD", test_3EnvVarsMap),
+		// 	expectStdoutOutput: test_3EnvVarsMap[""]["EXTRA"] + "\n",
+		// },
+		// {
+		// 	name:               "unspecified env, current=non-default, var not present in env or default",
+		// 	args:               []string{"vars", "PASSWORD"},
+		// 	p:                  testProject_vars("PROD", test_3EnvVarsMap),
+		// 	expectStderrOutput: "${PASSWORD} is not defined\n",
+		// },
+		// {
+		// 	name:               "--current, current=default, var is present",
+		// 	args:               []string{"vars", "HOST", "--current"},
+		// 	p:                  testProject_vars("", test_3EnvVarsMap),
+		// 	expectStdoutOutput: test_3EnvVarsMap[""]["HOST"] + "\n",
+		// },
+		// {
+		// 	name:               "--current, current=default, var is not present",
+		// 	args:               []string{"vars", "PASSWORD", "--current"},
+		// 	p:                  testProject_vars("", test_3EnvVarsMap),
+		// 	expectStderrOutput: "${PASSWORD} is not defined in current env (default env)\n",
+		// },
+		// {
+		// 	name:               "--current, current=non-default, var present in env",
+		// 	args:               []string{"vars", "HOST", "--current"},
+		// 	p:                  testProject_vars("PROD", test_3EnvVarsMap),
+		// 	expectStdoutOutput: test_3EnvVarsMap["PROD"]["HOST"] + "\n",
+		// },
+		// {
+		// 	name:               "--current, current=non-default, var not present in env, present in default",
+		// 	args:               []string{"vars", "EXTRA", "--current"},
+		// 	p:                  testProject_vars("PROD", test_3EnvVarsMap),
+		// 	expectStderrOutput: "${EXTRA} is not defined in current env (PROD); value is via default env\n",
+		// },
+		// {
+		// 	name:               "--current, current=non-default, var not present in env or default",
+		// 	args:               []string{"vars", "PASSWORD", "--current"},
+		// 	p:                  testProject_vars("PROD", test_3EnvVarsMap),
+		// 	expectStderrOutput: "${PASSWORD} is not defined in current env (PROD)\n",
+		// },
+		// {
+		// 	name:               "--env=current, current=non-default, var present in env",
+		// 	args:               []string{"vars", "HOST", "--env", "PROD"},
+		// 	p:                  testProject_vars("PROD", test_3EnvVarsMap),
+		// 	expectStdoutOutput: test_3EnvVarsMap["PROD"]["HOST"] + "\n",
+		// },
+		// {
+		// 	name:               "--env=current, current=non-default, var not present in env, present in default",
+		// 	args:               []string{"vars", "EXTRA", "--env", "PROD"},
+		// 	p:                  testProject_vars("PROD", test_3EnvVarsMap),
+		// 	expectStderrOutput: "${EXTRA} is not defined in env PROD; value is via default env\n",
+		// },
+		// {
+		// 	name:               "--env=current, current=non-default, var not present in env or default",
+		// 	args:               []string{"vars", "PASSWORD", "--env", "PROD"},
+		// 	p:                  testProject_vars("PROD", test_3EnvVarsMap),
+		// 	expectStderrOutput: "${PASSWORD} is not defined in env PROD\n",
+		// },
+		// {
+		// 	name:               "--env=other, current=non-default, var present in env",
+		// 	args:               []string{"vars", "HOST", "--env", "PROD"},
+		// 	p:                  testProject_vars("DEBUG", test_3EnvVarsMap),
+		// 	expectStdoutOutput: test_3EnvVarsMap["PROD"]["HOST"] + "\n",
+		// },
+		// {
+		// 	name:               "--env=other, current=non-default, var not present in env, present in default",
+		// 	args:               []string{"vars", "EXTRA", "--env", "PROD"},
+		// 	p:                  testProject_vars("DEBUG", test_3EnvVarsMap),
+		// 	expectStderrOutput: "${EXTRA} is not defined in env PROD; value is via default env\n",
+		// },
+		// {
+		// 	name:               "--env=other, current=non-default, var not present in env or default",
+		// 	args:               []string{"vars", "PASSWORD", "--env", "PROD"},
+		// 	p:                  testProject_vars("DEBUG", test_3EnvVarsMap),
+		// 	expectStderrOutput: "${PASSWORD} is not defined in env PROD\n",
+		// },
+		// {
+		// 	name:               "--env=other, current=default, var present in env",
+		// 	args:               []string{"vars", "HOST", "--env", "PROD"},
+		// 	p:                  testProject_vars("", test_3EnvVarsMap),
+		// 	expectStdoutOutput: test_3EnvVarsMap["PROD"]["HOST"] + "\n",
+		// },
+		// {
+		// 	name:               "--env=other, current=default, var not present in env, present in default",
+		// 	args:               []string{"vars", "EXTRA", "--env", "PROD"},
+		// 	p:                  testProject_vars("", test_3EnvVarsMap),
+		// 	expectStderrOutput: "${EXTRA} is not defined in env PROD; value is via default env\n",
+		// },
+		// {
+		// 	name:               "--env=other, current=default, var not present in env or default",
+		// 	args:               []string{"vars", "PASSWORD", "--env", "PROD"},
+		// 	p:                  testProject_vars("", test_3EnvVarsMap),
+		// 	expectStderrOutput: "${PASSWORD} is not defined in env PROD\n",
+		// },
+		// {
+		// 	name:      "--env='' ERRORS",
+		// 	args:      []string{"vars", "PASSWORD", "--env", ""},
+		// 	p:         testProject_vars("DEBUG", test_3EnvVarsMap),
+		// 	expectErr: "cannot specify env \"\"; use --default to get from default env",
+		// },
+		// {
+		// 	name:      "--env=default ERRORS",
+		// 	args:      []string{"vars", "EXTRA", "--env", reservedDefaultEnvName},
+		// 	p:         testProject_vars("DEBUG", test_3EnvVarsMap),
+		// 	expectErr: "cannot specify reserved env name \"<DEFAULT>\"; use --default to get from default env",
+		// },
+		// {
+		// 	name:               "--default, current=default, var is present",
+		// 	args:               []string{"vars", "HOST", "--default"},
+		// 	p:                  testProject_vars("", test_3EnvVarsMap),
+		// 	expectStdoutOutput: test_3EnvVarsMap[""]["HOST"] + "\n",
+		// },
+		// {
+		// 	name:               "--default, current=default, var is not present",
+		// 	args:               []string{"vars", "PASSWORD", "--default"},
+		// 	p:                  testProject_vars("", test_3EnvVarsMap),
+		// 	expectStderrOutput: "${PASSWORD} is not defined in default env\n",
+		// },
+		// {
+		// 	name:               "--default, current=non-default, var is present in default",
+		// 	args:               []string{"vars", "HOST", "--default"},
+		// 	p:                  testProject_vars("PROD", test_3EnvVarsMap),
+		// 	expectStdoutOutput: test_3EnvVarsMap[""]["HOST"] + "\n",
+		// },
+		// {
+		// 	name:               "--default, current=non-default, var is not present in default",
+		// 	args:               []string{"vars", "PASSWORD", "--default"},
+		// 	p:                  testProject_vars("PROD", test_3EnvVarsMap),
+		// 	expectStderrOutput: "${PASSWORD} is not defined in default env\n",
+		// },
 		{
-			name:               "empty project",
-			args:               []string{"vars", "VAR1"},
-			p:                  morc.Project{},
-			expectStderrOutput: "${VAR1} is not defined\n",
+			name:               "--all, var is present in some",
+			args:               []string{"vars", "EXTRA", "--all"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap_debugHasExtra),
+			expectStdoutOutput: "Env      Value\n(default): \"\"\nDEBUG: \"\"\n",
 		},
 		{
-			name:               "unspecified env, current=default, var is present",
-			args:               []string{"vars", "HOST"},
-			p:                  testProject_vars("", test_3EnvVarsMap),
-			expectStdoutOutput: test_3EnvVarsMap[""]["HOST"] + "\n",
-		},
-		{
-			name:               "unspecified env, current=default, var is not present",
-			args:               []string{"vars", "PASSWORD"},
-			p:                  testProject_vars("", test_3EnvVarsMap),
-			expectStderrOutput: "${PASSWORD} is not defined\n",
-		},
-		{
-			name:               "unspecified env, current=non-default, var present in env",
-			args:               []string{"vars", "HOST"},
+			name:               "--all, var is present in all",
+			args:               []string{"vars", "HOST", "--all"},
 			p:                  testProject_vars("PROD", test_3EnvVarsMap),
-			expectStdoutOutput: test_3EnvVarsMap["PROD"]["HOST"] + "\n",
+			expectStdoutOutput: "Env      Value\n(default): \"\"\nDEBUG: \"\"\n",
 		},
 		{
-			name:               "unspecified env, current=non-default, var not present in env, present in default",
-			args:               []string{"vars", "EXTRA"},
-			p:                  testProject_vars("PROD", test_3EnvVarsMap),
-			expectStdoutOutput: test_3EnvVarsMap[""]["EXTRA"] + "\n",
+			name:               "--all, var is present in none",
+			args:               []string{"vars", "PASSWORD", "--all"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap_debugHasExtra),
+			expectStderrOutput: "(no values defined)\n",
 		},
-		{
-			name:               "unspecified env, current=non-default, var not present in env or default",
-			args:               []string{"vars", "PASSWORD"},
-			p:                  testProject_vars("PROD", test_3EnvVarsMap),
-			expectStderrOutput: "${PASSWORD} is not defined\n",
-		},
-
-		// GET cases
-		// * specify --current
-		//   * current is default
-		//     * current has var - VALUE
-		//     * current does not have var - NO VALUE
-		//   * current is non-default
-		//     * current has own var def - VALUE
-		//     * current does not define var
-		//       * default does - NO VALUE, IT IS VIA DEFAULT
-		//       * default does not - NO VALUE
-		// * specify --env
-		//   * current is default
-		//     * specified env has var - VALUE
-		//     * specified env has no var
-		//       * default does - NO VALUE, IT IS VIA DEFAULT
-		//       * default does not - NO VALUE
-		//   * current is non-default
-		//     * specified env has var - VALUE
-		//     * specified env has no var
-		//       * default does - NO VALUE, IT IS VIA DEFAULT
-		//       * default does not - NO VALUE
-		// * specifiy --default
-		//   * current is default
-		//     * default has value - VALUE
-		//     * default has no value - NO VALUE
-		//   * current is non-default
-		//     * default has value - VALUE
-		//     * default has no value - NO VALUE
-		// * specify --all - list all values by env.
 	}
 
 	for _, tc := range testCases {
@@ -713,7 +815,7 @@ func Test_Vars_Get(t *testing.T) {
 }
 
 // TODO: should RLY have non-fs IO to begin with, and would be esp nice for
-// testing.
+// testing. do that FIRST so we can fix the huge amount of ssd io.
 
 // SET cases
 // * unspecified env

@@ -8,6 +8,7 @@ import (
 	"github.com/dekarrin/morc"
 	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/dekarrin/morc/internal/sliceops"
+	"github.com/dekarrin/rosed"
 	"github.com/spf13/cobra"
 )
 
@@ -108,23 +109,94 @@ func invokeVarGet(io cmdio.IO, projFile string, env envSelection, varName string
 	}
 
 	var val string
-	if env.useDefault {
+	if env.useAll {
+		// NOTE: this will short-circ out of the if block because it produces
+		// its own special output. It will not continue to the return at the
+		// the bottom.
+
+		nonDefs := p.Vars.NonDefaultEnvsWith(varName)
+		sort.Strings(nonDefs)
+		inEnvs := nonDefs
+
+		if p.Vars.IsDefinedIn(varName, "") {
+			inEnvs = make([]string, len(nonDefs)+1)
+			inEnvs[0] = ""
+			copy(inEnvs[1:], nonDefs)
+		}
+
+		if len(inEnvs) == 0 {
+			io.PrintErrf("(no values defined)\n")
+			return nil
+		}
+
+		tableData := [][]string{}
+
+		doHeaders := !io.Quiet
+		if doHeaders {
+			tableData = append(tableData, []string{"Env", "Value"})
+		}
+
+		for _, envName := range inEnvs {
+			val = p.Vars.GetFrom(varName, envName)
+			displayName := strings.ToUpper(envName)
+			if envName == "" {
+				displayName = "(default)"
+			}
+
+			if !io.Quiet {
+				displayName += ":"
+			}
+			tableData = append(tableData, []string{displayName, val})
+		}
+
+		const minWidth = 8
+		output := rosed.Editor{}.
+			InsertTableOpts(
+				rosed.End,
+				tableData,
+				minWidth,
+				rosed.Options{
+					TableHeaders: doHeaders,
+				},
+			).
+			String()
+
+		io.Printf("%s", output)
+		return nil
+	} else if env.useDefault {
 		if !p.Vars.IsDefinedIn(varName, "") {
-			io.PrintErrf("${%s} is not defined in default environment\n", varName)
+			io.PrintErrf("${%s} is not defined in default env\n", varName)
 			return nil
 		}
 
 		val = p.Vars.GetFrom(varName, "")
 	} else if env.useName != "" {
 		if !p.Vars.IsDefinedIn(varName, env.useName) {
-			io.PrintErrf("${%s} is not defined in environment %q\n", varName, env.useName)
+			// does it have a value via default? say so if so
+			valueViaDefault := ""
+			if p.Vars.IsDefined(varName) {
+				valueViaDefault = "; value is via default env"
+			}
+
+			io.PrintErrf("${%s} is not defined in env %s%s\n", varName, strings.ToUpper(env.useName), valueViaDefault)
 			return nil
 		}
 
 		val = p.Vars.GetFrom(varName, env.useName)
 	} else if env.useCurrent {
 		if !p.Vars.IsDefinedIn(varName, p.Vars.Environment) {
-			io.PrintErrf("${%s} is not defined in current environment (%q)\n", varName, p.Vars.Environment)
+			var envName = strings.ToUpper(p.Vars.Environment)
+			if envName == "" {
+				envName = "default env"
+			}
+
+			// does it have a value via default? say so if so
+			valueViaDefault := ""
+			if p.Vars.IsDefined(varName) {
+				valueViaDefault = "; value is via default env"
+			}
+
+			io.PrintErrf("${%s} is not defined in current env (%s)%s\n", varName, envName, valueViaDefault)
 			return nil
 		}
 
@@ -362,6 +434,7 @@ func parseVarsArgs(cmd *cobra.Command, posArgs []string, args *varsArgs) error {
 		// nothing to do here
 	case varsActionGet:
 		args.varName = posArgs[0]
+		args.env.useAll = flags.BAll
 	case varsActionSet:
 		args.varName = posArgs[0]
 		args.value = posArgs[1]
@@ -401,25 +474,26 @@ func parseVarsActionFromFlags(cmd *cobra.Command, posArgs []string) (varsAction,
 	if len(posArgs) == 0 {
 		// listing mode
 		if flags.BAll {
-			return varsActionList, fmt.Errorf("--all is only valid when deleting a var; use --default to list vars in default env")
+			return varsActionList, fmt.Errorf("--all is only valid when deleting or getting; use --default to list vars in default env")
 		}
 		if flags.Env == reservedDefaultEnvName {
 			return varsActionList, fmt.Errorf("cannot use reserved environment name %q; use --default to list vars in default env", reservedDefaultEnvName)
 		}
 		return varsActionList, nil
 	} else if len(posArgs) == 1 {
-		// setting mode
-		if flags.BAll {
-			return varsActionGet, fmt.Errorf("--all is only valid when deleting a var; use --default to get from default env")
-		}
+		// getting mode
+
 		if flags.Env == reservedDefaultEnvName {
-			return varsActionList, fmt.Errorf("cannot use reserved environment name %q; use --default to get from default env", reservedDefaultEnvName)
+			return varsActionGet, fmt.Errorf("cannot specify reserved env name %q; use --default to get from default env", reservedDefaultEnvName)
+		}
+		if f.Changed("env") && flags.Env == "" {
+			return varsActionGet, fmt.Errorf("cannot specify env \"\"; use --default to get from default env")
 		}
 		return varsActionGet, nil
 	} else if len(posArgs) == 2 {
 		// setting mode
 		if flags.BAll {
-			return varsActionSet, fmt.Errorf("--all is only valid when deleting; use --default to set var in the default environment")
+			return varsActionSet, fmt.Errorf("--all is only valid when deleting or getting; use --default to set var in the default environment")
 		}
 		if flags.Env == reservedDefaultEnvName {
 			return varsActionList, fmt.Errorf("cannot use reserved environment name %q; use --default to set in default env", reservedDefaultEnvName)

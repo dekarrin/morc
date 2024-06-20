@@ -92,7 +92,7 @@ func init() {
 
 func invokeFlowsDelete(io cmdio.IO, projFile, flowName string) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(projFile, false)
+	p, err := readProject(projFile, false)
 	if err != nil {
 		return err
 	}
@@ -118,7 +118,7 @@ func invokeFlowsDelete(io cmdio.IO, projFile, flowName string) error {
 
 func invokeFlowsEdit(io cmdio.IO, projFile, flowName string, attrs flowAttrValues) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(projFile, false)
+	p, err := readProject(projFile, false)
 	if err != nil {
 		return err
 	}
@@ -276,7 +276,7 @@ func invokeFlowsEdit(io cmdio.IO, projFile, flowName string, attrs flowAttrValue
 
 func invokeFlowsGet(io cmdio.IO, projFile, flowName string, getItem flowKey) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -311,7 +311,7 @@ func invokeFlowsGet(io cmdio.IO, projFile, flowName string, getItem flowKey) err
 
 func invokeFlowsNew(io cmdio.IO, projFile, flowName string, templates []string) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(projFile, false)
+	p, err := readProject(projFile, false)
 	if err != nil {
 		return err
 	}
@@ -361,7 +361,7 @@ func invokeFlowsNew(io cmdio.IO, projFile, flowName string, templates []string) 
 
 func invokeFlowsShow(io cmdio.IO, projFile, flowName string) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(projFile, false)
+	p, err := readProject(projFile, false)
 	if err != nil {
 		return err
 	}
@@ -403,7 +403,7 @@ func invokeFlowsShow(io cmdio.IO, projFile, flowName string) error {
 }
 
 func invokeFlowsList(io cmdio.IO, projFile string) error {
-	p, err := morc.LoadProjectFromDisk(projFile, false)
+	p, err := readProject(projFile, false)
 	if err != nil {
 		return err
 	}

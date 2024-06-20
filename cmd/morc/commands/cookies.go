@@ -73,7 +73,7 @@ func init() {
 }
 
 func invokeCookiesOn(io cmdio.IO, projFile string) error {
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -95,7 +95,7 @@ func invokeCookiesOn(io cmdio.IO, projFile string) error {
 }
 
 func invokeCookiesOff(io cmdio.IO, projFile string) error {
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -112,7 +112,7 @@ func invokeCookiesOff(io cmdio.IO, projFile string) error {
 }
 
 func invokeCookiesClear(io cmdio.IO, projFile string) error {
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -129,7 +129,7 @@ func invokeCookiesClear(io cmdio.IO, projFile string) error {
 }
 
 func invokeCookiesInfo(io cmdio.IO, projFile string) error {
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -175,7 +175,7 @@ func invokeCookiesInfo(io cmdio.IO, projFile string) error {
 }
 
 func invokeCookiesList(io cmdio.IO, projFile string, url *url.URL) error {
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}

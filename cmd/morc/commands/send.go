@@ -49,7 +49,7 @@ func init() {
 // invokeRequest receives named vars and checked/defaulted requestOptions.
 func invokeSend(io cmdio.IO, projFile, reqName string, varOverrides map[string]string, skipVerify bool, oc morc.OutputControl) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}

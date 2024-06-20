@@ -86,7 +86,7 @@ func init() {
 
 func invokeCapsDelete(io cmdio.IO, projFile string, reqName, varName string) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(projFile, false)
+	p, err := readProject(projFile, false)
 	if err != nil {
 		return err
 	}
@@ -124,7 +124,7 @@ func invokeCapsDelete(io cmdio.IO, projFile string, reqName, varName string) err
 
 func invokeCapsEdit(io cmdio.IO, projFile, reqName, varName string, attrs capAttrValues) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(projFile, false)
+	p, err := readProject(projFile, false)
 	if err != nil {
 		return err
 	}
@@ -205,7 +205,7 @@ func invokeCapsEdit(io cmdio.IO, projFile, reqName, varName string, attrs capAtt
 
 func invokeCapsGet(io cmdio.IO, projFile, reqName, capName string, getItem capKey) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -244,7 +244,7 @@ func invokeCapsNew(io cmdio.IO, projFile, reqName, varName string, attrs capAttr
 	}
 
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -294,7 +294,7 @@ func invokeCapsNew(io cmdio.IO, projFile, reqName, varName string, attrs capAttr
 
 func invokeCapsList(io cmdio.IO, projFile string, reqName string) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -320,7 +320,7 @@ func invokeCapsList(io cmdio.IO, projFile string, reqName string) error {
 
 func invokeCapsShow(io cmdio.IO, projFile, reqName, capName string) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}

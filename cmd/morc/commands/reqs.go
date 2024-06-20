@@ -114,7 +114,7 @@ func invokeReqsEdit(io cmdio.IO, projFile, reqName string, attrs reqAttrValues) 
 	loadAllFiles := attrs.name.set
 
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(projFile, loadAllFiles)
+	p, err := readProject(projFile, loadAllFiles)
 	if err != nil {
 		return err
 	}
@@ -280,7 +280,7 @@ func invokeReqsEdit(io cmdio.IO, projFile, reqName string, attrs reqAttrValues) 
 
 func invokeReqsNew(io cmdio.IO, projFile, reqName string, attrs reqAttrValues) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -319,7 +319,7 @@ func invokeReqsNew(io cmdio.IO, projFile, reqName string, attrs reqAttrValues) e
 
 func invokeReqsDelete(io cmdio.IO, projFile, reqName string, force bool) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -360,7 +360,7 @@ func invokeReqsDelete(io cmdio.IO, projFile, reqName string, force bool) error {
 
 func invokeReqsShow(io cmdio.IO, projFile, reqName string) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -441,7 +441,7 @@ func invokeReqsShow(io cmdio.IO, projFile, reqName string) error {
 }
 
 func invokeReqsList(io cmdio.IO, projFile string) error {
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -482,7 +482,7 @@ func invokeReqsList(io cmdio.IO, projFile string) error {
 
 func invokeReqsGet(io cmdio.IO, projFile, reqName string, item reqKey) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}

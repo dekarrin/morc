@@ -80,7 +80,7 @@ func invokeVarSet(io cmdio.IO, projFile string, env envSelection, varName, value
 		return err
 	}
 
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func invokeVarSet(io cmdio.IO, projFile string, env envSelection, varName, value
 }
 
 func invokeVarGet(io cmdio.IO, projFile string, env envSelection, varName string) error {
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -226,7 +226,7 @@ func invokeVarGet(io cmdio.IO, projFile string, env envSelection, varName string
 // incredibly difficult to follow. Change to use an if-case for each of the env
 // selection possibilities and key off of that.
 func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName string) error {
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -351,7 +351,7 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 }
 
 func invokeVarList(io cmdio.IO, projFile string, env envSelection) error {
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}

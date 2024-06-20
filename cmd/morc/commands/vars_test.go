@@ -825,6 +825,17 @@ func Test_Vars_Get(t *testing.T) {
 
 // TODO: should RLY have non-fs IO to begin with, and would be esp nice for
 // testing. do that FIRST so we can fix the huge amount of ssd io.
+//
+// * update all commands to call new, common function for loading project.
+// * make said common function check a buffer first before performing disk io.
+// * update all commands to call new, common function for persisting aspects of
+// project.
+// * make said common function check for a buffer and write to it before calling
+// normal disk io.
+//
+// * Add ability to load project from general reader to Project.
+// * Add ability to set project writers and make project check for them during
+// persistence.
 
 // SET cases
 // * unspecified env

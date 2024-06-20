@@ -122,7 +122,7 @@ func invokeProjEdit(io cmdio.IO, projFile string, attrs projAttrValues) error {
 	modifyAllFiles := attrs.changesFilePaths() || attrs.cookieLifetime.set
 
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(projFile, modifyAllFiles)
+	p, err := readProject(projFile, modifyAllFiles)
 	if err != nil {
 		return err
 	}
@@ -299,7 +299,7 @@ func invokeProjNew(io cmdio.IO, projFile string, attrs projAttrValues) error {
 }
 
 func invokeProjGet(io cmdio.IO, projFile string, item projKey) error {
-	proj, err := morc.LoadProjectFromDisk(projFile, true)
+	proj, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -325,7 +325,7 @@ func invokeProjGet(io cmdio.IO, projFile string, item projKey) error {
 }
 
 func invokeProjShow(io cmdio.IO, projFile string) error {
-	proj, err := morc.LoadProjectFromDisk(projFile, true)
+	proj, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}

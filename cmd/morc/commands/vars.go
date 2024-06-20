@@ -146,7 +146,13 @@ func invokeVarGet(io cmdio.IO, projFile string, env envSelection, varName string
 			if !io.Quiet {
 				displayName += ":"
 			}
-			tableData = append(tableData, []string{displayName, val})
+
+			displayVal := val
+			if !io.Quiet {
+				displayVal = fmt.Sprintf("%q", val)
+			}
+
+			tableData = append(tableData, []string{displayName, displayVal})
 		}
 
 		const minWidth = 8

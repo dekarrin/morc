@@ -106,7 +106,7 @@ func invokeFlowsDelete(io cmdio.IO, projFile, flowName string) error {
 	delete(p.Flows, flowLower)
 
 	// save the project file
-	err = p.PersistToDisk(false)
+	err = writeProject(p, false)
 	if err != nil {
 		return err
 	}
@@ -264,7 +264,7 @@ func invokeFlowsEdit(io cmdio.IO, projFile, flowName string, attrs flowAttrValue
 
 	// flow name might have been modified so take the currently set .Name and lowercase it.
 	p.Flows[strings.ToLower(flow.Name)] = flow
-	err = p.PersistToDisk(false)
+	err = writeProject(p, false)
 	if err != nil {
 		return err
 	}
@@ -349,7 +349,7 @@ func invokeFlowsNew(io cmdio.IO, projFile, flowName string, templates []string) 
 	p.Flows[flowLower] = flow
 
 	// save the project file
-	err = p.PersistToDisk(false)
+	err = writeProject(p, false)
 	if err != nil {
 		return err
 	}

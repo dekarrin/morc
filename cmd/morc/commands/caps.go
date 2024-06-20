@@ -112,7 +112,7 @@ func invokeCapsDelete(io cmdio.IO, projFile string, reqName, varName string) err
 	p.Templates[reqName] = req
 
 	// save the project file
-	err = p.PersistToDisk(false)
+	err = writeProject(p, false)
 	if err != nil {
 		return err
 	}
@@ -193,7 +193,7 @@ func invokeCapsEdit(io cmdio.IO, projFile, reqName, varName string, attrs capAtt
 	p.Templates[reqName] = req
 
 	// save the project file
-	err = p.PersistToDisk(false)
+	err = writeProject(p, false)
 	if err != nil {
 		return err
 	}
@@ -275,7 +275,7 @@ func invokeCapsNew(io cmdio.IO, projFile, reqName, varName string, attrs capAttr
 	req.Captures[varUpper] = cap
 
 	// save the project file
-	err = p.PersistToDisk(false)
+	err = writeProject(p, false)
 	if err != nil {
 		return err
 	}

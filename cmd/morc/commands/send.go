@@ -49,7 +49,7 @@ func init() {
 // invokeRequest receives named vars and checked/defaulted requestOptions.
 func invokeSend(io cmdio.IO, projFile, reqName string, varOverrides map[string]string, skipVerify bool, oc morc.OutputControl) error {
 	// load the project file
-	p, err := readProject(projFile, true)
+	p, err := morc.LoadProjectFromDisk(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -164,7 +164,7 @@ func sendTemplate(p *morc.Project, tmpl morc.RequestTemplate, vars map[string]st
 		for k, v := range result.Captures {
 			p.Vars.Set(k, v)
 		}
-		err := p.PersistToDisk(false)
+		err := writeProject(*p, false)
 		if err != nil {
 			return result, fmt.Errorf("save project to disk: %w", err)
 		}
@@ -182,7 +182,7 @@ func sendTemplate(p *morc.Project, tmpl morc.RequestTemplate, vars map[string]st
 		}
 
 		p.History = append(p.History, entry)
-		err := p.PersistHistoryToDisk()
+		err := writeHistory(*p)
 		if err != nil {
 			return result, fmt.Errorf("save history to disk: %w", err)
 		}
@@ -192,7 +192,7 @@ func sendTemplate(p *morc.Project, tmpl morc.RequestTemplate, vars map[string]st
 	if p.Config.RecordSession && len(result.Cookies) > 0 {
 		p.Session.Cookies = result.Cookies
 
-		err := p.PersistSessionToDisk()
+		err := writeSession(*p)
 		if err != nil {
 			return result, fmt.Errorf("save session to disk: %w", err)
 		}

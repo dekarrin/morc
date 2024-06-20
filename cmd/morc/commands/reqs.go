@@ -267,7 +267,7 @@ func invokeReqsEdit(io cmdio.IO, projFile, reqName string, attrs reqAttrValues) 
 	p.Templates[strings.ToLower(req.Name)] = req
 
 	// save the project file
-	err = p.PersistToDisk(loadAllFiles)
+	err = writeProject(p, loadAllFiles)
 	if err != nil {
 		return err
 	}
@@ -307,7 +307,7 @@ func invokeReqsNew(io cmdio.IO, projFile, reqName string, attrs reqAttrValues) e
 	p.Templates[reqLower] = req
 
 	// save the project file
-	err = p.PersistToDisk(false)
+	err = writeProject(p, false)
 	if err != nil {
 		return err
 	}
@@ -348,7 +348,7 @@ func invokeReqsDelete(io cmdio.IO, projFile, reqName string, force bool) error {
 	delete(p.Templates, reqLower)
 
 	// save the project file
-	err = p.PersistToDisk(false)
+	err = writeProject(p, false)
 	if err != nil {
 		return err
 	}

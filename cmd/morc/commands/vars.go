@@ -99,7 +99,7 @@ func invokeVarSet(io cmdio.IO, projFile string, env envSelection, varName, value
 		io.PrintLoudf("Set ${%s} to %q\n", varName, value)
 	}
 
-	return p.PersistToDisk(false)
+	return writeProject(p, false)
 }
 
 func invokeVarGet(io cmdio.IO, projFile string, env envSelection, varName string) error {
@@ -248,7 +248,7 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 		}
 
 		p.Vars.Remove(varName)
-		if err := p.PersistToDisk(false); err != nil {
+		if err := writeProject(p, false); err != nil {
 			return err
 		}
 
@@ -338,7 +338,7 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 		}
 	}
 
-	if err := p.PersistToDisk(false); err != nil {
+	if err := writeProject(p, false); err != nil {
 		return err
 	}
 

@@ -136,7 +136,7 @@ func invokeEnvDelete(io cmdio.IO, projFile string, env envSelection) error {
 		panic("neither useAll nor useName set; should never happen")
 	}
 
-	if err := p.PersistToDisk(false); err != nil {
+	if err := writeProject(p, false); err != nil {
 		return err
 	}
 
@@ -158,7 +158,7 @@ func invokeEnvSwitch(io cmdio.IO, projFile string, env envSelection) error {
 	// caller already has set env to "" if we are going to the default env
 	p.Vars.Environment = env.useName
 
-	if err := p.PersistToDisk(false); err != nil {
+	if err := writeProject(p, false); err != nil {
 		return err
 	}
 

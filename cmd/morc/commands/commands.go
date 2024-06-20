@@ -249,6 +249,22 @@ func writeProject(p morc.Project, all bool) error {
 	return p.PersistToDisk(all)
 }
 
+func writeHistory(p morc.Project) error {
+	if histWriter != nil {
+		return p.DumpHistory(histWriter)
+	}
+
+	return p.PersistHistoryToDisk()
+}
+
+func writeSession(p morc.Project) error {
+	if seshWriter != nil {
+		return p.Session.Dump(histWriter)
+	}
+
+	return p.PersistSessionToDisk()
+}
+
 type optional[E any] struct {
 	set bool
 	v   E

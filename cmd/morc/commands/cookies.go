@@ -85,7 +85,7 @@ func invokeCookiesOn(io cmdio.IO, projFile string) error {
 
 	p.Config.RecordSession = true
 
-	if err := p.PersistToDisk(false); err != nil {
+	if err := writeProject(p, false); err != nil {
 		return err
 	}
 
@@ -102,7 +102,7 @@ func invokeCookiesOff(io cmdio.IO, projFile string) error {
 
 	p.Config.RecordSession = false
 
-	if err := p.PersistToDisk(false); err != nil {
+	if err := writeProject(p, false); err != nil {
 		return err
 	}
 
@@ -119,7 +119,7 @@ func invokeCookiesClear(io cmdio.IO, projFile string) error {
 
 	p.Session.Cookies = nil
 
-	if err := p.PersistSessionToDisk(); err != nil {
+	if err := writeSession(p); err != nil {
 		return err
 	}
 

@@ -122,7 +122,7 @@ func invokeHistOn(io cmdio.IO, projFile string) error {
 
 	p.Config.RecordHistory = true
 
-	if err := p.PersistToDisk(false); err != nil {
+	if err := writeProject(p, false); err != nil {
 		return err
 	}
 
@@ -139,7 +139,7 @@ func invokeHistOff(io cmdio.IO, projFile string) error {
 
 	p.Config.RecordHistory = false
 
-	if err := p.PersistToDisk(false); err != nil {
+	if err := writeProject(p, false); err != nil {
 		return err
 	}
 
@@ -156,7 +156,7 @@ func invokeHistClear(io cmdio.IO, projFile string) error {
 
 	p.History = nil
 
-	if err := p.PersistHistoryToDisk(); err != nil {
+	if err := writeHistory(p); err != nil {
 		return err
 	}
 

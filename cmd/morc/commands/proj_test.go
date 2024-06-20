@@ -54,13 +54,6 @@ Cookie record lifetime: 0s`,
 				return
 			}
 
-			// reload the project and make sure it matches the expected project
-			updatedProj, err := morc.LoadProjectFromDisk(projFilePath, true)
-			if err != nil {
-				t.Fatalf("error loading project post execution: %v", err)
-				return
-			}
-
 			// okay, check stdout and stderr, running contains check to be sure
 
 			if tc.expectStdoutOutput != "" {
@@ -71,8 +64,7 @@ Cookie record lifetime: 0s`,
 			}
 
 			// ignore the project file path
-			updatedProj.Config.ProjFile = tc.p.Config.ProjFile
-			assert.Equal(tc.p, updatedProj)
+			assert_projectInFileMatches(assert, tc.p, projFilePath)
 		})
 	}
 }
@@ -126,21 +118,13 @@ func Test_Proj_Get(t *testing.T) {
 				return
 			}
 
-			// reload the project and make sure it matches the expected project
-			updatedProj, err := morc.LoadProjectFromDisk(projFilePath, true)
-			if err != nil {
-				t.Fatalf("error loading project post execution: %v", err)
-				return
-			}
-
 			// okay, check stdout and stderr, running contains check to be sure
 
 			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
 			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
 
 			// ignore the project file path
-			updatedProj.Config.ProjFile = tc.p.Config.ProjFile
-			assert.Equal(tc.p, updatedProj)
+			assert_projectInFileMatches(assert, tc.p, projFilePath)
 		})
 	}
 }

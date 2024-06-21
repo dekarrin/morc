@@ -823,52 +823,83 @@ func Test_Vars_Get(t *testing.T) {
 	}
 }
 
-// TODO: should RLY have non-fs IO to begin with, and would be esp nice for
-// testing. do that FIRST so we can fix the huge amount of ssd io.
-//
-// * update all commands to call new, common function for loading project.
-// * make said common function check a buffer first before performing disk io.
-// * update all commands to call new, common function for persisting aspects of
-// project.
-// * make said common function check for a buffer and write to it before calling
-// normal disk io.
-//
-// * Add ability to load project from general reader to Project.
-// * Add ability to set project writers and make project check for them during
-// persistence.
+func Test_Vars_Set(t *testing.T) {
+	testCases := []struct {
+		name               string
+		args               []string // DO NOT INCLUDE -F; it is automatically set to a project file
+		p                  morc.Project
+		expectP            morc.Project
+		expectErr          string // set if command.Execute expected to fail, with a string that would be in the error message
+		expectStderrOutput string // set with expected output to stderr
+		expectStdoutOutput string // set with expected output to stdout
+	}{
 
-// SET cases
-// * unspecified env
-//   * current is default
-//     * var already existed in default and no others - it is updated
-//     * var already existed in default and others - it is updated ONLY in default
-//     * var did not exist in default - it is set in default only
-//   * current is non-default
-//     * var exists in default
-//       * var exists in other non-default - var is set in current only.
-//       * var exists in no other non-default - var is set in current only.
-//     * var does not exist in default - var is set in current and to BLANK in default.
-// * specify --current
-//   * current is default
-//     * var already existed in default - PASS
-//     * var did not exist in default - PASS
-//   * current is non-default
-//     * var exists in default - var is set in current only
-//     * var does not exist in default - var is set in current AND in default as blank.
-// * specify --env
-//   * current is default
-//     * var already existed in default - var is set in specified only
-//     * var did not exist in default - var is set in specified AND in default as blank
-//   * current is non-default
-//     * var exists in default - var is set in specified only
-//     * var does not exist in default - var is set in specified AND in default as blank
-// * specify --default
-//   * current is default
-//     * var already existed in default - PASS
-//     * var did not exist in default - PASS
-//   * current is non-default
-//     * var exists in default - var is set in default only
-//     * var does not exist in default - var is set in default only
+		// * unspecified env
+		//   * current is default
+		//     * var already existed in default and no others - it is updated
+		//     * var already existed in default and others - it is updated ONLY in default
+		//     * var did not exist in default - it is set in default only
+		//   * current is non-default
+		//     * var exists in default
+		//       * var exists in other non-default - var is set in current only.
+		//       * var exists in no other non-default - var is set in current only.
+		//     * var does not exist in default - var is set in current and to BLANK in default.
+		// * specify --current
+		//   * current is default
+		//     * var already existed in default - PASS
+		//     * var did not exist in default - PASS
+		//   * current is non-default
+		//     * var exists in default - var is set in current only
+		//     * var does not exist in default - var is set in current AND in default as blank.
+		// * specify --env
+		//   * current is default
+		//     * var already existed in default - var is set in specified only
+		//     * var did not exist in default - var is set in specified AND in default as blank
+		//   * current is non-default
+		//     * var exists in default - var is set in specified only
+		//     * var does not exist in default - var is set in specified AND in default as blank
+		// * specify --default
+		//   * current is default
+		//     * var already existed in default - PASS
+		//     * var did not exist in default - PASS
+		//   * current is non-default
+		//     * var exists in default - var is set in default only
+		//     * var does not exist in default - var is set in default only
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+			resetVarsFlags()
+
+			// create project and dump config to a temp dir
+			projFilePath := createTestProjectIO(t, tc.p)
+			// set up the root command and run
+			output, outputErr, err := runTestCommand(varsCmd, projFilePath, tc.args)
+
+			// assert and check stdout and stderr
+			if err != nil {
+				if tc.expectErr == "" {
+					t.Fatalf("unexpected returned error: %v", err)
+					return
+				}
+				if !strings.Contains(err.Error(), tc.expectErr) {
+					t.Fatalf("expected returned error to contain %q, got %q", tc.expectErr, err)
+				}
+				return
+			} else if tc.expectErr != "" {
+				t.Fatalf("expected error %q, got no error", tc.expectErr)
+			}
+
+			// assertions
+
+			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
+			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
+
+			assert_projectInBufferMatches(assert, tc.expectP)
+		})
+	}
+}
 
 func resetVarsFlags() {
 	flags.ProjectFile = ""

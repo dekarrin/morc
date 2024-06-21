@@ -41,7 +41,27 @@ func assert_noProjectMutations(assert *assert.Assertions) bool {
 	return true
 }
 
-func assert_projectInBufferMatches(assert *assert.Assertions, expected morc.Project) bool {
+func assert_historyInBufferMatches(assert *assert.Assertions, expected []morc.HistoryEntry) bool {
+	// we just did writes so assume they hold *bytes.Buffers and use it as the
+	// input
+	var histR io.Reader
+
+	if histWriter == nil {
+		panic("nothing to read; project writer buffer is nil")
+	}
+
+	histBuf := histWriter.(*bytes.Buffer)
+	histR = histBuf
+
+	updatedHist, err := morc.LoadHistory(histR)
+	if !assert.NoError(err, "error loading history to check expectations: %v", err) {
+		return false
+	}
+
+	return assert.Equal(expected, updatedHist, "history in file does not match expected")
+}
+
+func assert_projectFilesInBuffersMatch(assert *assert.Assertions, expected morc.Project) bool {
 	// we just did writes so assume they hold *bytes.Buffers and use it as the
 	// input
 	var projR, histR, seshR io.Reader

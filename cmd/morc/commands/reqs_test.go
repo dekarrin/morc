@@ -121,7 +121,7 @@ func Test_Reqs_Delete(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
 			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
 
-			assert_projectInBufferMatches(assert, tc.expectP)
+			assert_projectFilesInBuffersMatch(assert, tc.expectP)
 		})
 	}
 }
@@ -286,7 +286,7 @@ func Test_Reqs_Edit(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
 			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
 
-			assert_projectInBufferMatches(assert, tc.expectP)
+			assert_projectFilesInBuffersMatch(assert, tc.expectP)
 		})
 	}
 
@@ -321,7 +321,7 @@ func Test_Reqs_Edit(t *testing.T) {
 		assert.Equal(expectStdoutOutput, output)
 		assert.Equal("", outputErr)
 
-		assert_projectInBufferMatches(assert, expectP)
+		assert_projectFilesInBuffersMatch(assert, expectP)
 	})
 
 }
@@ -401,7 +401,7 @@ func Test_Reqs_New(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output)
 			assert.Equal(tc.expectStderrOutput, outputErr)
 
-			assert_projectInBufferMatches(assert, tc.expectP)
+			assert_projectFilesInBuffersMatch(assert, tc.expectP)
 		})
 	}
 
@@ -436,7 +436,7 @@ func Test_Reqs_New(t *testing.T) {
 		assert.Equal(expectStdoutOutput, output)
 		assert.Equal("", outputErr)
 
-		assert_projectInBufferMatches(assert, expectP)
+		assert_projectFilesInBuffersMatch(assert, expectP)
 	})
 }
 

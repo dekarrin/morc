@@ -1,16 +1,14 @@
 package commands
 
 import (
-	"bytes"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/dekarrin/morc"
 	"github.com/dekarrin/morc/cmd/morc/cmdio"
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,22 +20,19 @@ func Test_Send(t *testing.T) {
 	testCases := []struct {
 		name            string
 		respFn          func(w http.ResponseWriter, r *http.Request)
-		reqs            []morc.RequestTemplate // endpoints are relative to some server; do not include host
-		args            []string               // DO NOT INCLUDE -F; it is automatically set to a project file
-		expectErr       string                 // set if command.Execute expected to fail, with a string that would be in the error message
-		expectErrOutput string                 // set with expected output to stderr
-		expectOutput    string                 // set with expected output to stdout
+		p               morc.Project // endpoints are relative to some server; do not include host
+		reqs            []morc.RequestTemplate
+		args            []string // DO NOT INCLUDE -F; it is automatically set to a project file
+		expectErr       string   // set if command.Execute expected to fail, with a string that would be in the error message
+		expectErrOutput string   // set with expected output to stderr
+		expectOutput    string   // set with expected output to stdout
 	}{
 		{
 			name:   "minimal request/response",
 			respFn: respFnNoBodyOK,
-			reqs: []morc.RequestTemplate{
-				{
-					Name:   "testreq",
-					Method: "GET",
-					URL:    "/",
-				},
-			},
+			p: testProject_withRequests(
+				morc.RequestTemplate{Name: "testreq", Method: "GET", URL: "/"},
+			),
 			args: []string{"send", "testreq"},
 			expectOutput: `HTTP/1.1 200 OK
 (no response body)
@@ -75,43 +70,12 @@ func Test_Send(t *testing.T) {
 			defer srv.Close()
 			cmdio.HTTPClient = srv.Client()
 
+			resetSendFlags()
+
 			// create project and dump config to a temp dir
-			dir := t.TempDir()
-			projFilePath := filepath.Join(dir, "project.json")
-			p := morc.Project{
-				Name:      "Test",
-				Templates: map[string]morc.RequestTemplate{},
-				Config: morc.Settings{
-					ProjFile: projFilePath,
-				},
-			}
-			for _, req := range tc.reqs {
-				req.URL = srv.URL + req.URL
-				p.Templates[strings.ToLower(req.Name)] = req
-			}
-
-			f, err := os.Create(projFilePath)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := p.Dump(f); err != nil {
-				t.Fatal(err)
-			}
-			f.Close()
-
+			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
-			stdoutCapture := &bytes.Buffer{}
-			stderrCapture := &bytes.Buffer{}
-
-			args := tc.args
-			args = append(args, "-F", projFilePath)
-
-			sendCmd.Root().SetOut(stdoutCapture)
-			sendCmd.Root().SetErr(stderrCapture)
-			sendCmd.Root().SetArgs(args)
-
-			// SETUP COMPLETE, EXECUTE
-			err = sendCmd.Execute()
+			output, outputErr, err := runTestCommand(varsCmd, projFilePath, tc.args)
 
 			// assert and check stdout and stderr
 			if err != nil {
@@ -121,16 +85,36 @@ func Test_Send(t *testing.T) {
 				}
 				if !strings.Contains(err.Error(), tc.expectErr) {
 					t.Fatalf("expected returned error to contain %q, got %q", tc.expectErr, err)
-					return
 				}
+				return
+			} else if tc.expectErr != "" {
+				t.Fatalf("expected error %q, got no error", tc.expectErr)
 			}
 
-			// okay, check stdout and stderr
-			output := stdoutCapture.String()
-			outputErr := stderrCapture.String()
+			// assertions
+
+			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
+			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
+
+			assert_projectFilesInBuffersMatch(assert, tc.expectP)
 
 			assert.Equal(tc.expectOutput, output)
 			assert.Equal(tc.expectErrOutput, outputErr)
 		})
 	}
+}
+
+func resetSendFlags() {
+	flags.ProjectFile = ""
+	flags.Vars = nil
+	flags.BInsecure = false
+	flags.BHeaders = false
+	flags.BCaptures = false
+	flags.BNoBody = false
+	flags.BRequest = false
+	flags.Format = ""
+
+	sendCmd.Flags().VisitAll(func(fl *pflag.Flag) {
+		fl.Changed = false
+	})
 }

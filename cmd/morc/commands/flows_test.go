@@ -81,7 +81,7 @@ func Test_Flows_Delete(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
 			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
 
-			assert_projectInBufferMatches(assert, tc.expectP)
+			assert_projectFilesInBuffersMatch(assert, tc.expectP)
 		})
 	}
 }
@@ -209,7 +209,7 @@ func Test_Flows_Edit(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
 			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
 
-			assert_projectInBufferMatches(assert, tc.expectP)
+			assert_projectFilesInBuffersMatch(assert, tc.expectP)
 		})
 	}
 
@@ -354,7 +354,7 @@ func Test_Flows_New(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output)
 			assert.Equal(tc.expectStderrOutput, outputErr)
 
-			assert_projectInBufferMatches(assert, tc.expectP)
+			assert_projectFilesInBuffersMatch(assert, tc.expectP)
 		})
 	}
 }

@@ -285,7 +285,7 @@ func Test_Vars_List(t *testing.T) {
 			resetVarsFlags()
 
 			// create project and dump config to a temp dir
-			projFilePath := createTestProjectFiles(t, tc.p)
+			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
 			output, outputErr, err := runTestCommand(varsCmd, projFilePath, tc.args)
 
@@ -306,7 +306,7 @@ func Test_Vars_List(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
 			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
 
-			assert_projectInFileMatches(assert, tc.p, projFilePath)
+			assert_noProjectMutations(assert)
 		})
 	}
 }
@@ -566,7 +566,7 @@ func Test_Vars_Delete(t *testing.T) {
 			resetVarsFlags()
 
 			// create project and dump config to a temp dir
-			projFilePath := createTestProjectFiles(t, tc.p)
+			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
 			output, outputErr, err := runTestCommand(varsCmd, projFilePath, tc.args)
 
@@ -589,7 +589,7 @@ func Test_Vars_Delete(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
 			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
 
-			assert_projectInFileMatches(assert, tc.expectP, projFilePath)
+			assert_projectInBufferMatches(assert, tc.expectP)
 		})
 	}
 }
@@ -795,7 +795,7 @@ func Test_Vars_Get(t *testing.T) {
 			resetVarsFlags()
 
 			// create project and dump config to a temp dir
-			projFilePath := createTestProjectFiles(t, tc.p)
+			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
 			output, outputErr, err := runTestCommand(varsCmd, projFilePath, tc.args)
 
@@ -818,7 +818,7 @@ func Test_Vars_Get(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
 			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
 
-			assert_projectInFileMatches(assert, tc.p, projFilePath)
+			assert_noProjectMutations(assert)
 		})
 	}
 }

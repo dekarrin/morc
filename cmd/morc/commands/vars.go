@@ -237,6 +237,7 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 	if env.useCurrent && p.Vars.Environment == "" {
 		otherEnvs := p.Vars.NonDefaultEnvsWith(varName)
 		if len(otherEnvs) > 0 {
+			sort.Strings(otherEnvs)
 			return fmt.Errorf("cannot remove ${%s} from current env (default env)\nValue is also defined in envs: %s\nSet --all to delete from all environments", varName, strings.Join(otherEnvs, ", "))
 		}
 	}
@@ -264,6 +265,7 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 		otherEnvs := p.Vars.NonDefaultEnvsWith(varName)
 
 		if len(otherEnvs) > 0 {
+			sort.Strings(otherEnvs)
 			return fmt.Errorf("${%s} is also defined in non-default envs: %s\nSet --all to delete from all environments", varName, strings.Join(otherEnvs, ", "))
 		}
 	}
@@ -276,6 +278,7 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 		// otherwise, we can delete ONLY if the var is not defined in any other env
 		nonDefaultEnvs := p.Vars.NonDefaultEnvsWith(varName)
 		if len(nonDefaultEnvs) > 0 {
+			sort.Strings(nonDefaultEnvs)
 			return fmt.Errorf("cannot remove ${%s} from default env\nValue is also defined in envs: %s\nSet --all to delete from all environments", varName, strings.Join(nonDefaultEnvs, ", "))
 		}
 
@@ -324,6 +327,7 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 			})
 
 			if len(otherEnvs) > 0 {
+				sort.Strings(otherEnvs)
 				return fmt.Errorf("cannot remove ${%s}\nValue is via default env and var is defined in envs: %s\nSet --all to delete from all environments", varName, strings.Join(otherEnvs, ", "))
 			}
 

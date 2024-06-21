@@ -3,6 +3,7 @@ package commands
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +14,72 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func assert_noProjectMutations(assert *assert.Assertions) bool {
+	if projWriter == nil {
+		panic("project buffer was never set up")
+	}
+
+	projBuf := projWriter.(*bytes.Buffer)
+	if projBuf.Len() > 0 {
+		return assert.Fail("project buffer was written")
+	}
+
+	if histWriter != nil {
+		histBuf := histWriter.(*bytes.Buffer)
+		if histBuf.Len() > 0 {
+			return assert.Fail("history buffer was written")
+		}
+	}
+
+	if seshWriter != nil {
+		seshBuf := seshWriter.(*bytes.Buffer)
+		if seshBuf.Len() > 0 {
+			return assert.Fail("session buffer was written")
+		}
+	}
+
+	return true
+}
+
+func assert_projectInBufferMatches(assert *assert.Assertions, expected morc.Project) bool {
+	// we just did writes so assume they hold *bytes.Buffers and use it as the
+	// input
+	var projR, histR, seshR io.Reader
+
+	if projWriter == nil {
+		panic("nothing to read; project writer buffer is nil")
+	}
+
+	projBuf := projWriter.(*bytes.Buffer)
+	projR = projBuf
+
+	if histWriter != nil {
+		histBuf := histWriter.(*bytes.Buffer)
+		histR = histBuf
+	}
+
+	if seshWriter != nil {
+		seshBuf := seshWriter.(*bytes.Buffer)
+		seshR = seshBuf
+	}
+
+	updatedProj, err := morc.LoadProject(projR, seshR, histR)
+	if !assert.NoError(err, "error loading project to check expectations: %v", err) {
+		return false
+	}
+
+	// ignore project file paths
+	expected.Config.ProjFile = ""
+	expected.Config.HistFile = ""
+	expected.Config.SeshFile = ""
+	updatedProj.Config.ProjFile = ""
+	updatedProj.Config.HistFile = ""
+	updatedProj.Config.SeshFile = ""
+	return assert.Equal(expected, updatedProj, "project in file does not match expected")
+}
+
+// TODO: make unit tests that actually cover loading from file. This func can be
+// used there.
 func assert_projectInFileMatches(assert *assert.Assertions, expected morc.Project, projFilePath string) bool {
 	updatedProj, err := morc.LoadProjectFromDisk(projFilePath, true)
 	if !assert.NoError(err, "error loading project to check expectations: %v", err) {
@@ -56,6 +123,8 @@ func runTestCommand(cmd *cobra.Command, projFilePath string, args []string) (std
 	return stdoutCapture.String(), stderrCapture.String(), err
 }
 
+// TODO: make unit tests that actually cover loading from file. This func can be
+// used there.
 func createTestProjectFiles(t *testing.T, p morc.Project) string {
 	dir := t.TempDir()
 
@@ -121,6 +190,69 @@ func createTestProjectFiles(t *testing.T, p morc.Project) string {
 			t.Fatal(err)
 			return ""
 		}
+	}
+
+	return projFilePath
+}
+
+func createTestProjectIO(t *testing.T, p morc.Project) string {
+	projReader = nil
+	projWriter = nil
+	histReader = nil
+	histWriter = nil
+	seshReader = nil
+	seshWriter = nil
+
+	projFilePath := "(in-memory)"
+
+	projBuf := &bytes.Buffer{}
+
+	// set the proj file path in project at this point or there will be issues
+	// on persistence
+	p.Config.ProjFile = projFilePath
+
+	if err := p.Dump(projBuf); err != nil {
+		t.Fatal(err)
+		return ""
+	}
+
+	projReader = projBuf
+	projWriter = &bytes.Buffer{}
+
+	// next do hist file, if one is given
+	if p.Config.HistFile != "" {
+		if !strings.HasPrefix(p.Config.HistFile, morc.ProjDirVar) {
+			t.Fatal("hist file path must start with " + morc.ProjDirVar + " if present in tests")
+			return ""
+		}
+
+		histBuf := &bytes.Buffer{}
+
+		if err := p.DumpHistory(histBuf); err != nil {
+			t.Fatal(err)
+			return ""
+		}
+
+		histReader = histBuf
+		histWriter = &bytes.Buffer{}
+	}
+
+	// next do sesh file, if one is given
+	if p.Config.SeshFile != "" {
+		if !strings.HasPrefix(p.Config.SeshFile, morc.ProjDirVar) {
+			t.Fatal("session file path must start with " + morc.ProjDirVar + " if present in tests")
+			return ""
+		}
+
+		seshBuf := &bytes.Buffer{}
+
+		if err := p.Session.Dump(seshBuf); err != nil {
+			t.Fatal(err)
+			return ""
+		}
+
+		seshReader = seshBuf
+		seshWriter = &bytes.Buffer{}
 	}
 
 	return projFilePath

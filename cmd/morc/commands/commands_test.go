@@ -272,7 +272,28 @@ func testVarStore(curEnv string, vars map[string]map[string]string) morc.VarStor
 	return vs
 }
 
-func testProject_vars(curEnv string, vars map[string]map[string]string) morc.Project {
+func testProject_vars(curEnv string, vars map[string]map[string]string, moreVars ...map[string]map[string]string) morc.Project {
+	if len(moreVars) > 0 {
+		combined := make(map[string]map[string]string)
+		for env, envVars := range vars {
+			combined[env] = make(map[string]string)
+			for k, v := range envVars {
+				combined[env][k] = v
+			}
+		}
+		for _, varsToMerge := range moreVars {
+			for env, envVars := range varsToMerge {
+				if _, ok := combined[env]; !ok {
+					combined[env] = make(map[string]string)
+				}
+				for k, v := range envVars {
+					combined[env][k] = v
+				}
+			}
+		}
+		vars = combined
+	}
+
 	return morc.Project{
 		Vars: testVarStore(curEnv, vars),
 	}

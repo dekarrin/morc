@@ -700,6 +700,11 @@ func (v *VarStore) EnvNames() []string {
 		names = append(names, "") // default env is always considered to exist
 	}
 
+	// as is the current env
+	if _, ok := v.envs[strings.ToUpper(v.Environment)]; !ok {
+		names = append(names, strings.ToUpper(v.Environment))
+	}
+
 	return names
 }
 

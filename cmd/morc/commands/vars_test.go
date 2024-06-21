@@ -833,38 +833,200 @@ func Test_Vars_Set(t *testing.T) {
 		expectStderrOutput string // set with expected output to stderr
 		expectStdoutOutput string // set with expected output to stdout
 	}{
-
-		// * unspecified env
-		//   * current is default
-		//     * var already existed in default and no others - it is updated
-		//     * var already existed in default and others - it is updated ONLY in default
-		//     * var did not exist in default - it is set in default only
-		//   * current is non-default
-		//     * var exists in default
-		//       * var exists in other non-default - var is set in current only.
-		//       * var exists in no other non-default - var is set in current only.
-		//     * var does not exist in default - var is set in current and to BLANK in default.
-		// * specify --current
-		//   * current is default
-		//     * var already existed in default - PASS
-		//     * var did not exist in default - PASS
-		//   * current is non-default
-		//     * var exists in default - var is set in current only
-		//     * var does not exist in default - var is set in current AND in default as blank.
-		// * specify --env
-		//   * current is default
-		//     * var already existed in default - var is set in specified only
-		//     * var did not exist in default - var is set in specified AND in default as blank
-		//   * current is non-default
-		//     * var exists in default - var is set in specified only
-		//     * var does not exist in default - var is set in specified AND in default as blank
-		// * specify --default
-		//   * current is default
-		//     * var already existed in default - PASS
-		//     * var did not exist in default - PASS
-		//   * current is non-default
-		//     * var exists in default - var is set in default only
-		//     * var does not exist in default - var is set in default only
+		{
+			name:               "make a new var",
+			args:               []string{"vars", "var1", "VRISKA"},
+			p:                  morc.Project{},
+			expectP:            testProject_vars("", map[string]map[string]string{"": {"VAR1": "VRISKA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"VRISKA\"\n",
+		},
+		{
+			name:               "unspecified env, current=default, var not present",
+			args:               []string{"vars", "var1", "VRISKA"},
+			p:                  testProject_vars("", test_3EnvVarsMap),
+			expectP:            testProject_vars("", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "VRISKA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"VRISKA\"\n",
+		},
+		{
+			name:               "unspecified env, current=default, var present in default and no others",
+			args:               []string{"vars", "var1", "NEPETA"},
+			p:                  testProject_vars("", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "VRISKA"}}),
+			expectP:            testProject_vars("", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "NEPETA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"NEPETA\"\n",
+		},
+		{
+			name:               "unspecified env, current=default, var present in default and others",
+			args:               []string{"vars", "var1", "NEPETA"},
+			p:                  testProject_vars("", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "VRISKA"}, "PROD": {"VAR1": "TEREZI"}, "DEBUG": {"VAR1": "KANAYA"}}),
+			expectP:            testProject_vars("", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "NEPETA"}, "PROD": {"VAR1": "TEREZI"}, "DEBUG": {"VAR1": "KANAYA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"NEPETA\"\n",
+		},
+		{
+			name:               "unspecified env, current=non-default, var not present in default",
+			args:               []string{"vars", "var1", "VRISKA"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap),
+			expectP:            testProject_vars("PROD", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": ""}, "PROD": {"VAR1": "VRISKA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"VRISKA\"\n",
+		},
+		{
+			name:               "unspecified env, current=non-default, var present in default and no others",
+			args:               []string{"vars", "var1", "NEPETA"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "VRISKA"}}),
+			expectP:            testProject_vars("PROD", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "VRISKA"}, "PROD": {"VAR1": "NEPETA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"NEPETA\"\n",
+		},
+		{
+			name:               "unspecified env, current=non-default, var present in default and others",
+			args:               []string{"vars", "var1", "NEPETA"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "VRISKA"}, "PROD": {"VAR1": "TEREZI"}, "DEBUG": {"VAR1": "KANAYA"}}),
+			expectP:            testProject_vars("PROD", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "VRISKA"}, "PROD": {"VAR1": "NEPETA"}, "DEBUG": {"VAR1": "KANAYA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"NEPETA\"\n",
+		},
+		{
+			name:               "--current, current=default, var not present",
+			args:               []string{"vars", "var1", "VRISKA", "--current"},
+			p:                  testProject_vars("", test_3EnvVarsMap),
+			expectP:            testProject_vars("", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "VRISKA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"VRISKA\" in current env\n",
+		},
+		{
+			name:               "--current, current=default, var present",
+			args:               []string{"vars", "var1", "NEPETA", "--current"},
+			p:                  testProject_vars("", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "VRISKA"}}),
+			expectP:            testProject_vars("", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "NEPETA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"NEPETA\" in current env\n",
+		},
+		{
+			name:               "--current, current=non-default, var not present",
+			args:               []string{"vars", "var1", "VRISKA", "--current"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap),
+			expectP:            testProject_vars("PROD", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": ""}, "PROD": {"VAR1": "VRISKA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"VRISKA\" in current env\n",
+		},
+		{
+			name:               "--current, current=non-default, var present in default",
+			args:               []string{"vars", "var1", "NEPETA", "--current"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "VRISKA"}}),
+			expectP:            testProject_vars("PROD", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "VRISKA"}, "PROD": {"VAR1": "NEPETA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"NEPETA\" in current env\n",
+		},
+		{
+			name:               "--env=other, current=default, var not present",
+			args:               []string{"vars", "var1", "VRISKA", "--env", "PROD"},
+			p:                  testProject_vars("", test_3EnvVarsMap),
+			expectP:            testProject_vars("", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": ""}, "PROD": {"VAR1": "VRISKA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"VRISKA\" in env PROD\n",
+		},
+		{
+			name:               "--env=other, current=default, var present",
+			args:               []string{"vars", "var1", "NEPETA", "--env", "PROD"},
+			p:                  testProject_vars("", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "TEREZI"}, "PROD": {"VAR1": "VRISKA"}}),
+			expectP:            testProject_vars("", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "TEREZI"}, "PROD": {"VAR1": "NEPETA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"NEPETA\" in env PROD\n",
+		},
+		{
+			name:               "--env=current, current=non-default, var not present",
+			args:               []string{"vars", "var1", "VRISKA", "--env", "PROD"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap),
+			expectP:            testProject_vars("PROD", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": ""}, "PROD": {"VAR1": "VRISKA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"VRISKA\" in env PROD\n",
+		},
+		{
+			name:               "--env=current, current=non-default, var present",
+			args:               []string{"vars", "var1", "NEPETA", "--env", "PROD"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "TEREZI"}, "PROD": {"VAR1": "VRISKA"}}),
+			expectP:            testProject_vars("PROD", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "TEREZI"}, "PROD": {"VAR1": "NEPETA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"NEPETA\" in env PROD\n",
+		},
+		{
+			name:               "--env=other, current=non-default, var not present",
+			args:               []string{"vars", "var1", "VRISKA", "--env", "DEBUG"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap),
+			expectP:            testProject_vars("PROD", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": ""}, "DEBUG": {"VAR1": "VRISKA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"VRISKA\" in env DEBUG\n",
+		},
+		{
+			name:               "--env=other, current=non-default, var present in default",
+			args:               []string{"vars", "var1", "NEPETA", "--env", "DEBUG"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "TEREZI"}, "DEBUG": {"VAR1": "VRISKA"}}),
+			expectP:            testProject_vars("PROD", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "TEREZI"}, "DEBUG": {"VAR1": "NEPETA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"NEPETA\" in env DEBUG\n",
+		},
+		{
+			name:      "--env=default ERRORS",
+			args:      []string{"vars", "var1", "VRISKA", "--env", reservedDefaultEnvName},
+			p:         testProject_vars("PROD", test_3EnvVarsMap),
+			expectErr: "cannot specify reserved env name \"<DEFAULT>\"; use --default to set in default env",
+		},
+		{
+			name:      "--env='' ERRORS",
+			args:      []string{"vars", "var1", "VRISKA", "--env", ""},
+			p:         testProject_vars("DEBUG", test_3EnvVarsMap),
+			expectErr: "cannot specify env \"\"; use --default to set in default env",
+		},
+		{
+			name:               "--default, current=default, var not present",
+			args:               []string{"vars", "var1", "VRISKA", "--default"},
+			p:                  testProject_vars("", test_3EnvVarsMap),
+			expectP:            testProject_vars("", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "VRISKA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"VRISKA\" in default env\n",
+		},
+		{
+			name:               "--default, current=default, var present",
+			args:               []string{"vars", "var1", "NEPETA", "--default"},
+			p:                  testProject_vars("", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "VRISKA"}}),
+			expectP:            testProject_vars("", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "NEPETA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"NEPETA\" in default env\n",
+		},
+		{
+			name:               "--default, current=non-default, var not present",
+			args:               []string{"vars", "var1", "VRISKA", "--default"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap),
+			expectP:            testProject_vars("PROD", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "VRISKA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"VRISKA\" in default env\n",
+		},
+		{
+			name:               "--default, current=non-default, var present in default",
+			args:               []string{"vars", "var1", "NEPETA", "--default"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "VRISKA"}}),
+			expectP:            testProject_vars("PROD", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "NEPETA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"NEPETA\" in default env\n",
+		},
+		{
+			name:               "--all, from nil varset",
+			args:               []string{"vars", "var1", "VRISKA", "--all"},
+			p:                  testProject_vars("PROD", nil),
+			expectP:            testProject_vars("PROD", map[string]map[string]string{"": {"VAR1": "VRISKA"}, "PROD": {"VAR1": "VRISKA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"VRISKA\" in all envs\n",
+		},
+		{
+			name:               "--all, from empty varset",
+			args:               []string{"vars", "var1", "VRISKA", "--all"},
+			p:                  testProject_vars("PROD", map[string]map[string]string{}),
+			expectP:            testProject_vars("PROD", map[string]map[string]string{"": {"VAR1": "VRISKA"}, "PROD": {"VAR1": "VRISKA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"VRISKA\" in all envs\n",
+		},
+		{
+			name:               "--all, var did not exist",
+			args:               []string{"vars", "var1", "VRISKA", "--all"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap),
+			expectP:            testProject_vars("PROD", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "VRISKA"}, "PROD": {"VAR1": "VRISKA"}, "DEBUG": {"VAR1": "VRISKA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"VRISKA\" in all envs\n",
+		},
+		{
+			name:               "--all, var exists in some envs",
+			args:               []string{"vars", "var1", "VRISKA", "--all"},
+			p:                  testProject_vars("", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": ""}, "PROD": {"VAR1": "NEPETA"}}),
+			expectP:            testProject_vars("", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "VRISKA"}, "PROD": {"VAR1": "VRISKA"}, "DEBUG": {"VAR1": "VRISKA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"VRISKA\" in all envs\n",
+		},
+		{
+			name:               "--all, var exists in all envs",
+			args:               []string{"vars", "var1", "VRISKA", "--all"},
+			p:                  testProject_vars("", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "VRISKA"}, "PROD": {"VAR1": "KANAYA"}, "DEBUG": {"VAR1": "TEREZI"}}),
+			expectP:            testProject_vars("", test_3EnvVarsMap, map[string]map[string]string{"": {"VAR1": "VRISKA"}, "PROD": {"VAR1": "VRISKA"}, "DEBUG": {"VAR1": "VRISKA"}}),
+			expectStdoutOutput: "Set ${VAR1} to \"VRISKA\" in all envs\n",
+		},
 	}
 
 	for _, tc := range testCases {

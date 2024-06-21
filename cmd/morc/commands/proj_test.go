@@ -38,7 +38,7 @@ Cookie record lifetime: 0s`,
 			resetProjFlags()
 
 			// create project and dump config to a temp dir
-			projFilePath := createTestProjectFiles(t, tc.p)
+			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
 			output, outputErr, err := runTestCommand(projCmd, projFilePath, tc.args)
 
@@ -54,13 +54,6 @@ Cookie record lifetime: 0s`,
 				return
 			}
 
-			// reload the project and make sure it matches the expected project
-			updatedProj, err := morc.LoadProjectFromDisk(projFilePath, true)
-			if err != nil {
-				t.Fatalf("error loading project post execution: %v", err)
-				return
-			}
-
 			// okay, check stdout and stderr, running contains check to be sure
 
 			if tc.expectStdoutOutput != "" {
@@ -70,9 +63,7 @@ Cookie record lifetime: 0s`,
 				assert.Contains(outputErr, tc.expectStderrOutput, "stderr output mismatch")
 			}
 
-			// ignore the project file path
-			updatedProj.Config.ProjFile = tc.p.Config.ProjFile
-			assert.Equal(tc.p, updatedProj)
+			assert_noProjectMutations(assert)
 		})
 	}
 }
@@ -110,7 +101,7 @@ func Test_Proj_Get(t *testing.T) {
 			resetProjFlags()
 
 			// create project and dump config to a temp dir
-			projFilePath := createTestProjectFiles(t, tc.p)
+			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
 			output, outputErr, err := runTestCommand(projCmd, projFilePath, tc.args)
 
@@ -126,21 +117,12 @@ func Test_Proj_Get(t *testing.T) {
 				return
 			}
 
-			// reload the project and make sure it matches the expected project
-			updatedProj, err := morc.LoadProjectFromDisk(projFilePath, true)
-			if err != nil {
-				t.Fatalf("error loading project post execution: %v", err)
-				return
-			}
-
 			// okay, check stdout and stderr, running contains check to be sure
 
 			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
 			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
 
-			// ignore the project file path
-			updatedProj.Config.ProjFile = tc.p.Config.ProjFile
-			assert.Equal(tc.p, updatedProj)
+			assert_noProjectMutations(assert)
 		})
 	}
 }

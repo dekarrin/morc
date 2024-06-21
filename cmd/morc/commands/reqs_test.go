@@ -100,7 +100,7 @@ func Test_Reqs_Delete(t *testing.T) {
 			resetReqsFlags()
 
 			// create project and dump config to a temp dir
-			projFilePath := createTestProjectFiles(t, tc.p)
+			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
 			output, outputErr, err := runTestCommand(reqsCmd, projFilePath, tc.args)
 
@@ -121,7 +121,7 @@ func Test_Reqs_Delete(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
 			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
 
-			assert_projectInFileMatches(assert, tc.expectP, projFilePath)
+			assert_projectInBufferMatches(assert, tc.expectP)
 		})
 	}
 }
@@ -265,7 +265,7 @@ func Test_Reqs_Edit(t *testing.T) {
 			resetReqsFlags()
 
 			// create project and dump config to a temp dir
-			projFilePath := createTestProjectFiles(t, tc.p)
+			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
 			output, outputErr, err := runTestCommand(reqsCmd, projFilePath, tc.args)
 
@@ -286,7 +286,7 @@ func Test_Reqs_Edit(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
 			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
 
-			assert_projectInFileMatches(assert, tc.expectP, projFilePath)
+			assert_projectInBufferMatches(assert, tc.expectP)
 		})
 	}
 
@@ -299,9 +299,8 @@ func Test_Reqs_Edit(t *testing.T) {
 		expectStdoutOutput := "Set request body to data with length 20\n"
 
 		// create project and dump config to a temp dir
-		projFilePath := createTestProjectFiles(t, p)
-		projDir := filepath.Dir(projFilePath)
-		bodyFilePath := filepath.Join(projDir, "body.json")
+		projFilePath := createTestProjectIO(t, p)
+		bodyFilePath := filepath.Join(t.TempDir(), "body.json")
 		err := os.WriteFile(bodyFilePath, []byte(`{"name":"JACK NOIR"}`), 0644)
 		if err != nil {
 			t.Fatalf("failed to write body file: %v", err)
@@ -322,7 +321,7 @@ func Test_Reqs_Edit(t *testing.T) {
 		assert.Equal(expectStdoutOutput, output)
 		assert.Equal("", outputErr)
 
-		assert_projectInFileMatches(assert, expectP, projFilePath)
+		assert_projectInBufferMatches(assert, expectP)
 	})
 
 }
@@ -381,7 +380,7 @@ func Test_Reqs_New(t *testing.T) {
 			resetReqsFlags()
 
 			// create project and dump config to a temp dir
-			projFilePath := createTestProjectFiles(t, tc.p)
+			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
 			output, outputErr, err := runTestCommand(reqsCmd, projFilePath, tc.args)
 
@@ -402,7 +401,7 @@ func Test_Reqs_New(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output)
 			assert.Equal(tc.expectStderrOutput, outputErr)
 
-			assert_projectInFileMatches(assert, tc.expectP, projFilePath)
+			assert_projectInBufferMatches(assert, tc.expectP)
 		})
 	}
 
@@ -415,9 +414,8 @@ func Test_Reqs_New(t *testing.T) {
 		expectStdoutOutput := "Created new request req1\n"
 
 		// create project and dump config to a temp dir
-		projFilePath := createTestProjectFiles(t, p)
-		projDir := filepath.Dir(projFilePath)
-		bodyFilePath := filepath.Join(projDir, "body.json")
+		projFilePath := createTestProjectIO(t, p)
+		bodyFilePath := filepath.Join(t.TempDir(), "body.json")
 		err := os.WriteFile(bodyFilePath, []byte(`{"name":"JACK NOIR"}`), 0644)
 		if err != nil {
 			t.Fatalf("failed to write body file: %v", err)
@@ -438,7 +436,7 @@ func Test_Reqs_New(t *testing.T) {
 		assert.Equal(expectStdoutOutput, output)
 		assert.Equal("", outputErr)
 
-		assert_projectInFileMatches(assert, expectP, projFilePath)
+		assert_projectInBufferMatches(assert, expectP)
 	})
 }
 
@@ -519,7 +517,7 @@ func Test_Reqs_Get(t *testing.T) {
 			resetReqsFlags()
 
 			// create project and dump config to a temp dir
-			projFilePath := createTestProjectFiles(t, tc.p)
+			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
 			output, outputErr, err := runTestCommand(reqsCmd, projFilePath, tc.args)
 
@@ -540,7 +538,7 @@ func Test_Reqs_Get(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output)
 			assert.Equal(tc.expectStderrOutput, outputErr)
 
-			assert_projectInFileMatches(assert, tc.p, projFilePath)
+			assert_noProjectMutations(assert)
 		})
 	}
 
@@ -671,7 +669,7 @@ func Test_Reqs_Show(t *testing.T) {
 			resetReqsFlags()
 
 			// create project and dump config to a temp dir
-			profFilePath := createTestProjectFiles(t, tc.p)
+			profFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
 			output, outputErr, err := runTestCommand(reqsCmd, profFilePath, tc.args)
 
@@ -692,7 +690,7 @@ func Test_Reqs_Show(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output)
 			assert.Equal(tc.expectStderrOutput, outputErr)
 
-			assert_projectInFileMatches(assert, tc.p, profFilePath)
+			assert_noProjectMutations(assert)
 		})
 	}
 }
@@ -754,7 +752,7 @@ func Test_Reqs_List(t *testing.T) {
 			resetReqsFlags()
 
 			// create project and dump config to a temp dir
-			projFilePath := createTestProjectFiles(t, tc.p)
+			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
 			output, outputErr, err := runTestCommand(reqsCmd, projFilePath, tc.args)
 
@@ -775,7 +773,7 @@ func Test_Reqs_List(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output)
 			assert.Equal(tc.expectStderrOutput, outputErr)
 
-			assert_projectInFileMatches(assert, tc.p, projFilePath)
+			assert_noProjectMutations(assert)
 		})
 	}
 }

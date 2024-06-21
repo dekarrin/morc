@@ -75,7 +75,7 @@ func init() {
 }
 
 func invokeHistDetail(io cmdio.IO, projFile string, entry int, reqOC morc.OutputControl, noDates bool) error {
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -110,7 +110,7 @@ func invokeHistDetail(io cmdio.IO, projFile string, entry int, reqOC morc.Output
 }
 
 func invokeHistOn(io cmdio.IO, projFile string) error {
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -122,7 +122,7 @@ func invokeHistOn(io cmdio.IO, projFile string) error {
 
 	p.Config.RecordHistory = true
 
-	if err := p.PersistToDisk(false); err != nil {
+	if err := writeProject(p, false); err != nil {
 		return err
 	}
 
@@ -132,14 +132,14 @@ func invokeHistOn(io cmdio.IO, projFile string) error {
 }
 
 func invokeHistOff(io cmdio.IO, projFile string) error {
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
 
 	p.Config.RecordHistory = false
 
-	if err := p.PersistToDisk(false); err != nil {
+	if err := writeProject(p, false); err != nil {
 		return err
 	}
 
@@ -149,14 +149,14 @@ func invokeHistOff(io cmdio.IO, projFile string) error {
 }
 
 func invokeHistClear(io cmdio.IO, projFile string) error {
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
 
 	p.History = nil
 
-	if err := p.PersistHistoryToDisk(); err != nil {
+	if err := writeHistory(p); err != nil {
 		return err
 	}
 
@@ -166,7 +166,7 @@ func invokeHistClear(io cmdio.IO, projFile string) error {
 }
 
 func invokeHistInfo(io cmdio.IO, projFile string) error {
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -193,7 +193,7 @@ func invokeHistInfo(io cmdio.IO, projFile string) error {
 }
 
 func invokeHistList(io cmdio.IO, projFile string) error {
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}

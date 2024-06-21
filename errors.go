@@ -1,5 +1,7 @@
 package morc
 
+// TODO: convert all error wording to these functions, adding as needed
+
 import "fmt"
 
 func NewFlowNotFoundError(name string) error {

@@ -46,7 +46,7 @@ func init() {
 // invokeExec receives the name of the flow to execute and the options to use.
 func invokeExec(io cmdio.IO, projFile, flowName string, initialVarOverrides map[string]string, skipVerify bool, oc morc.OutputControl) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -82,6 +82,7 @@ func invokeExec(io cmdio.IO, projFile, flowName string, initialVarOverrides map[
 
 	oc.Writer = io.Out
 	for i, tmpl := range templates {
+		// persistence should be covered in sendTemplate
 		result, err := sendTemplate(&p, tmpl, p.Vars.MergedSet(varOverrides), skipVerify, oc)
 		if err != nil {
 			return fmt.Errorf("step #%d: %w", i, err)

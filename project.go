@@ -314,6 +314,50 @@ func dumpToFile(path string, dumpFunc func(io.Writer) error) error {
 	return nil
 }
 
+// LoadProject loads the project from the given reader. If seshR is set, the
+// session file is loaded from there. If histR is set, the history file is
+// loaded from there. The values of Settings.XFile in the read project is
+// ignored; to automatically use that, call LoadProjectFromDisk.
+func LoadProject(projR, seshR, histR io.Reader) (Project, error) {
+	projData, err := io.ReadAll(projR)
+	if err != nil {
+		return Project{}, fmt.Errorf("read project bytes: %w", err)
+	}
+
+	var m marshaledProject
+	if err := json.Unmarshal(projData, &m); err != nil {
+		return Project{}, fmt.Errorf("unmarshal project data: %w", err)
+	}
+
+	if m.Filetype != FiletypeProject {
+		return Project{}, fmt.Errorf("project file has wrong filetype: %s", m.Filetype)
+	}
+
+	p := Project{
+		Name:      m.Name,
+		Templates: m.Templates,
+		Flows:     m.Flows,
+		Vars:      m.Vars,
+		Config:    m.Config,
+	}
+
+	if seshR != nil {
+		p.Session, err = LoadSession(seshR)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return Project{}, fmt.Errorf("load session: %w", err)
+		}
+	}
+
+	if histR != nil {
+		p.History, err = LoadHistory(histR)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return Project{}, fmt.Errorf("load history: %w", err)
+		}
+	}
+
+	return p, nil
+}
+
 func LoadProjectFromDisk(projFilename string, all bool) (Project, error) {
 	projData, err := os.ReadFile(projFilename)
 	if err != nil {
@@ -356,6 +400,20 @@ func LoadProjectFromDisk(projFilename string, all bool) (Project, error) {
 	return p, nil
 }
 
+func LoadSession(r io.Reader) (Session, error) {
+	seshData, err := io.ReadAll(r)
+	if err != nil {
+		return Session{}, fmt.Errorf("read session bytes: %w", err)
+	}
+
+	var s Session
+	if err := json.Unmarshal(seshData, &s); err != nil {
+		return Session{}, fmt.Errorf("unmarshal session data: %w", err)
+	}
+
+	return s, nil
+}
+
 func LoadSessionFromDisk(seshFilename string) (Session, error) {
 	seshData, err := os.ReadFile(seshFilename)
 	if err != nil {
@@ -368,6 +426,24 @@ func LoadSessionFromDisk(seshFilename string) (Session, error) {
 	}
 
 	return s, nil
+}
+
+func LoadHistory(r io.Reader) ([]HistoryEntry, error) {
+	histData, err := io.ReadAll(r)
+	if err != nil {
+		return nil, fmt.Errorf("read history bytes: %w", err)
+	}
+
+	var m marshaledHistory
+	if err := json.Unmarshal(histData, &m); err != nil {
+		return nil, fmt.Errorf("unmarshal history data: %w", err)
+	}
+
+	if m.Filetype != FiletypeHistory {
+		return nil, fmt.Errorf("history file has wrong filetype: %s", m.Filetype)
+	}
+
+	return m.Entries, nil
 }
 
 func LoadHistoryFromDisk(histFilename string) ([]HistoryEntry, error) {
@@ -622,6 +698,11 @@ func (v *VarStore) EnvNames() []string {
 
 	if _, ok := v.envs[""]; !ok {
 		names = append(names, "") // default env is always considered to exist
+	}
+
+	// as is the current env
+	if _, ok := v.envs[strings.ToUpper(v.Environment)]; !ok {
+		names = append(names, strings.ToUpper(v.Environment))
 	}
 
 	return names

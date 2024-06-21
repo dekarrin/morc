@@ -2,6 +2,30 @@ package sliceops
 
 import "fmt"
 
+// Index returns the first (lowest) index of the value within the given slice.
+// If the value is not found, -1 is returned.
+// slices is only in stdlib as of Go 1.21; need to have this for 1.20
+func Index[E comparable](sl []E, v E) int {
+	for i, item := range sl {
+		if item == v {
+			return i
+		}
+	}
+	return -1
+}
+
+// Filter returns a new slice with only the items that the given function
+// returns true for.
+func Filter[E any](sl []E, fn func(E) bool) []E {
+	var newItems []E
+	for _, item := range sl {
+		if fn(item) {
+			newItems = append(newItems, item)
+		}
+	}
+	return newItems
+}
+
 // Remove removes the item at the given index. If the index does not exist, an
 // error is returned. -1 denotes the element at the end of the list.
 func Remove[E any](sl []E, index int) ([]E, error) {

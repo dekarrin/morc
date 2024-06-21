@@ -60,7 +60,7 @@ func Test_Flows_Delete(t *testing.T) {
 			resetFlowsFlags()
 
 			// create project and dump config to a temp dir
-			projFilePath := createTestProjectFiles(t, tc.p)
+			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
 			output, outputErr, err := runTestCommand(flowsCmd, projFilePath, tc.args)
 
@@ -81,7 +81,7 @@ func Test_Flows_Delete(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
 			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
 
-			assert_projectInFileMatches(assert, tc.expectP, projFilePath)
+			assert_projectInBufferMatches(assert, tc.expectP)
 		})
 	}
 }
@@ -188,7 +188,7 @@ func Test_Flows_Edit(t *testing.T) {
 			resetFlowsFlags()
 
 			// create project and dump config to a temp dir
-			projFilePath := createTestProjectFiles(t, tc.p)
+			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
 			output, outputErr, err := runTestCommand(flowsCmd, projFilePath, tc.args)
 
@@ -209,7 +209,7 @@ func Test_Flows_Edit(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
 			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
 
-			assert_projectInFileMatches(assert, tc.expectP, projFilePath)
+			assert_projectInBufferMatches(assert, tc.expectP)
 		})
 	}
 
@@ -268,7 +268,7 @@ func Test_Flows_Get(t *testing.T) {
 			resetFlowsFlags()
 
 			// create project and dump config to a temp dir
-			projFilePath := createTestProjectFiles(t, tc.p)
+			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
 			output, outputErr, err := runTestCommand(flowsCmd, projFilePath, tc.args)
 
@@ -289,7 +289,7 @@ func Test_Flows_Get(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output)
 			assert.Equal(tc.expectStderrOutput, outputErr)
 
-			assert_projectInFileMatches(assert, tc.p, projFilePath)
+			assert_noProjectMutations(assert)
 		})
 	}
 
@@ -333,7 +333,7 @@ func Test_Flows_New(t *testing.T) {
 			resetFlowsFlags()
 
 			// create project and dump config to a temp dir
-			projFilePath := createTestProjectFiles(t, tc.p)
+			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
 			output, outputErr, err := runTestCommand(flowsCmd, projFilePath, tc.args)
 
@@ -354,7 +354,7 @@ func Test_Flows_New(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output)
 			assert.Equal(tc.expectStderrOutput, outputErr)
 
-			assert_projectInFileMatches(assert, tc.expectP, projFilePath)
+			assert_projectInBufferMatches(assert, tc.expectP)
 		})
 	}
 }
@@ -429,7 +429,7 @@ func Test_Flows_Show(t *testing.T) {
 			resetFlowsFlags()
 
 			// create project and dump config to a temp dir
-			projFilePath := createTestProjectFiles(t, tc.p)
+			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
 			output, outputErr, err := runTestCommand(flowsCmd, projFilePath, tc.args)
 
@@ -450,7 +450,7 @@ func Test_Flows_Show(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output)
 			assert.Equal(tc.expectStderrOutput, outputErr)
 
-			assert_projectInFileMatches(assert, tc.p, projFilePath)
+			assert_noProjectMutations(assert)
 		})
 	}
 }
@@ -515,7 +515,7 @@ func Test_Flows_List(t *testing.T) {
 			resetFlowsFlags()
 
 			// create project and dump config to a temp dir
-			projFilePath := createTestProjectFiles(t, tc.p)
+			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
 			output, outputErr, err := runTestCommand(flowsCmd, projFilePath, tc.args)
 
@@ -536,7 +536,7 @@ func Test_Flows_List(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output)
 			assert.Equal(tc.expectStderrOutput, outputErr)
 
-			assert_projectInFileMatches(assert, tc.p, projFilePath)
+			assert_noProjectMutations(assert)
 		})
 	}
 }

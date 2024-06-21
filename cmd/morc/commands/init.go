@@ -73,5 +73,5 @@ func invokeInit(projName string) error {
 		return fmt.Errorf("init would overwrite an existing history file; remove it first")
 	}
 
-	return p.PersistToDisk(true)
+	return writeProject(p, true)
 }

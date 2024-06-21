@@ -122,7 +122,7 @@ func invokeProjEdit(io cmdio.IO, projFile string, attrs projAttrValues) error {
 	modifyAllFiles := attrs.changesFilePaths() || attrs.cookieLifetime.set
 
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(projFile, modifyAllFiles)
+	p, err := readProject(projFile, modifyAllFiles)
 	if err != nil {
 		return err
 	}
@@ -230,7 +230,7 @@ func invokeProjEdit(io cmdio.IO, projFile string, attrs projAttrValues) error {
 		}
 	}
 
-	err = p.PersistToDisk(modifyAllFiles)
+	err = writeProject(p, modifyAllFiles)
 	if err != nil {
 		return err
 	}
@@ -270,7 +270,7 @@ func invokeProjNew(io cmdio.IO, projFile string, attrs projAttrValues) error {
 		},
 	}
 
-	err := p.PersistToDisk(false)
+	err := writeProject(p, false)
 	if err != nil {
 		return err
 	}
@@ -278,7 +278,7 @@ func invokeProjNew(io cmdio.IO, projFile string, attrs projAttrValues) error {
 	if attrs.histFile.v != "" {
 		// persist at least once so user knows right away if it is a bad path
 
-		err = p.PersistHistoryToDisk()
+		err = writeHistory(p)
 		if err != nil {
 			return err
 		}
@@ -287,7 +287,7 @@ func invokeProjNew(io cmdio.IO, projFile string, attrs projAttrValues) error {
 	if attrs.seshFile.v != "" {
 		// persist at least once so user knows right away if it is a bad path
 
-		err = p.PersistSessionToDisk()
+		err = writeSession(p)
 		if err != nil {
 			return err
 		}
@@ -299,7 +299,7 @@ func invokeProjNew(io cmdio.IO, projFile string, attrs projAttrValues) error {
 }
 
 func invokeProjGet(io cmdio.IO, projFile string, item projKey) error {
-	proj, err := morc.LoadProjectFromDisk(projFile, true)
+	proj, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -325,7 +325,7 @@ func invokeProjGet(io cmdio.IO, projFile string, item projKey) error {
 }
 
 func invokeProjShow(io cmdio.IO, projFile string) error {
-	proj, err := morc.LoadProjectFromDisk(projFile, true)
+	proj, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}

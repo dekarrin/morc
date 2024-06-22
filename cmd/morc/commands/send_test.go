@@ -18,14 +18,14 @@ func Test_Send(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name            string
-		respFn          func(w http.ResponseWriter, r *http.Request)
-		p               morc.Project // endpoints are relative to some server; do not include host
-		reqs            []morc.RequestTemplate
-		args            []string // DO NOT INCLUDE -F; it is automatically set to a project file
-		expectErr       string   // set if command.Execute expected to fail, with a string that would be in the error message
-		expectErrOutput string   // set with expected output to stderr
-		expectOutput    string   // set with expected output to stdout
+		name               string
+		respFn             func(w http.ResponseWriter, r *http.Request)
+		p                  morc.Project // endpoints are relative to some server; do not include host
+		reqs               []morc.RequestTemplate
+		args               []string // DO NOT INCLUDE -F; it is automatically set to a project file
+		expectErr          string   // set if command.Execute expected to fail, with a string that would be in the error message
+		expectStderrOutput string   // set with expected output to stderr
+		expectStdoutOutput string   // set with expected output to stdout
 	}{
 		{
 			name:   "minimal request/response",
@@ -34,7 +34,7 @@ func Test_Send(t *testing.T) {
 				morc.RequestTemplate{Name: "testreq", Method: "GET", URL: "/"},
 			),
 			args: []string{"send", "testreq"},
-			expectOutput: `HTTP/1.1 200 OK
+			expectStdoutOutput: `HTTP/1.1 200 OK
 (no response body)
 `,
 		},
@@ -63,7 +63,7 @@ func Test_Send(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert := assert.New(t)
+			assert := &MorcIOAssertions{Assertions: *assert.New(t)}
 
 			// setup test server
 			srv := httptest.NewServer(http.HandlerFunc(tc.respFn))
@@ -75,7 +75,7 @@ func Test_Send(t *testing.T) {
 			// create project and dump config to a temp dir
 			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
-			output, outputErr, err := runTestCommand(varsCmd, projFilePath, tc.args)
+			output, outputErr, err := runTestCommand(sendCmd, projFilePath, tc.args)
 
 			// assert and check stdout and stderr
 			if err != nil {
@@ -95,11 +95,6 @@ func Test_Send(t *testing.T) {
 
 			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
 			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
-
-			assert_projectFilesInBuffersMatch(assert, tc.expectP)
-
-			assert.Equal(tc.expectOutput, output)
-			assert.Equal(tc.expectErrOutput, outputErr)
 		})
 	}
 }

@@ -70,6 +70,11 @@ func Test_Send(t *testing.T) {
 			defer srv.Close()
 			cmdio.HTTPClient = srv.Client()
 
+			// set host from srv
+			for i := range tc.p.Templates {
+				tc.p.Templates[i].URL = srv.URL + tc.p.Templates[i].URL
+			}
+
 			resetSendFlags()
 
 			// create project and dump config to a temp dir
@@ -107,7 +112,7 @@ func resetSendFlags() {
 	flags.BCaptures = false
 	flags.BNoBody = false
 	flags.BRequest = false
-	flags.Format = ""
+	flags.Format = "pretty" // TODO: make this default not be magic but rather have the cmd flag init and the reset use it
 
 	sendCmd.Flags().VisitAll(func(fl *pflag.Flag) {
 		fl.Changed = false

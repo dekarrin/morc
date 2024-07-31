@@ -24,7 +24,7 @@ var sendCmd = &cobra.Command{
 	GroupID: "sending",
 	RunE: func(cmd *cobra.Command, posArgs []string) error {
 		var args sendArgs
-		if err := parseSendArgs(posArgs, &args); err != nil {
+		if err := parseSendArgs(cmd, posArgs, &args); err != nil {
 			return err
 		}
 
@@ -49,7 +49,7 @@ func init() {
 // invokeRequest receives named vars and checked/defaulted requestOptions.
 func invokeSend(io cmdio.IO, projFile, reqName string, varOverrides map[string]string, skipVerify bool, oc morc.OutputControl) error {
 	// load the project file
-	p, err := morc.LoadProjectFromDisk(projFile, true)
+	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
@@ -76,7 +76,7 @@ type sendArgs struct {
 	skipVerify  bool
 }
 
-func parseSendArgs(posArgs []string, args *sendArgs) error {
+func parseSendArgs(cmd *cobra.Command, posArgs []string, args *sendArgs) error {
 	// send is a single-action command, so we will only be gathering pos args
 	// and flags.
 	args.projFile = flags.ProjectFile
@@ -85,7 +85,7 @@ func parseSendArgs(posArgs []string, args *sendArgs) error {
 	}
 
 	var err error
-	args.outputCtrl, err = gatherRequestOutputFlags()
+	args.outputCtrl, err = gatherRequestOutputFlags(cmd)
 	if err != nil {
 		return err
 	}

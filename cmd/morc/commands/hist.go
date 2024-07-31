@@ -254,7 +254,7 @@ func parseHistArgs(cmd *cobra.Command, posArgs []string, args *histArgs) error {
 			return fmt.Errorf("%q is not a valid history entry index; it must be an integer", posArgs[0])
 		}
 
-		args.outputCtrl, err = gatherRequestOutputFlags()
+		args.outputCtrl, err = gatherRequestOutputFlags(cmd)
 		if err != nil {
 			return err
 		}

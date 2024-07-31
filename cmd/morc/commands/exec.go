@@ -21,7 +21,7 @@ var execCmd = &cobra.Command{
 	GroupID: "sending",
 	RunE: func(cmd *cobra.Command, posArgs []string) error {
 		var args execArgs
-		if err := parseExecArgs(posArgs, &args); err != nil {
+		if err := parseExecArgs(cmd, posArgs, &args); err != nil {
 			return err
 		}
 
@@ -107,7 +107,7 @@ type execArgs struct {
 	skipVerify  bool
 }
 
-func parseExecArgs(posArgs []string, args *execArgs) error {
+func parseExecArgs(cmd *cobra.Command, posArgs []string, args *execArgs) error {
 	args.projFile = flags.ProjectFile
 	if args.projFile == "" {
 		return fmt.Errorf("project file cannot be set to empty string")
@@ -116,7 +116,7 @@ func parseExecArgs(posArgs []string, args *execArgs) error {
 	args.skipVerify = flags.BInsecure
 
 	var err error
-	args.outputCtrl, err = gatherRequestOutputFlags()
+	args.outputCtrl, err = gatherRequestOutputFlags(cmd)
 	if err != nil {
 		return err
 	}

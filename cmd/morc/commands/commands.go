@@ -1,12 +1,15 @@
 package commands
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"strings"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/dekarrin/rosed"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -20,6 +23,7 @@ var (
 
 const (
 	reservedDefaultEnvName = "<DEFAULT>"
+	morcProjectPointerFile = ".MORC_PROJECT"
 )
 
 const (
@@ -27,15 +31,32 @@ const (
 	annotationKeyHelpUsages = "morc_help_usages"
 )
 
-// CUSTOM HELP AND WRAPPING:
-//
-// - Replace all calls to cmd.Long in help template with call to func that gets
-// Long help by first word in Usage. (func getLongHelp(cmd *cobra) which just calls
-// a pre-reg func in a global map of func).
-// - For all existing Long help, move to new func in global map.
-// - Add getLongHelp binding to cobra Template funcs.
-// - Ensure getLongHelp calls wrap if func doesn't do it itself (include whether
-// pre-wrapped in func registration).
+func projPathFromFlagsOrFile(cmd *cobra.Command) string {
+	if cmd.Flags().Changed("project-file") {
+		// if it's changed, this has priority no matter what
+		return flags.ProjectFile
+	}
+
+	io := cmdio.From(cmd)
+
+	// if it's not changed, check if there is a file called .MORC_PROJECT and if
+	// so, load it
+	projPtrBytes, err := os.ReadFile(morcProjectPointerFile)
+	if err != nil {
+		if !errors.Is(err, fs.ErrNotExist) {
+			io.PrintErrf("WARN: reading %s: %v\nUsing default value for project file path", morcProjectPointerFile, err)
+		}
+		return flags.ProjectFile
+	}
+
+	projPtr := strings.TrimSpace(string(projPtrBytes))
+	if projPtr == "" {
+		io.PrintErrf("WARN: file path in %s is empty\nUsing default value for project file path", morcProjectPointerFile)
+		return flags.ProjectFile
+	}
+
+	return projPtr
+}
 
 func init() {
 	cobra.AddTemplateFunc("wrapFlags", wrappedFlagUsages)

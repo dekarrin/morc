@@ -111,6 +111,13 @@ Or if you are looking for *very* fine-grained control over new project creation,
 you can instead use `morc proj` with the `--new` flag. See `morc help proj` for
 information on using it.
 
+### Project Path and .MORC_PROJECT
+
+All commands in morc allow use of the -F flag to specify the project file to
+work with. You can also put the path to a project in a file called
+`.MORC_PROJECT`, located in the same directory as where you run the `morc`
+command from.
+
 ### Project Requests
 
 So, you've got a project rolling! Congrats. Now you can take a look at all the

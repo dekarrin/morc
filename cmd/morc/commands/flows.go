@@ -466,7 +466,7 @@ type flowStepMove struct {
 }
 
 func parseFlowsArgs(cmd *cobra.Command, posArgs []string, args *flowsArgs) error {
-	args.projFile = flags.ProjectFile
+	args.projFile = projPathFromFlagsOrFile(cmd)
 	if args.projFile == "" {
 		return fmt.Errorf("project file cannot be set to empty string")
 	}

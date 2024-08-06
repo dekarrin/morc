@@ -50,12 +50,30 @@ func Test_Send(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}
 
+	respFnNoBodyOKCookie := func(w http.ResponseWriter, r *http.Request) {
+		// suppress date header
+		w.Header()["Date"] = nil
+
+		w.Header().Set("Set-Cookie", "testcookie=1234")
+
+		w.WriteHeader(http.StatusOK)
+	}
+
+	respFnJSONBodyOK := func(w http.ResponseWriter, r *http.Request) {
+		// suppress date header
+		w.Header()["Date"] = nil
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"name":{"first":"VRISKA","last":"SERKET"}}`))
+	}
+
 	testCases := []struct {
 		name               string
+		args               []string // DO NOT INCLUDE -F; it is automatically set to a project file
 		respFn             func(w http.ResponseWriter, r *http.Request)
 		p                  morc.Project // endpoints are relative to some server; do not include host
 		reqs               []morc.RequestTemplate
-		args               []string // DO NOT INCLUDE -F; it is automatically set to a project file
 		expectP            morc.Project
 		expectErr          string // set if command.Execute expected to fail, with a string that would be in the error message
 		expectProjectSaved bool
@@ -65,7 +83,8 @@ func Test_Send(t *testing.T) {
 		expectStdoutOutput string // set with expected output to stdout
 	}{
 		{
-			name:   "minimal request/response - save history",
+			name:   "send saves history",
+			args:   []string{"send", "testreq"},
 			respFn: respFnNoBodyOK,
 			p: morc.Project{
 				Templates: map[string]morc.RequestTemplate{
@@ -109,7 +128,6 @@ func Test_Send(t *testing.T) {
 					RecordHistory: true,
 				},
 			},
-			args: []string{"send", "testreq"},
 			expectStdoutOutput: `HTTP/1.1 200 OK
 (no response body)
 `,
@@ -117,27 +135,169 @@ func Test_Send(t *testing.T) {
 			expectHistorySaved: true,
 			expectSessionSaved: false,
 		},
-		// 		{
-		// 			name:   "minimal request/response with headers",
-		// 			respFn: respFnNoBodyOK,
-		// 			reqs: []morc.RequestTemplate{
-		// 				{
-		// 					Name:   "testreq",
-		// 					Method: "GET",
-		// 					URL:    "/",
-		// 				},
-		// 			},
-		// 			args: []string{"send", "testreq", "--headers"},
-		// 			expectOutput: `HTTP/1.1 200 OK
-		// ------------------- HEADERS -------------------
-		// Content-Length: 0
-		// Date: Tue, 14 May 2024 15:27:36 GMT
-		// -----------------------------------------------
-		// (no response body)
-		// `,
-		// 		},
+		{
+			name:   "send saves session data",
+			args:   []string{"send", "testreq"},
+			respFn: respFnNoBodyOKCookie,
+			p: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {Name: "testreq", Method: "GET", URL: "/"},
+				},
+				Config: morc.Settings{
+					SeshFile:      "::PROJ_DIR::/session.json",
+					RecordSession: true,
+				},
+			},
+			expectP: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {Name: "testreq", Method: "GET", URL: "/"},
+				},
+				Session: morc.Session{
+					Cookies: []morc.SetCookiesCall{
+						{URL: mustParseURL("/"), Cookies: []*http.Cookie{{Name: "testcookie", Value: "1234", Raw: "testcookie=1234"}}},
+					},
+				},
+				Config: morc.Settings{
+					SeshFile:      "::PROJ_DIR::/session.json",
+					RecordSession: true,
+				},
+			},
+			expectStdoutOutput: `HTTP/1.1 200 OK
+(no response body)
+`,
+			expectProjectSaved: false,
+			expectHistorySaved: false,
+			expectSessionSaved: true,
+		},
+		{
+			name:   "send saves body captures - offset",
+			args:   []string{"send", "testreq"},
+			respFn: respFnJSONBodyOK,
+			p: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {
+						Name:   "testreq",
+						Method: "GET",
+						URL:    "/",
+						Captures: map[string]morc.VarScraper{
+							"TEST": {Name: "TEST", OffsetStart: 18, OffsetEnd: 24},
+						},
+					},
+				},
+				Config: morc.Settings{
+					ProjFile: "project.json",
+				},
+			},
+			expectP: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {
+						Name:   "testreq",
+						Method: "GET",
+						URL:    "/",
+						Captures: map[string]morc.VarScraper{
+							"TEST": {Name: "TEST", OffsetStart: 18, OffsetEnd: 24},
+						},
+					},
+				},
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"TEST": "VRISKA"},
+				}),
+				Config: morc.Settings{
+					ProjFile: "project.json",
+				},
+			},
+			expectStdoutOutput: `HTTP/1.1 200 OK
+{"name":{"first":"VRISKA","last":"SERKET"}}
+`,
+			expectProjectSaved: true,
+			expectHistorySaved: false,
+			expectSessionSaved: false,
+		},
+		{
+			name:   "send saves body captures - path",
+			args:   []string{"send", "testreq"},
+			respFn: respFnJSONBodyOK,
+			p: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {
+						Name:   "testreq",
+						Method: "GET",
+						URL:    "/",
+						Captures: map[string]morc.VarScraper{
+							"TEST": {Name: "TEST", Steps: []morc.TraversalStep{
+								{Key: "name"},
+								{Key: "last"},
+							}},
+						},
+					},
+				},
+				Config: morc.Settings{
+					ProjFile: "project.json",
+				},
+			},
+			expectP: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {
+						Name:   "testreq",
+						Method: "GET",
+						URL:    "/",
+						Captures: map[string]morc.VarScraper{
+							"TEST": {Name: "TEST", Steps: []morc.TraversalStep{
+								{Key: "name"},
+								{Key: "last"},
+							}},
+						},
+					},
+				},
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"TEST": "SERKET"},
+				}),
+				Config: morc.Settings{
+					ProjFile: "project.json",
+				},
+			},
+			expectStdoutOutput: `HTTP/1.1 200 OK
+{"name":{"first":"VRISKA","last":"SERKET"}}
+`,
+			expectProjectSaved: true,
+			expectHistorySaved: false,
+			expectSessionSaved: false,
+		},
+		{
+			name:   "minimal request/response with headers",
+			args:   []string{"send", "testreq", "--headers"},
+			respFn: respFnNoBodyOK,
+			p: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {Name: "testreq", Method: "GET", URL: "/"},
+				},
+			},
+			expectP: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {Name: "testreq", Method: "GET", URL: "/"},
+				},
+			},
+			expectStdoutOutput: `HTTP/1.1 200 OK
+------------------- HEADERS -------------------
+Content-Length: 0
+-----------------------------------------------
+(no response body)
+`,
+			expectProjectSaved: false,
+			expectHistorySaved: false,
+			expectSessionSaved: false,
+		},
 
-		// TODO: make above pass even though date is not exact
+		// TODO: request saves captures
+		// TODO: request uses body
+		// TODO: request uses headers
+		// TODO: request uses variables in url
+		// TODO: request uses variables in headers
+		// TODO: request uses variables in body
+		// TODO: request uses variables in method
+		// TODO: output control: no resp
+		// TODO: output control: request
+		// TODO: output control: captures
 	}
 
 	for _, tc := range testCases {
@@ -159,6 +319,13 @@ func Test_Send(t *testing.T) {
 			if tc.expectP.History != nil {
 				for i := range tc.expectP.History {
 					tc.expectP.History[i].Request.URL = mustParseURL(srv.URL + tc.expectP.History[i].Request.URL.Path)
+				}
+			}
+
+			// make shore that expected session set-cookie-calls have proper prefix
+			if tc.expectP.Session.Cookies != nil {
+				for i := range tc.expectP.Session.Cookies {
+					tc.expectP.Session.Cookies[i].URL = mustParseURL(srv.URL + tc.expectP.Session.Cookies[i].URL.Path)
 				}
 			}
 

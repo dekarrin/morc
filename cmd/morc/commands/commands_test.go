@@ -113,12 +113,24 @@ func assert_sessionPersistedToBuffer(assert *assert.Assertions, expected morc.Se
 
 	seshR = seshBuf
 
-	updatedHist, err := morc.LoadSession(seshR)
+	updatedSesh, err := morc.LoadSession(seshR)
 	if !assert.NoError(err, "error loading session to check expectations: %v", err) {
 		return false
 	}
 
-	return assert.Equal(expected, updatedHist, "session in buffer does not match expected")
+	if !assert.Len(updatedSesh.Cookies, len(expected.Cookies), "session set-cookie-call count does not match expected") {
+		return false
+	}
+
+	var failed bool
+
+	for i := range updatedSesh.Cookies {
+		if !assert_setCookiesMatches(assert, expected.Cookies, updatedSesh.Cookies, i) {
+			failed = true
+		}
+	}
+
+	return !failed
 }
 
 // assert_historyPersistedToBuffer checks that the history writer buffer was
@@ -167,6 +179,23 @@ func assert_historyPersistedToBuffer(assert *assert.Assertions, expected []morc.
 }
 
 // note: does not check time.
+func assert_setCookiesMatches(assert *assert.Assertions, expectedCookies []morc.SetCookiesCall, actualCookies []morc.SetCookiesCall, idx int) bool {
+	var failed bool
+
+	expected := expectedCookies[idx]
+	actual := actualCookies[idx]
+
+	if !assert.Equalf(expected.URL, actual.URL, "set-cookie[%d] URL does not match expected", idx) {
+		failed = true
+	}
+	if !assert.Equalf(expected.Cookies, actual.Cookies, "set-cookie[%d] cookies does not match expected", idx) {
+		failed = true
+	}
+
+	return !failed
+}
+
+// note: does not check time.
 func assert_histEntryMatches(assert *assert.Assertions, expectedHist []morc.HistoryEntry, actualHist []morc.HistoryEntry, idx int) bool {
 
 	var failed bool
@@ -177,8 +206,6 @@ func assert_histEntryMatches(assert *assert.Assertions, expectedHist []morc.Hist
 	if !assert.Equalf(expected.Template, actual.Template, "history entry[%d] template does not match expected", idx) {
 		failed = true
 	}
-
-	// we do not need to match the entire response
 	if !assert.Equalf(expected.Request, actual.Request, "history entry[%d] request does not match expected", idx) {
 		failed = true
 	}

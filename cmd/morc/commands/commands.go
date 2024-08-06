@@ -263,7 +263,7 @@ func writeHistory(p morc.Project) error {
 
 func writeSession(p morc.Project) error {
 	if seshWriter != nil {
-		return p.Session.Dump(histWriter)
+		return p.Session.Dump(seshWriter)
 	}
 
 	return p.PersistSessionToDisk()

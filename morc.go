@@ -1193,7 +1193,7 @@ func OutputRequest(req *http.Request, opts OutputControl) error {
 		}
 
 		// make shore to print the full URL in pretty format
-		fmt.Fprintf(w, "(%s)\n", req.URL)
+		fmt.Fprintf(w, "Request URI: %s\n\n", req.URL)
 
 		fmt.Fprintln(w, string(reqBytes))
 

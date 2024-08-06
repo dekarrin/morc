@@ -13,6 +13,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func mustParseURL(s string) *url.URL {
+	u, err := url.Parse(s)
+	if err != nil {
+		panic(err)
+	}
+	return u
+}
+
 type urlBaseRoundTripper struct {
 	base string
 	old  http.RoundTripper
@@ -46,22 +54,55 @@ func Test_Send(t *testing.T) {
 		args               []string // DO NOT INCLUDE -F; it is automatically set to a project file
 		expectP            morc.Project
 		expectErr          string // set if command.Execute expected to fail, with a string that would be in the error message
+		expectProjectSaved bool
+		expectHistorySaved bool
+		expectSessionSaved bool
 		expectStderrOutput string // set with expected output to stderr
 		expectStdoutOutput string // set with expected output to stdout
 	}{
 		{
-			name:   "minimal request/response",
+			name:   "minimal request/response - save history",
 			respFn: respFnNoBodyOK,
-			p: testProject_withRequests(
-				morc.RequestTemplate{Name: "testreq", Method: "GET", URL: "/"},
-			),
-			expectP: testProject_withRequests(
-				morc.RequestTemplate{Name: "testreq", Method: "GET", URL: "/"},
-			),
+			p: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {Name: "testreq", Method: "GET", URL: "/"},
+				},
+				Config: morc.Settings{
+					HistFile:      "::PROJ_DIR::/history.json",
+					RecordHistory: true,
+				},
+			},
+			expectP: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {Name: "testreq", Method: "GET", URL: "/"},
+				},
+				History: []morc.HistoryEntry{
+					{
+						Template: "testreq",
+						Request: &http.Request{
+							Method:     "GET",
+							URL:        mustParseURL("/"),
+							Proto:      "HTTP/1.1",
+							ProtoMajor: 1,
+							ProtoMinor: 1,
+						},
+						Response: &http.Response{
+							StatusCode: http.StatusOK,
+						},
+					},
+				},
+				Config: morc.Settings{
+					HistFile:      "::PROJ_DIR::/history.json",
+					RecordHistory: true,
+				},
+			},
 			args: []string{"send", "testreq"},
 			expectStdoutOutput: `HTTP/1.1 200 OK
 (no response body)
 `,
+			expectProjectSaved: false,
+			expectHistorySaved: true,
+			expectSessionSaved: true,
 		},
 		// 		{
 		// 			name:   "minimal request/response with headers",
@@ -101,6 +142,13 @@ func Test_Send(t *testing.T) {
 				old:  srvClient.Transport,
 			}
 
+			// make shore that expected historic entries have proper prefix
+			if tc.expectP.History != nil {
+				for i := range tc.expectP.History {
+					tc.expectP.History[i].Request.URL = mustParseURL(srv.URL + tc.expectP.History[i].Request.URL.Path)
+				}
+			}
+
 			cmdio.HTTPClient = srvClient
 
 			resetSendFlags()
@@ -129,7 +177,23 @@ func Test_Send(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
 			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
 
-			assert_projectFilesInBuffersMatch(assert, tc.expectP)
+			if tc.expectProjectSaved {
+				assert_projectPersistedToBuffer(assert, tc.expectP)
+			} else {
+				assert_noProjectFileMutations(assert)
+			}
+
+			if tc.expectHistorySaved {
+				assert_historyPersistedToBuffer(assert, tc.expectP.History)
+			} else {
+				assert_noHistoryFileMutations(assert)
+			}
+
+			if tc.expectSessionSaved {
+				assert_sessionPersistedToBuffer(assert, tc.expectP.Session)
+			} else {
+				assert_noSessionFileMutations(assert)
+			}
 		})
 	}
 }

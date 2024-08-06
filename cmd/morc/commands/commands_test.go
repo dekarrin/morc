@@ -25,20 +25,20 @@ func assert_noProjectMutations(assert *assert.Assertions) bool {
 
 	projBuf := projWriter.(*bytes.Buffer)
 	if projBuf.Len() > 0 {
-		return assert.Fail("project buffer was written")
+		return assert.Fail("project buffer was written to")
 	}
 
 	if histWriter != nil {
 		histBuf := histWriter.(*bytes.Buffer)
 		if histBuf.Len() > 0 {
-			return assert.Fail("history buffer was written")
+			return assert.Fail("history buffer was written to")
 		}
 	}
 
 	if seshWriter != nil {
 		seshBuf := seshWriter.(*bytes.Buffer)
 		if seshBuf.Len() > 0 {
-			return assert.Fail("session buffer was written")
+			return assert.Fail("session buffer was written to")
 		}
 	}
 
@@ -124,7 +124,8 @@ func assert_sessionPersistedToBuffer(assert *assert.Assertions, expected morc.Se
 // assert_historyPersistedToBuffer checks that the history writer buffer was
 // initially created (as creation depends on same conditions as writting to
 // file, TODO: upd8 that!!!!!!!! It is super 8ad), that it was written to, and
-// that reading from it results in the expected list of entries.
+// that reading from it results in the expected list of entries. The dates of
+// the entries are not checked.
 func assert_historyPersistedToBuffer(assert *assert.Assertions, expected []morc.HistoryEntry) bool {
 	// we just did writes so assume they hold *bytes.Buffers and use it as the
 	// input
@@ -150,7 +151,91 @@ func assert_historyPersistedToBuffer(assert *assert.Assertions, expected []morc.
 		return false
 	}
 
-	return assert.Equal(expected, updatedHist, "history in buffer does not match expected")
+	if !assert.Len(updatedHist, len(expected), "history entry count does not match expected") {
+		return false
+	}
+
+	var failed bool
+
+	for i := range updatedHist {
+		if !assert_histEntryMatches(assert, expected, updatedHist, i) {
+			failed = true
+		}
+	}
+
+	return !failed
+}
+
+// note: does not check time.
+func assert_histEntryMatches(assert *assert.Assertions, expectedHist []morc.HistoryEntry, actualHist []morc.HistoryEntry, idx int) bool {
+
+	var failed bool
+
+	expected := expectedHist[idx]
+	actual := actualHist[idx]
+
+	if !assert.Equalf(expected.Template, actual.Template, "history entry[%d] template does not match expected", idx) {
+		failed = true
+	}
+
+	// we do not need to match the entire response
+	if !assert.Equalf(expected.Request, actual.Request, "history entry[%d] request does not match expected", idx) {
+		failed = true
+	}
+	if !assert.Equalf(expected.Response, actual.Response, "history entry[%d] response does not match expected", idx) {
+		failed = true
+	}
+	if !assert.Equalf(expected.Captures, actual.Captures, "history entry[%d] captures do not match expected", idx) {
+		failed = true
+	}
+
+	return !failed
+}
+
+// specifically ensures that the project file was not written.
+func assert_noProjectFileMutations(assert *assert.Assertions) bool {
+	if projWriter == nil {
+		panic("project IO buffers were never set up")
+	}
+
+	projBuf := projWriter.(*bytes.Buffer)
+	if projBuf.Len() > 0 {
+		return assert.Fail("project buffer was written to")
+	}
+
+	return true
+}
+
+// specifically ensures that the project file was not written.
+func assert_noHistoryFileMutations(assert *assert.Assertions) bool {
+	if projWriter == nil {
+		panic("project IO buffers were never set up")
+	}
+
+	if histWriter != nil {
+		histBuf := histWriter.(*bytes.Buffer)
+		if histBuf.Len() > 0 {
+			return assert.Fail("history buffer was written to")
+		}
+	}
+
+	return true
+}
+
+// specifically ensures that the project file was not written.
+func assert_noSessionFileMutations(assert *assert.Assertions) bool {
+	if projWriter == nil {
+		panic("project IO buffers were never set up")
+	}
+
+	if seshWriter != nil {
+		seshBuf := seshWriter.(*bytes.Buffer)
+		if seshBuf.Len() > 0 {
+			return assert.Fail("session buffer was written to")
+		}
+	}
+
+	return true
 }
 
 func assert_projectFilesInBuffersMatch(assert *assert.Assertions, expected morc.Project) bool {

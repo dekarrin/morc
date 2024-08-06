@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -43,6 +44,9 @@ func (rt urlBaseRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 
 func Test_Send(t *testing.T) {
 	respFnNoBodyOK := func(w http.ResponseWriter, r *http.Request) {
+		// suppress date header
+		w.Header()["Date"] = nil
+
 		w.WriteHeader(http.StatusOK)
 	}
 
@@ -85,9 +89,18 @@ func Test_Send(t *testing.T) {
 							Proto:      "HTTP/1.1",
 							ProtoMajor: 1,
 							ProtoMinor: 1,
+							Body:       http.NoBody,
 						},
 						Response: &http.Response{
+							Status:     fmt.Sprintf("%d %s", http.StatusOK, http.StatusText(http.StatusOK)),
 							StatusCode: http.StatusOK,
+							Proto:      "HTTP/1.1",
+							ProtoMajor: 1,
+							ProtoMinor: 1,
+							Header: http.Header{
+								"Content-Length": []string{"0"},
+							},
+							Body: http.NoBody,
 						},
 					},
 				},
@@ -102,7 +115,7 @@ func Test_Send(t *testing.T) {
 `,
 			expectProjectSaved: false,
 			expectHistorySaved: true,
-			expectSessionSaved: true,
+			expectSessionSaved: false,
 		},
 		// 		{
 		// 			name:   "minimal request/response with headers",

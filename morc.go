@@ -1147,13 +1147,15 @@ func OutputResponse(resp *http.Response, caps map[string]string, opts OutputCont
 		var entireBody string
 
 		if resp.Body != nil && resp.Body != http.NoBody {
-			entireBody, err := io.ReadAll(resp.Body)
+			entireBodyBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
 				return fmt.Errorf("read response body: %w", err)
 			}
 
 			// put the body back into a reader
-			resp.Body = io.NopCloser(bytes.NewBuffer(entireBody))
+			resp.Body = io.NopCloser(bytes.NewBuffer(entireBodyBytes))
+
+			entireBody = string(entireBodyBytes)
 		}
 
 		if len(entireBody) > 0 {
@@ -1191,7 +1193,7 @@ func OutputRequest(req *http.Request, opts OutputControl) error {
 		}
 
 		// make shore to print the full URL in pretty format
-		fmt.Fprintf(w, "(%s)\n", req.URL)
+		fmt.Fprintf(w, "Request URI: %s\n\n", req.URL)
 
 		fmt.Fprintln(w, string(reqBytes))
 

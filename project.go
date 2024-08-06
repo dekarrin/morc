@@ -102,6 +102,11 @@ type Project struct {
 	Config    Settings
 }
 
+func (p Project) WithConfig(cfg Settings) Project {
+	p.Config = cfg
+	return p
+}
+
 // Dump writes the contents of the project in "project-file" format to the given
 // io.Writer.
 func (p Project) Dump(w io.Writer) error {

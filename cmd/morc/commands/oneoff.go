@@ -143,7 +143,7 @@ func parseOneoffArgs(cmd *cobra.Command, posArgs []string, args *oneoffArgs) err
 	args.skipVerify = flags.BInsecure
 
 	var err error
-	args.outputCtrl, err = gatherRequestOutputFlags()
+	args.outputCtrl, err = gatherRequestOutputFlags(cmd)
 	if err != nil {
 		return err
 	}

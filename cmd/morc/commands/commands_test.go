@@ -14,6 +14,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type MorcIOAssertions struct {
+	assert.Assertions
+}
+
 func assert_noProjectMutations(assert *assert.Assertions) bool {
 	if projWriter == nil {
 		panic("project buffer was never set up")
@@ -21,27 +25,247 @@ func assert_noProjectMutations(assert *assert.Assertions) bool {
 
 	projBuf := projWriter.(*bytes.Buffer)
 	if projBuf.Len() > 0 {
-		return assert.Fail("project buffer was written")
+		return assert.Fail("project buffer was written to")
 	}
 
 	if histWriter != nil {
 		histBuf := histWriter.(*bytes.Buffer)
 		if histBuf.Len() > 0 {
-			return assert.Fail("history buffer was written")
+			return assert.Fail("history buffer was written to")
 		}
 	}
 
 	if seshWriter != nil {
 		seshBuf := seshWriter.(*bytes.Buffer)
 		if seshBuf.Len() > 0 {
-			return assert.Fail("session buffer was written")
+			return assert.Fail("session buffer was written to")
 		}
 	}
 
 	return true
 }
 
-func assert_projectInBufferMatches(assert *assert.Assertions, expected morc.Project) bool {
+// assert_projectPersistedToBuffer checks that the project writer buffer was
+// initially created (will be true if createTestProjectIO was called in the test
+// this comes from) that it was written to, and that reading from it results in
+// the expected Project. Note that this check specifically does *not* do loading
+// of any history or session data that may have been written, and the checks
+// will ignore expected.History and expected.Session; to check those at the same
+// time, use assert_projectFilesInBuffersMatch. Additionally, all project file
+// paths in expected.Config are ignored.
+func assert_projectPersistedToBuffer(assert *assert.Assertions, expected morc.Project) bool {
+	// we just did writes so assume they hold *bytes.Buffers and use it as the
+	// input
+	var projR io.Reader
+
+	if projWriter == nil {
+		return assert.Fail("project buffer was not set up\nMake sure to call createTestProjectIO() in same test first")
+	}
+
+	projBuf := projWriter.(*bytes.Buffer)
+
+	// it exists, but was not necessarily written to. all writes should result
+	// in at least two chars being written for an empty list/object, so we will
+	// rely on that fact here glub.
+	if !assert.Greater(projBuf.Len(), 0, "project was not persisted") {
+		return false
+	}
+
+	projR = projBuf
+
+	updatedProj, err := morc.LoadProject(projR, nil, nil)
+	if !assert.NoError(err, "error loading project to check expectations: %v", err) {
+		return false
+	}
+
+	// ignore project file paths
+	expected.Config.ProjFile = ""
+	expected.Config.HistFile = ""
+	expected.Config.SeshFile = ""
+	updatedProj.Config.ProjFile = ""
+	updatedProj.Config.HistFile = ""
+	updatedProj.Config.SeshFile = ""
+
+	return assert.Equal(expected, updatedProj, "project in buffer does not match expected")
+}
+
+// assert_sessionPersistedToBuffer checks that the history writer buffer was
+// initially created (as creation depends on same conditions as writting to
+// file, TODO: upd8 that!!!!!!!! It is super 8ad), that it was written to, and
+// that reading from it results in the expected session data.
+func assert_sessionPersistedToBuffer(assert *assert.Assertions, expected morc.Session) bool {
+	// we just did writes so assume they hold *bytes.Buffers and use it as the
+	// input
+	var seshR io.Reader
+
+	if seshWriter == nil {
+		return assert.Fail("session buffer was not set up\nMake sure to call createTestProjectIO() in same test first")
+	}
+
+	seshBuf := seshWriter.(*bytes.Buffer)
+
+	// it exists, but was not necessarily written to. all writes should result
+	// in at least two chars being written for an empty list/object, so we will
+	// rely on that fact here glub.
+	if !assert.Greater(seshBuf.Len(), 0, "session was not persisted") {
+		return false
+	}
+
+	seshR = seshBuf
+
+	updatedSesh, err := morc.LoadSession(seshR)
+	if !assert.NoError(err, "error loading session to check expectations: %v", err) {
+		return false
+	}
+
+	if !assert.Len(updatedSesh.Cookies, len(expected.Cookies), "session set-cookie-call count does not match expected") {
+		return false
+	}
+
+	var failed bool
+
+	for i := range updatedSesh.Cookies {
+		if !assert_setCookiesMatches(assert, expected.Cookies, updatedSesh.Cookies, i) {
+			failed = true
+		}
+	}
+
+	return !failed
+}
+
+// assert_historyPersistedToBuffer checks that the history writer buffer was
+// initially created (as creation depends on same conditions as writting to
+// file, TODO: upd8 that!!!!!!!! It is super 8ad), that it was written to, and
+// that reading from it results in the expected list of entries. The dates of
+// the entries are not checked.
+func assert_historyPersistedToBuffer(assert *assert.Assertions, expected []morc.HistoryEntry) bool {
+	// we just did writes so assume they hold *bytes.Buffers and use it as the
+	// input
+	var histR io.Reader
+
+	if histWriter == nil {
+		return assert.Fail("history buffer was not set up\nMake sure to call createTestProjectIO() in same test first")
+	}
+
+	histBuf := histWriter.(*bytes.Buffer)
+
+	// it exists, but was not necessarily written to. all writes should result
+	// in at least two chars being written for an empty list/object, so we will
+	// rely on that fact here glub.
+	if !assert.Greater(histBuf.Len(), 0, "history was not persisted") {
+		return false
+	}
+
+	histR = histBuf
+
+	updatedHist, err := morc.LoadHistory(histR)
+	if !assert.NoError(err, "error loading history to check expectations: %v", err) {
+		return false
+	}
+
+	if !assert.Len(updatedHist, len(expected), "history entry count does not match expected") {
+		return false
+	}
+
+	var failed bool
+
+	for i := range updatedHist {
+		if !assert_histEntryMatches(assert, expected, updatedHist, i) {
+			failed = true
+		}
+	}
+
+	return !failed
+}
+
+// note: does not check time.
+func assert_setCookiesMatches(assert *assert.Assertions, expectedCookies []morc.SetCookiesCall, actualCookies []morc.SetCookiesCall, idx int) bool {
+	var failed bool
+
+	expected := expectedCookies[idx]
+	actual := actualCookies[idx]
+
+	if !assert.Equalf(expected.URL, actual.URL, "set-cookie[%d] URL does not match expected", idx) {
+		failed = true
+	}
+	if !assert.Equalf(expected.Cookies, actual.Cookies, "set-cookie[%d] cookies does not match expected", idx) {
+		failed = true
+	}
+
+	return !failed
+}
+
+// note: does not check time.
+func assert_histEntryMatches(assert *assert.Assertions, expectedHist []morc.HistoryEntry, actualHist []morc.HistoryEntry, idx int) bool {
+
+	var failed bool
+
+	expected := expectedHist[idx]
+	actual := actualHist[idx]
+
+	if !assert.Equalf(expected.Template, actual.Template, "history entry[%d] template does not match expected", idx) {
+		failed = true
+	}
+	if !assert.Equalf(expected.Request, actual.Request, "history entry[%d] request does not match expected", idx) {
+		failed = true
+	}
+	if !assert.Equalf(expected.Response, actual.Response, "history entry[%d] response does not match expected", idx) {
+		failed = true
+	}
+	if !assert.Equalf(expected.Captures, actual.Captures, "history entry[%d] captures do not match expected", idx) {
+		failed = true
+	}
+
+	return !failed
+}
+
+// specifically ensures that the project file was not written.
+func assert_noProjectFileMutations(assert *assert.Assertions) bool {
+	if projWriter == nil {
+		panic("project IO buffers were never set up")
+	}
+
+	projBuf := projWriter.(*bytes.Buffer)
+	if projBuf.Len() > 0 {
+		return assert.Fail("project buffer was written to")
+	}
+
+	return true
+}
+
+// specifically ensures that the project file was not written.
+func assert_noHistoryFileMutations(assert *assert.Assertions) bool {
+	if projWriter == nil {
+		panic("project IO buffers were never set up")
+	}
+
+	if histWriter != nil {
+		histBuf := histWriter.(*bytes.Buffer)
+		if histBuf.Len() > 0 {
+			return assert.Fail("history buffer was written to")
+		}
+	}
+
+	return true
+}
+
+// specifically ensures that the project file was not written.
+func assert_noSessionFileMutations(assert *assert.Assertions) bool {
+	if projWriter == nil {
+		panic("project IO buffers were never set up")
+	}
+
+	if seshWriter != nil {
+		seshBuf := seshWriter.(*bytes.Buffer)
+		if seshBuf.Len() > 0 {
+			return assert.Fail("session buffer was written to")
+		}
+	}
+
+	return true
+}
+
+func assert_projectFilesInBuffersMatch(assert *assert.Assertions, expected morc.Project) bool {
 	// we just did writes so assume they hold *bytes.Buffers and use it as the
 	// input
 	var projR, histR, seshR io.Reader

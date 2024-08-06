@@ -176,24 +176,28 @@ func addRequestOutputFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVarP(&flags.Format, "format", "f", "pretty", "(Output flag) Set output format. `FMT` must be one of 'pretty', 'line', or 'sr')")
 }
 
-func gatherRequestOutputFlags() (morc.OutputControl, error) {
+func gatherRequestOutputFlags(cmd *cobra.Command) (morc.OutputControl, error) {
 	oc := morc.OutputControl{}
 
 	// check format
-	switch strings.ToLower(flags.Format) {
-	case "pretty":
-		oc.Format = morc.FormatPretty
-	case "sr":
-		oc.Format = morc.FormatLine
+	if cmd.Flags().Changed("format") {
+		switch strings.ToLower(flags.Format) {
+		case "pretty":
+			oc.Format = morc.FormatPretty
+		case "sr":
+			oc.Format = morc.FormatLine
 
-		// check if user is trying to turn on things that aren't allowed
-		if flags.BRequest || flags.BHeaders || flags.BNoBody || flags.BCaptures {
-			return oc, fmt.Errorf("format 'sr' only allows status line and response body; use format 'line' for control over output")
+			// check if user is trying to turn on things that aren't allowed
+			if flags.BRequest || flags.BHeaders || flags.BNoBody || flags.BCaptures {
+				return oc, fmt.Errorf("format 'sr' only allows status line and response body; use format 'line' for control over output")
+			}
+		case "line":
+			oc.Format = morc.FormatLine
+		default:
+			return oc, fmt.Errorf("invalid format %q; must be one of pretty, line, or sr", flags.Format)
 		}
-	case "line":
-		oc.Format = morc.FormatLine
-	default:
-		return oc, fmt.Errorf("invalid format %q; must be one of pretty, line, or sr", flags.Format)
+	} else {
+		oc.Format = morc.FormatPretty
 	}
 
 	oc.Request = flags.BRequest
@@ -259,7 +263,7 @@ func writeHistory(p morc.Project) error {
 
 func writeSession(p morc.Project) error {
 	if seshWriter != nil {
-		return p.Session.Dump(histWriter)
+		return p.Session.Dump(seshWriter)
 	}
 
 	return p.PersistSessionToDisk()

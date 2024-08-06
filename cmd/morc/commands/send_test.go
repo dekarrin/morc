@@ -380,7 +380,6 @@ Content-Length: 0
 			expectStdoutOutput: `HTTP/1.1 200 OK
 `,
 		},
-
 		{
 			name:   "print body captures",
 			args:   []string{"send", "testreq", "--captures"},
@@ -428,11 +427,198 @@ HTTP/1.1 200 OK
 			expectHistorySaved: false,
 			expectSessionSaved: false,
 		},
+		{
+			name:   "send template with var in url",
+			args:   []string{"send", "testreq", "--request"},
+			respFn: respFnNoBodyOK,
+			p: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {
+						Name:   "testreq",
+						Method: "GET",
+						URL:    "${PATH}",
+					},
+				},
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"PATH": "/path"},
+				}),
+			},
+			expectP: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {
+						Name:   "testreq",
+						Method: "GET",
+						URL:    "${PATH}",
+					},
+				},
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"PATH": "/path"},
+				}),
+			},
+			expectStdoutOutput: `------------------- REQUEST -------------------
+Request URI: $TESTSERVER_URL$/path
 
-		// TODO: request uses variables in url
-		// TODO: request uses variables in headers
-		// TODO: request uses variables in body
-		// TODO: request uses variables in method
+GET /path HTTP/1.1` + "\r" + `
+Host: $TESTSERVER_HOST$` + "\r" + `
+User-Agent: Go-http-client/1.1` + "\r" + `
+Accept-Encoding: gzip` + "\r" + `
+` + "\r" + `
+
+(no request body)
+----------------- END REQUEST -----------------
+HTTP/1.1 200 OK
+(no response body)
+`,
+			expectProjectSaved: false,
+			expectHistorySaved: false,
+			expectSessionSaved: false,
+		},
+		{
+			name:   "send template with var in headers",
+			args:   []string{"send", "testreq", "--request"},
+			respFn: respFnNoBodyOK,
+			p: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {
+						Name:    "testreq",
+						Method:  "GET",
+						URL:     "/",
+						Headers: http.Header{"${API_KEY_HEADER}": []string{"${API_KEY}"}},
+					},
+				},
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"API_KEY": "fake", "API_KEY_HEADER": "X-Api-Key"},
+				}),
+			},
+			expectP: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {
+						Name:    "testreq",
+						Method:  "GET",
+						URL:     "/",
+						Headers: http.Header{"${API_KEY_HEADER}": []string{"${API_KEY}"}},
+					},
+				},
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"API_KEY": "fake", "API_KEY_HEADER": "X-Api-Key"},
+				}),
+			},
+			expectStdoutOutput: `------------------- REQUEST -------------------
+Request URI: $TESTSERVER_URL$/
+
+GET / HTTP/1.1` + "\r" + `
+Host: $TESTSERVER_HOST$` + "\r" + `
+User-Agent: Go-http-client/1.1` + "\r" + `
+X-Api-Key: fake` + "\r" + `
+Accept-Encoding: gzip` + "\r" + `
+` + "\r" + `
+
+(no request body)
+----------------- END REQUEST -----------------
+HTTP/1.1 200 OK
+(no response body)
+`,
+			expectProjectSaved: false,
+			expectHistorySaved: false,
+			expectSessionSaved: false,
+		},
+		{
+			name:   "send template with var in body",
+			args:   []string{"send", "testreq", "--request"},
+			respFn: respFnNoBodyOK,
+			p: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {
+						Name:   "testreq",
+						Method: "GET",
+						URL:    "/",
+						Body:   []byte("special.key=${API_KEY}"),
+					},
+				},
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"API_KEY": "fake"},
+				}),
+			},
+			expectP: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {
+						Name:   "testreq",
+						Method: "GET",
+						URL:    "/",
+						Body:   []byte("special.key=${API_KEY}"),
+					},
+				},
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"API_KEY": "fake"},
+				}),
+			},
+			expectStdoutOutput: `------------------- REQUEST -------------------
+Request URI: $TESTSERVER_URL$/
+
+GET / HTTP/1.1` + "\r" + `
+Host: $TESTSERVER_HOST$` + "\r" + `
+User-Agent: Go-http-client/1.1` + "\r" + `
+Content-Length: 16` + "\r" + `
+Accept-Encoding: gzip` + "\r" + `
+` + "\r" + `
+special.key=fake
+----------------- END REQUEST -----------------
+HTTP/1.1 200 OK
+(no response body)
+`,
+			expectProjectSaved: false,
+			expectHistorySaved: false,
+			expectSessionSaved: false,
+		},
+
+		{
+			name:   "send template with CLI-overriden var in body",
+			args:   []string{"send", "testreq", "--request", "-V", "API_KEY=test-value"},
+			respFn: respFnNoBodyOK,
+			p: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {
+						Name:   "testreq",
+						Method: "GET",
+						URL:    "/",
+						Body:   []byte("special.key=${API_KEY}"),
+					},
+				},
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"API_KEY": "fake"},
+				}),
+			},
+			expectP: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {
+						Name:   "testreq",
+						Method: "GET",
+						URL:    "/",
+						Body:   []byte("special.key=${API_KEY}"),
+					},
+				},
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"API_KEY": "fake"},
+				}),
+			},
+			expectStdoutOutput: `------------------- REQUEST -------------------
+Request URI: $TESTSERVER_URL$/
+
+GET / HTTP/1.1` + "\r" + `
+Host: $TESTSERVER_HOST$` + "\r" + `
+User-Agent: Go-http-client/1.1` + "\r" + `
+Content-Length: 22` + "\r" + `
+Accept-Encoding: gzip` + "\r" + `
+` + "\r" + `
+special.key=test-value
+----------------- END REQUEST -----------------
+HTTP/1.1 200 OK
+(no response body)
+`,
+			expectProjectSaved: false,
+			expectHistorySaved: false,
+			expectSessionSaved: false,
+		},
 	}
 
 	for _, tc := range testCases {

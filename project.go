@@ -34,7 +34,7 @@ const (
 )
 
 type Settings struct {
-	ProjFile       string        `json:"project_file"`
+	ProjFile       string        `json:"-"`
 	HistFile       string        `json:"history_file"`
 	SeshFile       string        `json:"session_file"`
 	CookieLifetime time.Duration `json:"cookie_lifetime"`
@@ -260,17 +260,18 @@ func (p Project) PersistSessionToDisk() error {
 }
 
 // PersistToDisk writes up to 3 files; one for the suite, one for the session,
-// and one for the history. If p.ProjFile is empty, it will be written to the
-// current working directory at path .morc/suite.json. If p.SeshFile is
-// empty, it will be written to the current working directory at path
-// .morc/session.json. If p.HistFile is empty, it will be written to the
+// and one for the history. If p.ProjFile is not set either manually or
+// automatically when created via LoadProjectFromDisk, the project will be
+// written to the current working directory at path .morc/project.json. If
+// p.SeshFile is empty, it will be written to the current working directory at
+// path .morc/session.json. If p.HistFile is empty, it will be written to the
 // current working directory at path .morc/history.json.
 func (p Project) PersistToDisk(all bool) error {
 	// check file paths and see if they need to be defaulted
-	projPath := p.Config.ProjFile
-	if projPath == "" {
-		projPath = DefaultProjectPath
+	if p.Config.ProjFile == "" {
+		p.Config.ProjFile = DefaultProjectPath
 	}
+	projPath := p.Config.ProjFile
 
 	if err := dumpToFile(projPath, p.Dump); err != nil {
 		return fmt.Errorf("persist project: %w", err)
@@ -385,6 +386,9 @@ func LoadProjectFromDisk(projFilename string, all bool) (Project, error) {
 		Vars:      m.Vars,
 		Config:    m.Config,
 	}
+
+	// set current project file path to the one we just read from
+	p.Config.ProjFile = projFilename
 
 	if all {
 		if p.Config.SessionFSPath() != "" {

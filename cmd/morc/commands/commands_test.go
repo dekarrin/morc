@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -118,19 +116,7 @@ func assert_sessionPersistedToBuffer(assert *assert.Assertions, expected morc.Se
 		return false
 	}
 
-	if !assert.Len(updatedSesh.Cookies, len(expected.Cookies), "session set-cookie-call count does not match expected") {
-		return false
-	}
-
-	var failed bool
-
-	for i := range updatedSesh.Cookies {
-		if !assert_setCookiesMatches(assert, expected.Cookies, updatedSesh.Cookies, i) {
-			failed = true
-		}
-	}
-
-	return !failed
+	return morc.AssertSessionsMatch(assert, expected, updatedSesh)
 }
 
 // assert_historyPersistedToBuffer checks that the history writer buffer was
@@ -163,60 +149,7 @@ func assert_historyPersistedToBuffer(assert *assert.Assertions, expected []morc.
 		return false
 	}
 
-	if !assert.Len(updatedHist, len(expected), "history entry count does not match expected") {
-		return false
-	}
-
-	var failed bool
-
-	for i := range updatedHist {
-		if !assert_histEntryMatches(assert, expected, updatedHist, i) {
-			failed = true
-		}
-	}
-
-	return !failed
-}
-
-// note: does not check time.
-func assert_setCookiesMatches(assert *assert.Assertions, expectedCookies []morc.SetCookiesCall, actualCookies []morc.SetCookiesCall, idx int) bool {
-	var failed bool
-
-	expected := expectedCookies[idx]
-	actual := actualCookies[idx]
-
-	if !assert.Equalf(expected.URL, actual.URL, "set-cookie[%d] URL does not match expected", idx) {
-		failed = true
-	}
-	if !assert.Equalf(expected.Cookies, actual.Cookies, "set-cookie[%d] cookies does not match expected", idx) {
-		failed = true
-	}
-
-	return !failed
-}
-
-// note: does not check time.
-func assert_histEntryMatches(assert *assert.Assertions, expectedHist []morc.HistoryEntry, actualHist []morc.HistoryEntry, idx int) bool {
-
-	var failed bool
-
-	expected := expectedHist[idx]
-	actual := actualHist[idx]
-
-	if !assert.Equalf(expected.Template, actual.Template, "history entry[%d] template does not match expected", idx) {
-		failed = true
-	}
-	if !assert.Equalf(expected.Request, actual.Request, "history entry[%d] request does not match expected", idx) {
-		failed = true
-	}
-	if !assert.Equalf(expected.Response, actual.Response, "history entry[%d] response does not match expected", idx) {
-		failed = true
-	}
-	if !assert.Equalf(expected.Captures, actual.Captures, "history entry[%d] captures do not match expected", idx) {
-		failed = true
-	}
-
-	return !failed
+	return morc.AssertHistoriesMatch(assert, expected, updatedHist)
 }
 
 // specifically ensures that the project file was not written.
@@ -302,24 +235,6 @@ func assert_projectFilesInBuffersMatch(assert *assert.Assertions, expected morc.
 	return assert.Equal(expected, updatedProj, "project in file does not match expected")
 }
 
-// TODO: make unit tests that actually cover loading from file. This func can be
-// used there.
-func assert_projectInFileMatches(assert *assert.Assertions, expected morc.Project, projFilePath string) bool {
-	updatedProj, err := morc.LoadProjectFromDisk(projFilePath, true)
-	if !assert.NoError(err, "error loading project to check expectations: %v", err) {
-		return false
-	}
-
-	// ignore project file paths
-	expected.Config.ProjFile = ""
-	expected.Config.HistFile = ""
-	expected.Config.SeshFile = ""
-	updatedProj.Config.ProjFile = ""
-	updatedProj.Config.HistFile = ""
-	updatedProj.Config.SeshFile = ""
-	return assert.Equal(expected, updatedProj, "project in file does not match expected")
-}
-
 // DO NOT INCLUDE -F IN args!!! It is added automatically from projFilePath
 func runTestCommand(cmd *cobra.Command, projFilePath string, args []string) (stdout string, stderr string, err error) {
 	stdoutCapture := &bytes.Buffer{}
@@ -345,78 +260,6 @@ func runTestCommand(cmd *cobra.Command, projFilePath string, args []string) (std
 
 	err = cmd.Execute()
 	return stdoutCapture.String(), stderrCapture.String(), err
-}
-
-// TODO: make unit tests that actually cover loading from file. This func can be
-// used there.
-func createTestProjectFiles(t *testing.T, p morc.Project) string {
-	dir := t.TempDir()
-
-	projFilePath := filepath.Join(dir, "project.json")
-	f, err := os.Create(projFilePath)
-	if err != nil {
-		t.Fatal(err)
-		return ""
-	}
-
-	// set the proj file path in project at this point or there will be issues
-	// on persistence
-	p.Config.ProjFile, err = filepath.Abs(projFilePath)
-	if err != nil {
-		t.Fatal(err)
-		return ""
-	}
-	defer f.Close()
-	if err := p.Dump(f); err != nil {
-		t.Fatal(err)
-		return ""
-	}
-
-	// next do hist file, if one is given
-	if p.Config.HistFile != "" {
-		if !strings.HasPrefix(p.Config.HistFile, morc.ProjDirVar) {
-			t.Fatal("hist file path must start with " + morc.ProjDirVar + " if present in tests")
-			return ""
-		}
-
-		relativePath := strings.TrimPrefix(p.Config.HistFile, morc.ProjDirVar)
-		histFilePath := filepath.Join(dir, relativePath)
-		hf, err := os.Create(histFilePath)
-		if err != nil {
-			t.Fatal(err)
-			return ""
-		}
-		defer hf.Close()
-
-		if err := p.DumpHistory(hf); err != nil {
-			t.Fatal(err)
-			return ""
-		}
-	}
-
-	// next do sesh file, if one is given
-	if p.Config.SeshFile != "" {
-		if !strings.HasPrefix(p.Config.SeshFile, morc.ProjDirVar) {
-			t.Fatal("session file path must start with " + morc.ProjDirVar + " if present in tests")
-			return ""
-		}
-
-		relativePath := strings.TrimPrefix(p.Config.SeshFile, morc.ProjDirVar)
-		seshFilePath := filepath.Join(dir, relativePath)
-		sf, err := os.Create(seshFilePath)
-		if err != nil {
-			t.Fatal(err)
-			return ""
-		}
-		defer sf.Close()
-
-		if err := p.Session.Dump(sf); err != nil {
-			t.Fatal(err)
-			return ""
-		}
-	}
-
-	return projFilePath
 }
 
 func createTestProjectIO(t *testing.T, p morc.Project) string {

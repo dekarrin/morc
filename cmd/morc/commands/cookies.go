@@ -240,7 +240,7 @@ type cookiesArgs struct {
 }
 
 func parseCookiesArgs(cmd *cobra.Command, posArgs []string, args *cookiesArgs) error {
-	args.projFile = flags.ProjectFile
+	args.projFile = projPathFromFlagsOrFile(cmd)
 
 	if args.projFile == "" {
 		return fmt.Errorf("project file cannot be set to empty string")

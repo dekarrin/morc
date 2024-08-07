@@ -79,7 +79,7 @@ type sendArgs struct {
 func parseSendArgs(cmd *cobra.Command, posArgs []string, args *sendArgs) error {
 	// send is a single-action command, so we will only be gathering pos args
 	// and flags.
-	args.projFile = flags.ProjectFile
+	args.projFile = projPathFromFlagsOrFile(cmd)
 	if args.projFile == "" {
 		return fmt.Errorf("project file cannot be set to empty string")
 	}

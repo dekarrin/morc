@@ -373,7 +373,7 @@ func (sfv projAttrValues) changesFilePaths() bool {
 }
 
 func parseProjArgs(cmd *cobra.Command, _ []string, args *projArgs) error {
-	args.projFile = flags.ProjectFile
+	args.projFile = projPathFromFlagsOrFile(cmd)
 	if args.projFile == "" {
 		return fmt.Errorf("project file cannot be set to empty string")
 	}

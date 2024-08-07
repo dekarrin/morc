@@ -188,7 +188,7 @@ type envArgs struct {
 }
 
 func parseEnvArgs(cmd *cobra.Command, posArgs []string, args *envArgs) error {
-	args.projFile = flags.ProjectFile
+	args.projFile = projPathFromFlagsOrFile(cmd)
 	if args.projFile == "" {
 		return fmt.Errorf("project file cannot be set to empty string")
 	}

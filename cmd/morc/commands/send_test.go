@@ -184,9 +184,6 @@ func Test_Send(t *testing.T) {
 						},
 					},
 				},
-				Config: morc.Settings{
-					ProjFile: "project.json",
-				},
 			},
 			expectP: morc.Project{
 				Templates: map[string]morc.RequestTemplate{
@@ -202,9 +199,6 @@ func Test_Send(t *testing.T) {
 				Vars: testVarStore("", map[string]map[string]string{
 					"": {"TEST": "VRISKA"},
 				}),
-				Config: morc.Settings{
-					ProjFile: "project.json",
-				},
 			},
 			expectStdoutOutput: `HTTP/1.1 200 OK
 {"name":{"first":"VRISKA","last":"SERKET"}}
@@ -231,9 +225,6 @@ func Test_Send(t *testing.T) {
 						},
 					},
 				},
-				Config: morc.Settings{
-					ProjFile: "project.json",
-				},
 			},
 			expectP: morc.Project{
 				Templates: map[string]morc.RequestTemplate{
@@ -252,9 +243,6 @@ func Test_Send(t *testing.T) {
 				Vars: testVarStore("", map[string]map[string]string{
 					"": {"TEST": "SERKET"},
 				}),
-				Config: morc.Settings{
-					ProjFile: "project.json",
-				},
 			},
 			expectStdoutOutput: `HTTP/1.1 200 OK
 {"name":{"first":"VRISKA","last":"SERKET"}}
@@ -395,9 +383,6 @@ Content-Length: 0
 						},
 					},
 				},
-				Config: morc.Settings{
-					ProjFile: "project.json",
-				},
 			},
 			expectP: morc.Project{
 				Templates: map[string]morc.RequestTemplate{
@@ -413,9 +398,6 @@ Content-Length: 0
 				Vars: testVarStore("", map[string]map[string]string{
 					"": {"TEST": "VRISKA"},
 				}),
-				Config: morc.Settings{
-					ProjFile: "project.json",
-				},
 			},
 			expectStdoutOutput: `----------------- VAR CAPTURES ----------------
 TEST: VRISKA

@@ -19,7 +19,7 @@ func AssertProjectInFileMatches(assert *assert.Assertions, expected Project, pro
 	AssertHistoriesMatch(assert, expected.History, updatedProj.History)
 	AssertSessionsMatch(assert, expected.Session, updatedProj.Session)
 
-	// unset histories and sessions on both as they are separately checked above
+	// unset histories and sessions on both as they are checked separately above
 	expected.History = nil
 	expected.Session = Session{}
 	updatedProj.History = nil

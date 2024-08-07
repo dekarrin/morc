@@ -22,6 +22,8 @@ func AssertProjectInFileMatches(assert *assert.Assertions, expected Project, pro
 	// unset histories and sessions on both as they are separately checked above
 	expected.History = nil
 	expected.Session = Session{}
+	updatedProj.History = nil
+	updatedProj.Session = Session{}
 
 	return assert.Equal(expected, updatedProj, "project in file does not match expected")
 }

@@ -16,9 +16,9 @@ var projCmd = &cobra.Command{
 	Annotations: map[string]string{
 		annotationKeyHelpUsages: "" +
 			"proj\n" +
-			"proj --new [-nHSCcR]\n" +
+			"proj --new [-nHSCcRp]\n" +
 			"proj --get ATTR\n" +
-			"proj [-nHSCcR]",
+			"proj [-nHSCcRp]",
 	},
 	GroupID: "project",
 	Short:   "Show or manipulate project attributes and config",
@@ -58,6 +58,7 @@ func init() {
 	projCmd.PersistentFlags().StringVarP(&flags.CookieLifetime, "cookie-lifetime", "L", "", "Set the lifetime of recorded cookies to `DUR`. DUR must be a duration string such as 8m2s or similar. If set to 0 or less, it will be interpreted as '24h'. Altering this on an existing project will immediately apply an eviction check to all current cookies; this may result in some being purged.")
 	projCmd.PersistentFlags().StringVarP(&flags.RecordCookies, "cookies", "c", "", "Set whether cookie recording is enabled. `ON|OFF` must be one of 'ON' or 'OFF'. Setting this is equivalent to calling 'morc cookies --on' or 'morc cookies --off'")
 	projCmd.PersistentFlags().StringVarP(&flags.RecordHistory, "history", "R", "", "Set whether history recording is enabled. `ON|OFF` must be one of 'ON' or 'OFF'. Setting this is equivalent to calling 'morc history --on' or 'morc history --off'")
+	projCmd.PersistentFlags().StringVarP(&flags.VarPrefix, "var-prefix", "p", "", "Set the variable prefix string to `PREFIX`. It will be \"$\" by default.")
 
 	projCmd.MarkFlagsMutuallyExclusive("new", "get")
 	projCmd.MarkFlagsMutuallyExclusive("cookies", "get")
@@ -65,6 +66,8 @@ func init() {
 	projCmd.MarkFlagsMutuallyExclusive("history", "get")
 	projCmd.MarkFlagsMutuallyExclusive("history-file", "get")
 	projCmd.MarkFlagsMutuallyExclusive("cookies-file", "get")
+	projCmd.MarkFlagsMutuallyExclusive("name", "get")
+	projCmd.MarkFlagsMutuallyExclusive("var-prefix", "get")
 
 	customFormattedCommandDescriptions[projCmd.Name()] = longHelp{fn: projCmdHelp, resultIsWrapped: true}
 
@@ -99,6 +102,7 @@ var (
 			{projKeySeshFile.Name(), "The path to the session file. Does not affect whether sessions (cookies) are actually recorded; use " + projKeyCookies.Name() + " for that. If the special string '" + morc.ProjDirVar + "' is in the path, it is replaced with the directory containing the project file whenever morc is executed, allowing the session file path to still function even if the containing directory is moved."},
 			{projKeyHistory.Name(), "Whether cookie recording is enabled. When setting, the value must must be the string 'ON' or 'OFF' (case-insensitive). Setting this is equivalent to calling 'morc cookies --on' or 'morc cookies --off'"},
 			{projKeyCookieLifetime.Name(), "The lifetime of recorded Set-Cookie calls. When setting, the value must be a duration such as '24h' or '1h30m'. If set to 0 or less, it will be interpreted as 24h. Altering this will immediately apply an eviction check to all current cookies; this may result in some being purged."},
+			{projKeyVarPrefix.Name(), "The prefix used by variables in request templates. Variables that have the form PREFIX{VAR_NAME} in request templates will be interpreted with their actual value prior to sending the request."},
 		}
 
 		// format all with roseditor.
@@ -230,6 +234,15 @@ func invokeProjEdit(io cmdio.IO, projFile string, attrs projAttrValues) error {
 		}
 	}
 
+	if attrs.varPrefix.set {
+		if attrs.varPrefix.v == p.Config.VarPrefix {
+			noChangeVals[projKeyVarPrefix] = p.Config.VarPrefix
+		} else {
+			p.Config.VarPrefix = attrs.varPrefix.v
+			modifiedVals[projKeyVarPrefix] = p.Config.VarPrefix
+		}
+	}
+
 	err = writeProject(p, modifyAllFiles)
 	if err != nil {
 		return err
@@ -267,6 +280,7 @@ func invokeProjNew(io cmdio.IO, projFile string, attrs projAttrValues) error {
 			CookieLifetime: attrs.cookieLifetime.Or(24 * time.Hour),
 			RecordSession:  attrs.recordCookies.v,
 			RecordHistory:  attrs.recordHistory.v,
+			VarPrefix:      attrs.varPrefix.Or("$"),
 		},
 	}
 
@@ -317,6 +331,8 @@ func invokeProjGet(io cmdio.IO, projFile string, item projKey) error {
 		io.Printf("%s\n", io.OnOrOff(proj.Config.RecordSession))
 	case projKeyHistory:
 		io.Printf("%s\n", io.OnOrOff(proj.Config.RecordHistory))
+	case projKeyVarPrefix:
+		io.Printf("%s\n", proj.Config.VarPrefix)
 	default:
 		panic(fmt.Sprintf("unhandled proj key %q", item))
 	}
@@ -336,6 +352,7 @@ func invokeProjShow(io cmdio.IO, projFile string) error {
 	io.Printf("%s across %s\n", io.CountOf(proj.Vars.Count(), "variable"), io.CountOf(proj.Vars.EnvCount(), "environment"))
 	io.Printf("%s in active session\n", io.CountOf(proj.Session.TotalCookieSets(), "cookie"))
 	io.Println()
+	io.Printf("Variable prefix: %s\n", proj.Config.VarPrefix)
 	io.Printf("Cookie record lifetime: %s\n", proj.Config.CookieLifetime)
 	io.Printf("Project file on record: %s\n", proj.Config.ProjFile)
 	io.Printf("Session file on record: %s\n", proj.Config.SeshFile)
@@ -366,6 +383,7 @@ type projAttrValues struct {
 	seshFile       optionalC[string]
 	histFile       optionalC[string]
 	cookieLifetime optionalC[time.Duration]
+	varPrefix      optionalC[string]
 }
 
 func (sfv projAttrValues) changesFilePaths() bool {
@@ -465,11 +483,25 @@ func parseProjSetFlags(cmd *cobra.Command, attrs *projAttrValues) error {
 		attrs.recordHistory = optionalC[bool]{set: true, v: isOn}
 	}
 
+	if cmd.Flags().Lookup("var-prefix").Changed {
+		if flags.VarPrefix == "" {
+			return fmt.Errorf("var-prefix: cannot be set to empty string")
+		}
+
+		attrs.varPrefix = optionalC[string]{set: true, v: flags.VarPrefix}
+	}
+
 	return nil
 }
 
 func projSetFlagIsPresent() bool {
-	return flags.Name != "" || flags.HistoryFile != "" || flags.SessionFile != "" || flags.CookieLifetime != "" || flags.RecordCookies != "" || flags.RecordHistory != ""
+	return flags.Name != "" ||
+		flags.HistoryFile != "" ||
+		flags.SessionFile != "" ||
+		flags.CookieLifetime != "" ||
+		flags.RecordCookies != "" ||
+		flags.RecordHistory != "" ||
+		flags.VarPrefix != ""
 }
 
 type projAction int
@@ -490,6 +522,7 @@ const (
 	projKeyCookieLifetime projKey = "COOKIE-LIFETIME"
 	projKeyCookies        projKey = "COOKIES"
 	projKeyHistory        projKey = "HISTORY"
+	projKeyVarPrefix      projKey = "VAR-PREFIX"
 )
 
 // Human prints the human-readable description of the key.
@@ -507,6 +540,8 @@ func (pk projKey) Human() string {
 		return "cookie recording"
 	case projKeyHistory:
 		return "history recording"
+	case projKeyVarPrefix:
+		return "variable prefix"
 	default:
 		return fmt.Sprintf("unknown project key %q", pk)
 	}
@@ -526,6 +561,7 @@ var (
 		projKeySeshFile,
 		projKeyCookies,
 		projKeyCookieLifetime,
+		projKeyVarPrefix,
 	}
 )
 
@@ -551,6 +587,8 @@ func parseProjAttrKey(s string) (projKey, error) {
 		return projKeyCookies, nil
 	case projKeyHistory.Name():
 		return projKeyHistory, nil
+	case projKeyVarPrefix.Name():
+		return projKeyVarPrefix, nil
 	default:
 		return "", fmt.Errorf("invalid attribute %q; must be one of %s", s, strings.Join(projAttrKeyNames(), ", "))
 	}

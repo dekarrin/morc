@@ -395,6 +395,11 @@ type cliFlags struct {
 	// Vars is variables, in NAME=VALUE format. Can be specified more than once.
 	Vars []string
 
+	// VarPrefix is the sigil string that all variables in a request template
+	// start with. Strings composed of VarPrefix + "{" + VAR_NAME + "}" will be
+	// replaced with their actual values prior to sending requests.
+	VarPrefix string
+
 	// RemoveHeaders is a list of headers to be removed.
 	RemoveHeaders []string
 

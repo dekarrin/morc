@@ -57,6 +57,7 @@ func invokeInit(projName string) error {
 			SeshFile:       morc.DefaultSessionPath,
 			RecordHistory:  true,
 			RecordSession:  true,
+			VarPrefix:      "$",
 		},
 	}
 

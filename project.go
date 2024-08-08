@@ -40,6 +40,7 @@ type Settings struct {
 	CookieLifetime time.Duration `json:"cookie_lifetime"`
 	RecordHistory  bool          `json:"record_history"`
 	RecordSession  bool          `json:"record_cookies"`
+	VarPrefix      string        `json:"var_prefix"`
 }
 
 // HistoryFSPath returns the file-system compatible path to the history file. If

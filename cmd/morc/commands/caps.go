@@ -325,6 +325,11 @@ func invokeCapsShow(io cmdio.IO, projFile, reqName, capName string) error {
 		return err
 	}
 
+	varPrefix := p.Config.VarPrefix
+	if varPrefix == "" {
+		varPrefix = "$"
+	}
+
 	// case doesn't matter for request template names
 	reqName = strings.ToLower(reqName)
 	req, ok := p.Templates[reqName]
@@ -338,7 +343,7 @@ func invokeCapsShow(io cmdio.IO, projFile, reqName, capName string) error {
 		return fmt.Errorf("no capture to %s exists on request template %s", capName, reqName)
 	}
 
-	fmt.Printf("%s\n", cap.String())
+	fmt.Printf("%s%s\n", varPrefix, cap.String())
 
 	io.PrintLoudln(cap)
 	return nil

@@ -136,6 +136,7 @@ func resetProjFlags() {
 	flags.HistoryFile = ""
 	flags.RecordCookies = ""
 	flags.RecordHistory = ""
+	flags.VarPrefix = ""
 
 	projCmd.Flags().VisitAll(func(fl *pflag.Flag) {
 		fl.Changed = false

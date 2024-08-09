@@ -13,7 +13,7 @@ var execCmd = &cobra.Command{
 	Use: "exec FLOW",
 	Annotations: map[string]string{
 		annotationKeyHelpUsages: "" +
-			"exec FLOW [-k] [-V VAR=VALUE]... [output-flags]",
+			"exec FLOW [-k] [-p PREFIX] [-V VAR=VALUE]... [output-flags]",
 	},
 	Short:   "Execute a flow of requests",
 	Long:    "Execute a sequence of requests defined in a flow stored in the project. Initial variable values can be set with -V and will override any in the store before the first request in the flow is executed.",

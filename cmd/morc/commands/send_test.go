@@ -601,6 +601,103 @@ HTTP/1.1 200 OK
 			expectHistorySaved: false,
 			expectSessionSaved: false,
 		},
+		{
+			name:   "send template with var in url, non-default prefix",
+			args:   []string{"send", "testreq", "--request"},
+			respFn: respFnNoBodyOK,
+			p: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {
+						Name:   "testreq",
+						Method: "GET",
+						URL:    "^{PATH}",
+					},
+				},
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"PATH": "/path"},
+				}),
+				Config: morc.Settings{
+					VarPrefix: "^",
+				},
+			},
+			expectP: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {
+						Name:   "testreq",
+						Method: "GET",
+						URL:    "^{PATH}",
+					},
+				},
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"PATH": "/path"},
+				}),
+				Config: morc.Settings{
+					VarPrefix: "^",
+				},
+			},
+			expectStdoutOutput: `------------------- REQUEST -------------------
+Request URI: $TESTSERVER_URL$/path
+
+GET /path HTTP/1.1` + "\r" + `
+Host: $TESTSERVER_HOST$` + "\r" + `
+User-Agent: Go-http-client/1.1` + "\r" + `
+Accept-Encoding: gzip` + "\r" + `
+` + "\r" + `
+
+(no request body)
+----------------- END REQUEST -----------------
+HTTP/1.1 200 OK
+(no response body)
+`,
+			expectProjectSaved: false,
+			expectHistorySaved: false,
+			expectSessionSaved: false,
+		}, {
+			name:   "send template with var in url, prefix override",
+			args:   []string{"send", "testreq", "--request", "-p", "^"},
+			respFn: respFnNoBodyOK,
+			p: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {
+						Name:   "testreq",
+						Method: "GET",
+						URL:    "^{PATH}",
+					},
+				},
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"PATH": "/path"},
+				}),
+			},
+			expectP: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {
+						Name:   "testreq",
+						Method: "GET",
+						URL:    "^{PATH}",
+					},
+				},
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"PATH": "/path"},
+				}),
+			},
+			expectStdoutOutput: `------------------- REQUEST -------------------
+Request URI: $TESTSERVER_URL$/path
+
+GET /path HTTP/1.1` + "\r" + `
+Host: $TESTSERVER_HOST$` + "\r" + `
+User-Agent: Go-http-client/1.1` + "\r" + `
+Accept-Encoding: gzip` + "\r" + `
+` + "\r" + `
+
+(no request body)
+----------------- END REQUEST -----------------
+HTTP/1.1 200 OK
+(no response body)
+`,
+			expectProjectSaved: false,
+			expectHistorySaved: false,
+			expectSessionSaved: false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -695,6 +792,7 @@ func resetSendFlags() {
 	flags.BNoBody = false
 	flags.BRequest = false
 	flags.Format = "pretty" // TODO: make this default not be magic but rather have the cmd flag init and the reset use it
+	flags.VarPrefix = "$"
 
 	sendCmd.Flags().VisitAll(func(fl *pflag.Flag) {
 		fl.Changed = false

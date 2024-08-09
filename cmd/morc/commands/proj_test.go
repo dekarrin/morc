@@ -28,6 +28,7 @@ func Test_Proj_Show(t *testing.T) {
 0 variables across 1 environment
 0 cookies in active session
 
+Variable prefix: $
 Cookie record lifetime: 0s`,
 		},
 	}
@@ -136,6 +137,7 @@ func resetProjFlags() {
 	flags.HistoryFile = ""
 	flags.RecordCookies = ""
 	flags.RecordHistory = ""
+	flags.VarPrefix = ""
 
 	projCmd.Flags().VisitAll(func(fl *pflag.Flag) {
 		fl.Changed = false

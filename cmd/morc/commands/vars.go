@@ -98,19 +98,19 @@ func invokeVarSet(io cmdio.IO, projFile string, env envSelection, varName, value
 		for _, envName := range allEnvs {
 			p.Vars.SetIn(varName, value, envName)
 		}
-		io.PrintLoudf("Set ${%s} to %q in all envs\n", varName, value)
+		io.PrintLoudf("Set %s{%s} to %q in all envs\n", p.VarPrefix(), varName, value)
 	} else if env.useDefault {
 		p.Vars.SetIn(varName, value, "")
-		io.PrintLoudf("Set ${%s} to %q in default env\n", varName, value)
+		io.PrintLoudf("Set %s{%s} to %q in default env\n", p.VarPrefix(), varName, value)
 	} else if env.useName != "" {
 		p.Vars.SetIn(varName, value, env.useName)
-		io.PrintLoudf("Set ${%s} to %q in env %s\n", varName, value, env.useName)
+		io.PrintLoudf("Set %s{%s} to %q in env %s\n", p.VarPrefix(), varName, value, env.useName)
 	} else if env.useCurrent {
 		p.Vars.SetIn(varName, value, p.Vars.Environment)
-		io.PrintLoudf("Set ${%s} to %q in current env\n", varName, value)
+		io.PrintLoudf("Set %s{%s} to %q in current env\n", p.VarPrefix(), varName, value)
 	} else {
 		p.Vars.Set(varName, value)
-		io.PrintLoudf("Set ${%s} to %q\n", varName, value)
+		io.PrintLoudf("Set %s{%s} to %q\n", p.VarPrefix(), varName, value)
 	}
 
 	return writeProject(p, false)
@@ -185,7 +185,7 @@ func invokeVarGet(io cmdio.IO, projFile string, env envSelection, varName string
 		return nil
 	} else if env.useDefault {
 		if !p.Vars.IsDefinedIn(varName, "") {
-			io.PrintErrf("${%s} is not defined in default env\n", varName)
+			io.PrintErrf("%s{%s} is not defined in default env\n", p.VarPrefix(), varName)
 			return nil
 		}
 
@@ -198,7 +198,7 @@ func invokeVarGet(io cmdio.IO, projFile string, env envSelection, varName string
 				valueViaDefault = "; value is via default env"
 			}
 
-			io.PrintErrf("${%s} is not defined in env %s%s\n", varName, strings.ToUpper(env.useName), valueViaDefault)
+			io.PrintErrf("%s{%s} is not defined in env %s%s\n", p.VarPrefix(), varName, strings.ToUpper(env.useName), valueViaDefault)
 			return nil
 		}
 
@@ -216,14 +216,14 @@ func invokeVarGet(io cmdio.IO, projFile string, env envSelection, varName string
 				valueViaDefault = "; value is via default env"
 			}
 
-			io.PrintErrf("${%s} is not defined in current env (%s)%s\n", varName, envName, valueViaDefault)
+			io.PrintErrf("%s{%s} is not defined in current env (%s)%s\n", p.VarPrefix(), varName, envName, valueViaDefault)
 			return nil
 		}
 
 		val = p.Vars.GetFrom(varName, p.Vars.Environment)
 	} else {
 		if !p.Vars.IsDefined(varName) {
-			io.PrintErrf("${%s} is not defined\n", varName)
+			io.PrintErrf("%s{%s} is not defined\n", p.VarPrefix(), varName)
 			return nil
 		}
 
@@ -252,14 +252,14 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 		otherEnvs := p.Vars.NonDefaultEnvsWith(varName)
 		if len(otherEnvs) > 0 {
 			sort.Strings(otherEnvs)
-			return fmt.Errorf("cannot remove ${%s} from current env (default env)\nValue is also defined in envs: %s\nSet --all to delete from all environments", varName, strings.Join(otherEnvs, ", "))
+			return fmt.Errorf("cannot remove %s{%s} from current env (default env)\nValue is also defined in envs: %s\nSet --all to delete from all environments", p.VarPrefix(), varName, strings.Join(otherEnvs, ", "))
 		}
 	}
 
 	if env.useAll {
 		// easy, just delete from all environments
 		if !p.Vars.IsDefined(varName) {
-			return fmt.Errorf("${%s} does not exist in any environment", varName)
+			return fmt.Errorf("%s{%s} does not exist in any environment", p.VarPrefix(), varName)
 		}
 
 		p.Vars.Remove(varName)
@@ -267,7 +267,7 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 			return err
 		}
 
-		io.PrintLoudf("Deleted ${%s} from all environments\n", varName)
+		io.PrintLoudf("Deleted %s{%s} from all environments\n", p.VarPrefix(), varName)
 		return nil
 	}
 
@@ -280,20 +280,20 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 
 		if len(otherEnvs) > 0 {
 			sort.Strings(otherEnvs)
-			return fmt.Errorf("${%s} is also defined in non-default envs: %s\nSet --all to delete from all environments", varName, strings.Join(otherEnvs, ", "))
+			return fmt.Errorf("%s{%s} is also defined in non-default envs: %s\nSet --all to delete from all environments", p.VarPrefix(), varName, strings.Join(otherEnvs, ", "))
 		}
 	}
 
 	if env.useDefault {
 		if !p.Vars.IsDefinedIn(varName, "") {
-			return fmt.Errorf("${%s} does not exist in default env", varName)
+			return fmt.Errorf("%s{%s} does not exist in default env", p.VarPrefix(), varName)
 		}
 
 		// otherwise, we can delete ONLY if the var is not defined in any other env
 		nonDefaultEnvs := p.Vars.NonDefaultEnvsWith(varName)
 		if len(nonDefaultEnvs) > 0 {
 			sort.Strings(nonDefaultEnvs)
-			return fmt.Errorf("cannot remove ${%s} from default env\nValue is also defined in envs: %s\nSet --all to delete from all environments", varName, strings.Join(nonDefaultEnvs, ", "))
+			return fmt.Errorf("cannot remove %s{%s} from default env\nValue is also defined in envs: %s\nSet --all to delete from all environments", p.VarPrefix(), varName, strings.Join(nonDefaultEnvs, ", "))
 		}
 
 		p.Vars.Remove(varName)
@@ -305,10 +305,10 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 			// if it exists in default only we will not delete
 			// bc user explicitly asked for deletion from specific one only glub
 			if p.Vars.IsDefinedIn(varName, "") {
-				return fmt.Errorf("${%s} is not defined in env %s; value is via default env", varName, env.useName)
+				return fmt.Errorf("%s{%s} is not defined in env %s; value is via default env", p.VarPrefix(), varName, env.useName)
 			}
 
-			return fmt.Errorf("${%s} does not exist in env %s", varName, env.useName)
+			return fmt.Errorf("%s{%s} does not exist in env %s", p.VarPrefix(), varName, env.useName)
 		}
 
 		p.Vars.UnsetIn(varName, env.useName)
@@ -318,16 +318,16 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 			// if it exists in default only and not in current, we will not delete
 			// bc user explicitly asked for deletion from current only
 			if p.Vars.IsDefinedIn(varName, "") {
-				return fmt.Errorf("${%s} is not defined in current env; value is via default env", varName)
+				return fmt.Errorf("%s{%s} is not defined in current env; value is via default env", p.VarPrefix(), varName)
 			}
 
-			return fmt.Errorf("${%s} does not exist in current environment", varName)
+			return fmt.Errorf("%s{%s} does not exist in current environment", p.VarPrefix(), varName)
 		}
 
 		p.Vars.UnsetIn(varName, p.Vars.Environment)
 	} else {
 		if !p.Vars.IsDefined(varName) {
-			return fmt.Errorf("${%s} does not exist", varName)
+			return fmt.Errorf("%s{%s} does not exist", p.VarPrefix(), varName)
 		}
 
 		if p.Vars.IsDefinedIn(varName, "") && !p.Vars.IsDefinedIn(varName, p.Vars.Environment) {
@@ -342,7 +342,7 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 
 			if len(otherEnvs) > 0 {
 				sort.Strings(otherEnvs)
-				return fmt.Errorf("cannot remove ${%s}\nValue is via default env and var is defined in envs: %s\nSet --all to delete from all environments", varName, strings.Join(otherEnvs, ", "))
+				return fmt.Errorf("cannot remove %s{%s}\nValue is via default env and var is defined in envs: %s\nSet --all to delete from all environments", p.VarPrefix(), varName, strings.Join(otherEnvs, ", "))
 			}
 
 			// default env deletion
@@ -364,7 +364,7 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 	if env.IsSpecified() {
 		fromMsg = fmt.Sprintf(" from %s", env)
 	}
-	io.PrintLoudf("Deleted ${%s}%s\n", varName, fromMsg)
+	io.PrintLoudf("Deleted %s{%s}%s\n", p.VarPrefix(), varName, fromMsg)
 	return nil
 }
 
@@ -413,7 +413,7 @@ func invokeVarList(io cmdio.IO, projFile string, env envSelection) error {
 			} else {
 				v = p.Vars.Get(name)
 			}
-			io.Printf("${%s} = %q\n", name, v)
+			io.Printf("%s{%s} = %q\n", p.VarPrefix(), name, v)
 		}
 	}
 

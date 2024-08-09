@@ -32,7 +32,7 @@ var sendCmd = &cobra.Command{
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
 
-		return invokeSend(io, args.projFile, args.req, args.oneTimeVars, args.skipVerify, args.outputCtrl)
+		return invokeSend(io, args.projFile, args.req, args.oneTimeVars, args.skipVerify, args.prefixOverride, args.outputCtrl)
 	},
 }
 
@@ -40,6 +40,7 @@ func init() {
 	sendCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	sendCmd.PersistentFlags().StringArrayVarP(&flags.Vars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Overrides any value currently in the store. The argument to this flag must be in `VAR=VALUE` format.")
 	sendCmd.PersistentFlags().BoolVarP(&flags.BInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
+	sendCmd.PersistentFlags().StringVarP(&flags.VarPrefix, "var-prefix", "p", "", "Temporarily override the prefix used to identify variables in the request template for the current request only. Only variables in the request template that start with `PREFIX` will be interpreted as variables.")
 
 	addRequestOutputFlags(sendCmd)
 
@@ -47,7 +48,7 @@ func init() {
 }
 
 // invokeRequest receives named vars and checked/defaulted requestOptions.
-func invokeSend(io cmdio.IO, projFile, reqName string, varOverrides map[string]string, skipVerify bool, oc morc.OutputControl) error {
+func invokeSend(io cmdio.IO, projFile, reqName string, varOverrides map[string]string, skipVerify bool, prefixOverride optionalC[string], oc morc.OutputControl) error {
 	// load the project file
 	p, err := readProject(projFile, true)
 	if err != nil {
@@ -64,16 +65,18 @@ func invokeSend(io cmdio.IO, projFile, reqName string, varOverrides map[string]s
 	}
 
 	oc.Writer = io.Out
-	_, err = sendTemplate(&p, tmpl, p.Vars.MergedSet(varOverrides), skipVerify, oc)
+
+	_, err = sendTemplate(&p, tmpl, p.Vars.MergedSet(varOverrides), skipVerify, prefixOverride.Or(p.VarPrefix()), oc)
 	return err
 }
 
 type sendArgs struct {
-	projFile    string
-	req         string
-	oneTimeVars map[string]string
-	outputCtrl  morc.OutputControl
-	skipVerify  bool
+	projFile       string
+	req            string
+	oneTimeVars    map[string]string
+	outputCtrl     morc.OutputControl
+	skipVerify     bool
+	prefixOverride optionalC[string]
 }
 
 func parseSendArgs(cmd *cobra.Command, posArgs []string, args *sendArgs) error {
@@ -111,12 +114,16 @@ func parseSendArgs(cmd *cobra.Command, posArgs []string, args *sendArgs) error {
 		args.skipVerify = true
 	}
 
+	if cmd.Flags().Lookup("var-prefix").Changed {
+		args.prefixOverride = optionalC[string]{v: flags.VarPrefix, set: true}
+	}
+
 	args.req = posArgs[0]
 
 	return nil
 }
 
-func sendTemplate(p *morc.Project, tmpl morc.RequestTemplate, vars map[string]string, skipVerify bool, oc morc.OutputControl) (morc.SendResult, error) {
+func sendTemplate(p *morc.Project, tmpl morc.RequestTemplate, vars map[string]string, skipVerify bool, varSymbol string, oc morc.OutputControl) (morc.SendResult, error) {
 	// TODO: flows will call this and persist on EVERY request which is probably not needed.
 
 	if tmpl.Method == "" {
@@ -126,8 +133,6 @@ func sendTemplate(p *morc.Project, tmpl morc.RequestTemplate, vars map[string]st
 	if tmpl.URL == "" {
 		return morc.SendResult{}, fmt.Errorf("request template %s has no URL set", tmpl.Name)
 	}
-
-	varSymbol := "$"
 
 	sendOpts := morc.SendOptions{
 		Vars:               vars,

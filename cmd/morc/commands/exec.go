@@ -29,7 +29,7 @@ var execCmd = &cobra.Command{
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
 
-		return invokeExec(io, args.projFile, args.flow, args.oneTimeVars, args.skipVerify, args.outputCtrl)
+		return invokeExec(io, args.projFile, args.flow, args.oneTimeVars, args.skipVerify, args.prefixOverride, args.outputCtrl)
 	},
 }
 
@@ -37,6 +37,7 @@ func init() {
 	execCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	execCmd.PersistentFlags().StringArrayVarP(&flags.Vars, "var", "V", []string{}, "Temporarily set a variable's value at the start of the flow. The argument to this flag must be in `VAR=VALUE` format.")
 	execCmd.PersistentFlags().BoolVarP(&flags.BInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
+	projCmd.PersistentFlags().StringVarP(&flags.VarPrefix, "var-prefix", "p", "", "Temporarily override the prefix used to identify variables in the request templates in the executed flow. Only variables in the request templates that start with `PREFIX` will be interpreted as variables.")
 
 	addRequestOutputFlags(execCmd)
 
@@ -44,7 +45,7 @@ func init() {
 }
 
 // invokeExec receives the name of the flow to execute and the options to use.
-func invokeExec(io cmdio.IO, projFile, flowName string, initialVarOverrides map[string]string, skipVerify bool, oc morc.OutputControl) error {
+func invokeExec(io cmdio.IO, projFile, flowName string, initialVarOverrides map[string]string, skipVerify bool, prefixOverride optionalC[string], oc morc.OutputControl) error {
 	// load the project file
 	p, err := readProject(projFile, true)
 	if err != nil {
@@ -80,10 +81,17 @@ func invokeExec(io cmdio.IO, projFile, flowName string, initialVarOverrides map[
 		varOverrides[strings.ToUpper(k)] = v
 	}
 
+	projVarPrefix := p.Config.VarPrefix
+	if projVarPrefix == "" {
+		projVarPrefix = "$"
+	}
+
+	varPrefix := prefixOverride.Or(projVarPrefix)
+
 	oc.Writer = io.Out
 	for i, tmpl := range templates {
 		// persistence should be covered in sendTemplate
-		result, err := sendTemplate(&p, tmpl, p.Vars.MergedSet(varOverrides), skipVerify, oc)
+		result, err := sendTemplate(&p, tmpl, p.Vars.MergedSet(varOverrides), skipVerify, varPrefix, oc)
 		if err != nil {
 			return fmt.Errorf("step #%d: %w", i, err)
 		}
@@ -101,10 +109,11 @@ func invokeExec(io cmdio.IO, projFile, flowName string, initialVarOverrides map[
 type execArgs struct {
 	projFile string
 
-	flow        string
-	oneTimeVars map[string]string
-	outputCtrl  morc.OutputControl
-	skipVerify  bool
+	flow           string
+	oneTimeVars    map[string]string
+	outputCtrl     morc.OutputControl
+	skipVerify     bool
+	prefixOverride optionalC[string]
 }
 
 func parseExecArgs(cmd *cobra.Command, posArgs []string, args *execArgs) error {
@@ -132,6 +141,10 @@ func parseExecArgs(cmd *cobra.Command, posArgs []string, args *execArgs) error {
 			oneTimeVars[parts[0]] = parts[1]
 		}
 		args.oneTimeVars = oneTimeVars
+	}
+
+	if cmd.Flags().Lookup("var-prefix").Changed {
+		args.prefixOverride = optionalC[string]{v: flags.VarPrefix, set: true}
 	}
 
 	args.flow = posArgs[0]

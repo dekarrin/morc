@@ -40,7 +40,7 @@ func init() {
 	sendCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	sendCmd.PersistentFlags().StringArrayVarP(&flags.Vars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Overrides any value currently in the store. The argument to this flag must be in `VAR=VALUE` format.")
 	sendCmd.PersistentFlags().BoolVarP(&flags.BInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
-	projCmd.PersistentFlags().StringVarP(&flags.VarPrefix, "var-prefix", "p", "", "Temporarily override the prefix used to identify variables in the request template for the current request only. Only variables in the request template that start with `PREFIX` will be interpreted as variables.")
+	sendCmd.PersistentFlags().StringVarP(&flags.VarPrefix, "var-prefix", "p", "", "Temporarily override the prefix used to identify variables in the request template for the current request only. Only variables in the request template that start with `PREFIX` will be interpreted as variables.")
 
 	addRequestOutputFlags(sendCmd)
 
@@ -66,12 +66,7 @@ func invokeSend(io cmdio.IO, projFile, reqName string, varOverrides map[string]s
 
 	oc.Writer = io.Out
 
-	projVarPrefix := p.Config.VarPrefix
-	if projVarPrefix == "" {
-		projVarPrefix = "$"
-	}
-
-	_, err = sendTemplate(&p, tmpl, p.Vars.MergedSet(varOverrides), skipVerify, prefixOverride.Or(projVarPrefix), oc)
+	_, err = sendTemplate(&p, tmpl, p.Vars.MergedSet(varOverrides), skipVerify, prefixOverride.Or(p.VarPrefix()), oc)
 	return err
 }
 

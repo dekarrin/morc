@@ -352,7 +352,7 @@ func invokeProjShow(io cmdio.IO, projFile string) error {
 	io.Printf("%s across %s\n", io.CountOf(proj.Vars.Count(), "variable"), io.CountOf(proj.Vars.EnvCount(), "environment"))
 	io.Printf("%s in active session\n", io.CountOf(proj.Session.TotalCookieSets(), "cookie"))
 	io.Println()
-	io.Printf("Variable prefix: %s\n", proj.Config.VarPrefix)
+	io.Printf("Variable prefix: %s\n", proj.VarPrefix())
 	io.Printf("Cookie record lifetime: %s\n", proj.Config.CookieLifetime)
 	io.Printf("Project file on record: %s\n", proj.Config.ProjFile)
 	io.Printf("Session file on record: %s\n", proj.Config.SeshFile)

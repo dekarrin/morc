@@ -37,7 +37,7 @@ func init() {
 	execCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	execCmd.PersistentFlags().StringArrayVarP(&flags.Vars, "var", "V", []string{}, "Temporarily set a variable's value at the start of the flow. The argument to this flag must be in `VAR=VALUE` format.")
 	execCmd.PersistentFlags().BoolVarP(&flags.BInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
-	projCmd.PersistentFlags().StringVarP(&flags.VarPrefix, "var-prefix", "p", "", "Temporarily override the prefix used to identify variables in the request templates in the executed flow. Only variables in the request templates that start with `PREFIX` will be interpreted as variables.")
+	execCmd.PersistentFlags().StringVarP(&flags.VarPrefix, "var-prefix", "p", "", "Temporarily override the prefix used to identify variables in the request templates in the executed flow. Only variables in the request templates that start with `PREFIX` will be interpreted as variables.")
 
 	addRequestOutputFlags(execCmd)
 
@@ -81,12 +81,7 @@ func invokeExec(io cmdio.IO, projFile, flowName string, initialVarOverrides map[
 		varOverrides[strings.ToUpper(k)] = v
 	}
 
-	projVarPrefix := p.Config.VarPrefix
-	if projVarPrefix == "" {
-		projVarPrefix = "$"
-	}
-
-	varPrefix := prefixOverride.Or(projVarPrefix)
+	varPrefix := prefixOverride.Or(p.VarPrefix())
 
 	oc.Writer = io.Out
 	for i, tmpl := range templates {

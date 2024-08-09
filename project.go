@@ -40,7 +40,10 @@ type Settings struct {
 	CookieLifetime time.Duration `json:"cookie_lifetime"`
 	RecordHistory  bool          `json:"record_history"`
 	RecordSession  bool          `json:"record_cookies"`
-	VarPrefix      string        `json:"var_prefix"`
+
+	// VarPrefix could be empty if not set. To get the default when not set,
+	// use Project.VarPrefix() instead.
+	VarPrefix string `json:"var_prefix"`
 }
 
 // HistoryFSPath returns the file-system compatible path to the history file. If
@@ -106,6 +109,13 @@ type Project struct {
 func (p Project) WithConfig(cfg Settings) Project {
 	p.Config = cfg
 	return p
+}
+
+func (p Project) VarPrefix() string {
+	if p.Config.VarPrefix != "" {
+		return p.Config.VarPrefix
+	}
+	return "$"
 }
 
 // Dump writes the contents of the project in "project-file" format to the given

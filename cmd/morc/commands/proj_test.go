@@ -28,6 +28,7 @@ func Test_Proj_Show(t *testing.T) {
 0 variables across 1 environment
 0 cookies in active session
 
+Variable prefix: $
 Cookie record lifetime: 0s`,
 		},
 	}

@@ -64,7 +64,9 @@ var rootCmd = &cobra.Command{
 		"in a default environment. Variables are used to fill request templates at send time; any variable in request " +
 		"headers, body, or URL in form '${VAR_NAME}' is replaced with the value of the variable called VAR_NAME. By " +
 		"default, this is attempted to be taken from the current variable store environment, but can be overriden " +
-		"temporarily with flags at sendtime." +
+		"temporarily with flags at sendtime. Additionally, the prefix '$' may itself be overriden by using the " +
+		"--var-prefix flag on commands which support it. This can be done at the project level to set the default prefix" +
+		"or on individual commands to override that default" +
 		"",
 	Version:       morc.Version,
 	SilenceErrors: true,

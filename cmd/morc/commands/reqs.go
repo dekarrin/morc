@@ -365,11 +365,6 @@ func invokeReqsShow(io cmdio.IO, projFile, reqName string) error {
 		return err
 	}
 
-	varPrefix := p.Config.VarPrefix
-	if varPrefix == "" {
-		varPrefix = "$"
-	}
-
 	// case doesn't matter for request template names
 	reqLower := strings.ToLower(reqName)
 	req, ok := p.Templates[reqLower]
@@ -429,7 +424,7 @@ func invokeReqsShow(io cmdio.IO, projFile, reqName string) error {
 
 		for _, capName := range sortedNames {
 			cap := req.Captures[capName]
-			io.Printf("%s%s\n", varPrefix, cap.String())
+			io.Printf("%s%s\n", p.VarPrefix(), cap.String())
 		}
 	} else {
 		io.Printf("VAR CAPTURES: (none)\n")
@@ -490,11 +485,6 @@ func invokeReqsGet(io cmdio.IO, projFile, reqName string, item reqKey) error {
 	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
-	}
-
-	varPrefix := p.Config.VarPrefix
-	if varPrefix == "" {
-		varPrefix = "$"
 	}
 
 	// case doesn't matter for request template names
@@ -563,7 +553,7 @@ func invokeReqsGet(io cmdio.IO, projFile, reqName string, item reqKey) error {
 
 			for _, capName := range sortedNames {
 				cap := req.Captures[capName]
-				io.Printf("%s%s\n", varPrefix, cap.String())
+				io.Printf("%s%s\n", p.VarPrefix(), cap.String())
 			}
 		}
 	default:

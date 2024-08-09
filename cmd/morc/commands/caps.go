@@ -129,11 +129,6 @@ func invokeCapsEdit(io cmdio.IO, projFile, reqName, varName string, attrs capAtt
 		return err
 	}
 
-	varPrefix := p.Config.VarPrefix
-	if varPrefix == "" {
-		varPrefix = "$"
-	}
-
 	// case doesn't matter for request template names
 	reqName = strings.ToLower(reqName)
 	req, ok := p.Templates[reqName]
@@ -144,11 +139,11 @@ func invokeCapsEdit(io cmdio.IO, projFile, reqName, varName string, attrs capAtt
 	// case doesn't matter for var names
 	varUpper := strings.ToUpper(varName)
 	if len(req.Captures) == 0 {
-		return fmt.Errorf("no capture to variable %s%s exists in request %s", varPrefix, varUpper, reqName)
+		return fmt.Errorf("no capture to variable %s%s exists in request %s", p.VarPrefix(), varUpper, reqName)
 	}
 	cap, ok := req.Captures[varUpper]
 	if !ok {
-		return fmt.Errorf("no capture to variable %s%s exists in request %s", varPrefix, varUpper, reqName)
+		return fmt.Errorf("no capture to variable %s%s exists in request %s", p.VarPrefix(), varUpper, reqName)
 	}
 
 	// okay did the user actually ask to change somefin
@@ -167,7 +162,7 @@ func invokeCapsEdit(io cmdio.IO, projFile, reqName, varName string, attrs capAtt
 		if newNameUpper != varUpper {
 			// check if the new name is already in use
 			if _, ok := req.Captures[newNameUpper]; ok {
-				return fmt.Errorf("capture to variable %s%s already exists in request %s", varPrefix, attrs.capVar.v, reqName)
+				return fmt.Errorf("capture to variable %s%s already exists in request %s", p.VarPrefix(), attrs.capVar.v, reqName)
 			}
 
 			// remove the old name
@@ -254,11 +249,6 @@ func invokeCapsNew(io cmdio.IO, projFile, reqName, varName string, attrs capAttr
 		return err
 	}
 
-	varPrefix := p.Config.VarPrefix
-	if varPrefix == "" {
-		varPrefix = "$"
-	}
-
 	// case doesn't matter for request template names
 	reqName = strings.ToLower(reqName)
 	req, ok := p.Templates[reqName]
@@ -270,7 +260,7 @@ func invokeCapsNew(io cmdio.IO, projFile, reqName, varName string, attrs capAttr
 	varUpper := strings.ToUpper(varName)
 	if len(req.Captures) > 0 {
 		if _, ok := req.Captures[varUpper]; ok {
-			return fmt.Errorf("variable %s%s already has a capture", varPrefix, varUpper)
+			return fmt.Errorf("variable %s%s already has a capture", p.VarPrefix(), varUpper)
 		}
 	}
 
@@ -335,11 +325,6 @@ func invokeCapsShow(io cmdio.IO, projFile, reqName, capName string) error {
 		return err
 	}
 
-	varPrefix := p.Config.VarPrefix
-	if varPrefix == "" {
-		varPrefix = "$"
-	}
-
 	// case doesn't matter for request template names
 	reqName = strings.ToLower(reqName)
 	req, ok := p.Templates[reqName]
@@ -353,7 +338,7 @@ func invokeCapsShow(io cmdio.IO, projFile, reqName, capName string) error {
 		return fmt.Errorf("no capture to %s exists on request template %s", capName, reqName)
 	}
 
-	fmt.Printf("%s%s\n", varPrefix, cap.String())
+	fmt.Printf("%s%s\n", p.VarPrefix(), cap.String())
 
 	io.PrintLoudln(cap)
 	return nil

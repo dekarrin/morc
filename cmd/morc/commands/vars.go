@@ -16,10 +16,10 @@ var varsCmd = &cobra.Command{
 	Use: "vars [VAR [VALUE]]",
 	Annotations: map[string]string{
 		annotationKeyHelpUsages: "" +
-			"vars [-env ENV | --current | --default]\n" +
-			"vars --delete VAR [-env ENV | --current | --default | --all]\n" +
-			"vars VAR [-env ENV | --current | --default | --all]\n" +
-			"vars VAR VALUE [-env ENV | --current | --default | --all]",
+			"vars [--env ENV | --current | --default]\n" +
+			"vars --delete VAR [--env ENV | --current | --default | --all]\n" +
+			"vars VAR [--env ENV | --current | --default | --all]\n" +
+			"vars VAR VALUE [--env ENV | --current | --default | --all]",
 	},
 	GroupID: "project",
 	Short:   "Show or manipulate request variables",
@@ -68,7 +68,7 @@ var varsCmd = &cobra.Command{
 }
 
 func init() {
-	varsCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath)
+	varsCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath)
 	varsCmd.PersistentFlags().StringVarP(&flags.Delete, "delete", "D", "", "Delete the variable `VAR`")
 	varsCmd.PersistentFlags().StringVarP(&flags.Env, "env", "e", "", "Apply to environment `ENV` instead of the current one. Use --default instead to specify the default environment.")
 	varsCmd.PersistentFlags().BoolVarP(&flags.BDefault, "default", "", false, "Apply to the default environment.")

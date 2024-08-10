@@ -39,6 +39,7 @@ var envCmd = &cobra.Command{
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
+		io.Quiet = flags.BQuiet
 
 		switch args.action {
 		case envActionList:
@@ -61,6 +62,7 @@ func init() {
 	envCmd.PersistentFlags().BoolVarP(&flags.BDeleteAll, "delete-all", "", false, "Delete all environments and variables")
 	envCmd.PersistentFlags().BoolVarP(&flags.BAll, "all", "a", false, "List all environments instead of only the current one")
 	envCmd.PersistentFlags().BoolVarP(&flags.BDefault, "default", "", false, "Change to the default environment")
+	envCmd.PersistentFlags().BoolVarP(&flags.BQuiet, "quiet", "q", false, "Suppress all unnecessary output.")
 
 	// mark the delete and default flags as mutually exclusive
 	envCmd.MarkFlagsMutuallyExclusive("all", "default", "delete", "delete-all")

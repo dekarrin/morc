@@ -49,6 +49,7 @@ var flowsCmd = &cobra.Command{
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
+		io.Quiet = flags.BQuiet
 
 		switch args.action {
 		case flowsActionList:
@@ -80,6 +81,7 @@ func init() {
 	flowsCmd.PersistentFlags().StringArrayVarP(&flags.StepMoves, "move", "m", nil, "Move the step at index FROM to index TO. Argument must be a string in form `FROM:[TO]`. Can be given multiple times; if so, will be applied in order given after all replacements, removals, and adds are applied. If TO is not given, the step is moved to the end of the flow.")
 	flowsCmd.PersistentFlags().StringArrayVarP(&flags.StepReplaces, "update", "u", nil, "Update the template called in step IDX to REQ. Argument must be a string in form `IDX:REQ`. Can be given multiple times; if so, will be applied in order given before any other step modifications.")
 	flowsCmd.PersistentFlags().StringVarP(&flags.Name, "name", "n", "", "Change the name of the flow to `NAME`.")
+	flowsCmd.PersistentFlags().BoolVarP(&flags.BQuiet, "quiet", "q", false, "Suppress all unnecessary output.")
 
 	flowsCmd.MarkFlagsMutuallyExclusive("delete", "new", "get", "remove")
 	flowsCmd.MarkFlagsMutuallyExclusive("delete", "new", "get", "add")
@@ -374,7 +376,7 @@ func invokeFlowsShow(io cmdio.IO, projFile, flowName string) error {
 	}
 
 	if len(flow.Steps) == 0 {
-		io.Println("(no steps in flow)")
+		io.PrintLoudln("(no steps in flow)")
 	}
 
 	for i, step := range flow.Steps {
@@ -409,7 +411,7 @@ func invokeFlowsList(io cmdio.IO, projFile string) error {
 	}
 
 	if len(p.Flows) == 0 {
-		io.Println("(none)")
+		io.PrintLoudln("(none)")
 	} else {
 		// alphabetize the flows
 		var sortedNames []string

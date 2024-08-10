@@ -52,6 +52,16 @@ func Test_Flows_Delete(t *testing.T) {
 			},
 			expectStdoutOutput: "Deleted flow test\n",
 		},
+		{
+			name: "normal delete, quiet mode",
+			args: []string{"flows", "-D", "test", "-q"},
+			p:    testProject_singleFlowWithNSteps(3),
+			expectP: morc.Project{
+				Flows:     map[string]morc.Flow{},
+				Templates: testRequestsN(3),
+			},
+			expectStdoutOutput: "",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -180,6 +190,13 @@ func Test_Flows_Edit(t *testing.T) {
 			expectP:            testProject_singleFlowWithNSteps(3),
 			expectStderrOutput: "No change to step[2]; already set to index 2\n",
 		},
+		{
+			name:               "no-op move, quiet mode",
+			args:               []string{"flows", "test", "-m", "2:", "-q"},
+			p:                  testProject_singleFlowWithNSteps(3),
+			expectP:            testProject_singleFlowWithNSteps(3),
+			expectStderrOutput: "",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -245,6 +262,12 @@ func Test_Flows_Get(t *testing.T) {
 		{
 			name:               "get name",
 			args:               []string{"flows", "test", "-G", "NAME"},
+			p:                  testProject_singleFlowWithNSteps(2),
+			expectStdoutOutput: testFlowName + "\n",
+		},
+		{
+			name:               "get name, quiet mode still prints",
+			args:               []string{"flows", "test", "-G", "NAME", "-q"},
 			p:                  testProject_singleFlowWithNSteps(2),
 			expectStdoutOutput: testFlowName + "\n",
 		},
@@ -320,6 +343,13 @@ func Test_Flows_New(t *testing.T) {
 			expectStdoutOutput: "Created new flow test with 3 steps\n",
 		},
 		{
+			name:               "3 requests, quiet mode",
+			args:               []string{"flows", "req1", "req2", "req3", "--new", "test", "-q"},
+			p:                  testProject_nRequests(3),
+			expectP:            testProject_singleFlowWithNSteps(3),
+			expectStdoutOutput: "",
+		},
+		{
 			name:      "need more than 1 request",
 			args:      []string{"flows", "--new", "test", "req1"},
 			p:         testProject_nRequests(2),
@@ -387,6 +417,12 @@ func Test_Flows_Show(t *testing.T) {
 			expectStdoutOutput: "(no steps in flow)\n",
 		},
 		{
+			name:               "flow is present - no steps, quiet mode",
+			args:               []string{"flows", "test", "-q"},
+			p:                  testProject_singleFlowWithNSteps(0),
+			expectStdoutOutput: "",
+		},
+		{
 			name: "flow is present - one step is missing",
 			args: []string{"flows", "test"},
 			p: morc.Project{
@@ -418,6 +454,12 @@ func Test_Flows_Show(t *testing.T) {
 		{
 			name:               "flow is present - all steps are valid",
 			args:               []string{"flows", "test"},
+			p:                  testProject_singleFlowWithNSteps(2),
+			expectStdoutOutput: "0: req1 (GET https://example.com)\n1: req2 (POST https://example.com)\n",
+		},
+		{
+			name:               "flow is present - all steps are valid, quiet mode still prints",
+			args:               []string{"flows", "test", "-q"},
 			p:                  testProject_singleFlowWithNSteps(2),
 			expectStdoutOutput: "0: req1 (GET https://example.com)\n1: req2 (POST https://example.com)\n",
 		},
@@ -477,6 +519,12 @@ func Test_Flows_List(t *testing.T) {
 			expectStdoutOutput: "(none)\n",
 		},
 		{
+			name:               "no flows present - empty Flows, quiet mode",
+			args:               []string{"flows", "-q"},
+			p:                  morc.Project{Flows: map[string]morc.Flow{}},
+			expectStdoutOutput: "",
+		},
+		{
 			name:               "one flow present - no steps",
 			args:               []string{"flows"},
 			p:                  testProject_singleFlowWithNSteps(0),
@@ -485,6 +533,12 @@ func Test_Flows_List(t *testing.T) {
 		{
 			name:               "one flow present - 1 step, valid",
 			args:               []string{"flows"},
+			p:                  testProject_singleFlowWithNSteps(1),
+			expectStdoutOutput: "test: 1 request\n",
+		},
+		{
+			name:               "one flow present - 1 step, valid, quiet mode still prints",
+			args:               []string{"flows", "-q"},
 			p:                  testProject_singleFlowWithNSteps(1),
 			expectStdoutOutput: "test: 1 request\n",
 		},
@@ -551,6 +605,7 @@ func resetFlowsFlags() {
 	flags.StepAdds = nil
 	flags.StepMoves = nil
 	flags.StepReplaces = nil
+	flags.BQuiet = false
 
 	flowsCmd.Flags().VisitAll(func(fl *pflag.Flag) {
 		fl.Changed = false

@@ -28,6 +28,7 @@ var execCmd = &cobra.Command{
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
+		io.Quiet = flags.BQuiet
 
 		return invokeExec(io, args.projFile, args.flow, args.oneTimeVars, args.skipVerify, args.prefixOverride, args.outputCtrl)
 	},
@@ -38,6 +39,7 @@ func init() {
 	execCmd.PersistentFlags().StringArrayVarP(&flags.Vars, "var", "V", []string{}, "Temporarily set a variable's value at the start of the flow. The argument to this flag must be in `VAR=VALUE` format.")
 	execCmd.PersistentFlags().BoolVarP(&flags.BInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
 	execCmd.PersistentFlags().StringVarP(&flags.VarPrefix, "var-prefix", "p", "", "Temporarily override the prefix used to identify variables in the request templates in the executed flow. Only variables in the request templates that start with `PREFIX` will be interpreted as variables.")
+	execCmd.PersistentFlags().BoolVarP(&flags.BQuiet, "quiet", "q", false, "Suppress all unnecessary output.")
 
 	addRequestOutputFlags(execCmd)
 

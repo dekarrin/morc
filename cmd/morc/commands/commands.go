@@ -554,4 +554,8 @@ type cliFlags struct {
 	// verification, allowing requests to go through even if the server's
 	// certificate is invalid.
 	BInsecure bool
+
+	// BQuiet is a switch flag that, when set, suppresses all output except for
+	// output that was specifically requested.
+	BQuiet bool
 }

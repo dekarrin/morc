@@ -238,26 +238,13 @@ func invokeVarGet(io cmdio.IO, projFile string, env envSelection, varName string
 }
 
 // TODO: standardize env vs environment in output.
-// TODO: once unit tests are in place, refactor this whole damn func, glub. it's
-// incredibly difficult to follow. Change to use an if-case for each of the env
-// selection possibilities and key off of that.
 func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName string) error {
 	p, err := readProject(projFile, true)
 	if err != nil {
 		return err
 	}
 
-	// are we looking to delete from a specific environment?
-
-	// is the 'no default in --env' rule being bypassed by doing --current? reject if var is present in any other env
-	if env.useCurrent && p.Vars.Environment == "" {
-		otherEnvs := p.Vars.NonDefaultEnvsWith(varName)
-		if len(otherEnvs) > 0 {
-			sort.Strings(otherEnvs)
-			return fmt.Errorf("cannot remove %s{%s} from current env (default env)\nValue is also defined in envs: %s\nSet --all to delete from all environments", p.VarPrefix(), varName, strings.Join(otherEnvs, ", "))
-		}
-	}
-
+	// where are we deleting from?
 	if env.useAll {
 		// easy, just delete from all environments
 		if !p.Vars.IsDefined(varName) {
@@ -271,22 +258,7 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 
 		io.PrintLoudf("Deleted %s{%s} from all environments\n", p.VarPrefix(), varName)
 		return nil
-	}
-
-	// is the user currently in the default environment AND not specifying an
-	// env AND at least one other
-	// env with the to-be-deleted var is defined? if so, opts.envAll is required
-	// and they should have provided that if this is what they really want
-	if !env.IsSpecified() && p.Vars.Environment == "" {
-		otherEnvs := p.Vars.NonDefaultEnvsWith(varName)
-
-		if len(otherEnvs) > 0 {
-			sort.Strings(otherEnvs)
-			return fmt.Errorf("%s{%s} is also defined in non-default envs: %s\nSet --all to delete from all environments", p.VarPrefix(), varName, strings.Join(otherEnvs, ", "))
-		}
-	}
-
-	if env.useDefault {
+	} else if env.useDefault {
 		if !p.Vars.IsDefinedIn(varName, "") {
 			return fmt.Errorf("%s{%s} does not exist in default env", p.VarPrefix(), varName)
 		}
@@ -315,6 +287,15 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 
 		p.Vars.UnsetIn(varName, env.useName)
 	} else if env.useCurrent {
+		// is the 'no default in --env' rule being bypassed by doing --current? reject if var is present in any other env
+		if p.Vars.Environment == "" {
+			otherEnvs := p.Vars.NonDefaultEnvsWith(varName)
+			if len(otherEnvs) > 0 {
+				sort.Strings(otherEnvs)
+				return fmt.Errorf("cannot remove %s{%s} from current env (default env)\nValue is also defined in envs: %s\nSet --all to delete from all environments", p.VarPrefix(), varName, strings.Join(otherEnvs, ", "))
+			}
+		}
+
 		if !p.Vars.IsDefinedIn(varName, p.Vars.Environment) {
 
 			// if it exists in default only and not in current, we will not delete
@@ -328,6 +309,19 @@ func invokeVarDelete(io cmdio.IO, projFile string, env envSelection, varName str
 
 		p.Vars.UnsetIn(varName, p.Vars.Environment)
 	} else {
+		// is the user currently in the default environment AND not specifying
+		// an env AND at least one other env with the to-be-deleted var is
+		// defined? if so, opts.envAll is required and they should have provided
+		// that if this is what they really want
+		if p.Vars.Environment == "" {
+			otherEnvs := p.Vars.NonDefaultEnvsWith(varName)
+
+			if len(otherEnvs) > 0 {
+				sort.Strings(otherEnvs)
+				return fmt.Errorf("%s{%s} is also defined in non-default envs: %s\nSet --all to delete from all environments", p.VarPrefix(), varName, strings.Join(otherEnvs, ", "))
+			}
+		}
+
 		if !p.Vars.IsDefined(varName) {
 			return fmt.Errorf("%s{%s} does not exist", p.VarPrefix(), varName)
 		}

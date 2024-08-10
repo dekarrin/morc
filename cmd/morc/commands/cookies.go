@@ -40,6 +40,7 @@ var cookiesCmd = &cobra.Command{
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
+		io.Quiet = flags.BQuiet
 
 		switch args.action {
 		case cookiesActionList:
@@ -65,6 +66,7 @@ func init() {
 	cookiesCmd.PersistentFlags().BoolVarP(&flags.BEnable, "on", "", false, "Enable cookie recording for future requests")
 	cookiesCmd.PersistentFlags().BoolVarP(&flags.BDisable, "off", "", false, "Disable cookie recording for future requests")
 	cookiesCmd.PersistentFlags().StringVarP(&flags.URL, "url", "u", "", "Get cookies that would only be set on the given URL")
+	cookiesCmd.PersistentFlags().BoolVarP(&flags.BQuiet, "quiet", "q", false, "Suppress all unnecessary output.")
 
 	// mark the delete and default flags as mutually exclusive
 	cookiesCmd.MarkFlagsMutuallyExclusive("on", "off", "clear", "info", "url")
@@ -181,7 +183,7 @@ func invokeCookiesList(io cmdio.IO, projFile string, url *url.URL) error {
 	}
 
 	if len(p.Session.Cookies) == 0 {
-		io.Println("(no cookies)")
+		io.PrintLoudln("(no cookies)")
 		return nil
 	}
 
@@ -191,7 +193,7 @@ func invokeCookiesList(io cmdio.IO, projFile string, url *url.URL) error {
 		cookies := p.CookiesForURL(url)
 
 		if len(cookies) == 0 {
-			io.Println("(no cookies)")
+			io.PrintLoudln("(no cookies)")
 			return nil
 		}
 

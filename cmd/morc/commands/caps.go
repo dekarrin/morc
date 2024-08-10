@@ -45,6 +45,7 @@ var capsCmd = &cobra.Command{
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
+		io.Quiet = flags.BQuiet
 
 		switch args.action {
 		case capsActionList:
@@ -72,6 +73,7 @@ func init() {
 	capsCmd.PersistentFlags().StringVarP(&flags.Get, "get", "G", "", "Get the value of a specific attribute `ATTR` of the capture. Can only be used if giving REQ and CAP and no other arguments.")
 	capsCmd.PersistentFlags().StringVarP(&flags.Spec, "spec", "s", "", "Specify where in responses that data should be captured from. `SPEC` is a specially-formatted string of form :FROM,TO to specify a byte-offset or a jq-ish syntax string to specify a path to a value within a JSON response body.")
 	capsCmd.PersistentFlags().StringVarP(&flags.VarName, "var", "V", "", "Set the variable that the capture saves to to `VAR`.")
+	capsCmd.PersistentFlags().BoolVarP(&flags.BQuiet, "quiet", "q", false, "Suppress all unnecessary output.")
 
 	// cannot delete while doing new
 	capsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get")

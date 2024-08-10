@@ -31,6 +31,7 @@ var sendCmd = &cobra.Command{
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
+		io.Quiet = flags.BQuiet
 
 		return invokeSend(io, args.projFile, args.req, args.oneTimeVars, args.skipVerify, args.prefixOverride, args.outputCtrl)
 	},
@@ -41,6 +42,7 @@ func init() {
 	sendCmd.PersistentFlags().StringArrayVarP(&flags.Vars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Overrides any value currently in the store. The argument to this flag must be in `VAR=VALUE` format.")
 	sendCmd.PersistentFlags().BoolVarP(&flags.BInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
 	sendCmd.PersistentFlags().StringVarP(&flags.VarPrefix, "var-prefix", "p", "", "Temporarily override the prefix used to identify variables in the request template for the current request only. Only variables in the request template that start with `PREFIX` will be interpreted as variables.")
+	sendCmd.PersistentFlags().BoolVarP(&flags.BQuiet, "quiet", "q", false, "Suppress all unnecessary output.")
 
 	addRequestOutputFlags(sendCmd)
 

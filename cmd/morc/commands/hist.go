@@ -38,6 +38,7 @@ var histCmd = &cobra.Command{
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
+		io.Quiet = flags.BQuiet
 
 		switch args.action {
 		case histActionList:
@@ -65,6 +66,7 @@ func init() {
 	histCmd.PersistentFlags().BoolVarP(&flags.BEnable, "on", "", false, "Enable history for future requests")
 	histCmd.PersistentFlags().BoolVarP(&flags.BDisable, "off", "", false, "Disable history for future requests")
 	histCmd.PersistentFlags().BoolVarP(&flags.BNoDates, "no-dates", "", false, "(Output flag) Do not prefix the request with the date of request and response with date of response. Only used with 'hist ENTRY'")
+	histCmd.PersistentFlags().BoolVarP(&flags.BQuiet, "quiet", "q", false, "Suppress all unnecessary output.")
 
 	// mark the delete and default flags as mutually exclusive
 	histCmd.MarkFlagsMutuallyExclusive("on", "off", "clear", "info")
@@ -199,7 +201,7 @@ func invokeHistList(io cmdio.IO, projFile string) error {
 	}
 
 	if len(p.History) == 0 {
-		io.Println("(no history)")
+		io.PrintLoudln("(no history)")
 		return nil
 	}
 

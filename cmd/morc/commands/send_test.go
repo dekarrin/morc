@@ -793,6 +793,7 @@ func resetSendFlags() {
 	flags.BRequest = false
 	flags.Format = "pretty" // TODO: make this default not be magic but rather have the cmd flag init and the reset use it
 	flags.VarPrefix = "$"
+	flags.BQuiet = false
 
 	sendCmd.Flags().VisitAll(func(fl *pflag.Flag) {
 		fl.Changed = false

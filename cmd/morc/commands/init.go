@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/spf13/cobra"
 )
 
@@ -33,16 +34,20 @@ var initCmd = &cobra.Command{
 
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
+		io := cmdio.From(cmd)
+		io.Quiet = flags.BQuiet
 
-		return invokeInit(projName)
+		return invokeInit(io, projName)
 	},
 }
 
 func init() {
+	initCmd.PersistentFlags().BoolVarP(&flags.BQuiet, "quiet", "q", false, "Suppress all unnecessary output.")
+
 	rootCmd.AddCommand(initCmd)
 }
 
-func invokeInit(projName string) error {
+func invokeInit(io cmdio.IO, projName string) error {
 	p := morc.Project{
 		Name:      projName,
 		Templates: map[string]morc.RequestTemplate{},
@@ -73,6 +78,8 @@ func invokeInit(projName string) error {
 	if _, err := os.Lstat(p.Config.HistoryFSPath()); err == nil || !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("init would overwrite an existing history file; remove it first")
 	}
+
+	io.PrintLoudf("Project created successfully in %s\n", p.Config.ProjFile)
 
 	return writeProject(p, true)
 }

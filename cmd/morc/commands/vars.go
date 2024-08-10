@@ -16,10 +16,10 @@ var varsCmd = &cobra.Command{
 	Use: "vars [VAR [VALUE]]",
 	Annotations: map[string]string{
 		annotationKeyHelpUsages: "" +
-			"vars [-env ENV | --current | --default]\n" +
-			"vars --delete VAR [-env ENV | --current | --default | --all]\n" +
-			"vars VAR [-env ENV | --current | --default | --all]\n" +
-			"vars VAR VALUE [-env ENV | --current | --default | --all]",
+			"vars [--env ENV | --current | --default]\n" +
+			"vars --delete VAR [--env ENV | --current | --default | --all]\n" +
+			"vars VAR [--env ENV | --current | --default | --all]\n" +
+			"vars VAR VALUE [--env ENV | --current | --default | --all]",
 	},
 	GroupID: "project",
 	Short:   "Show or manipulate request variables",

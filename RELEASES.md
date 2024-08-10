@@ -1,4 +1,23 @@
 v0.4.0 - August 10, 2024
+------------------------
+* The prefix used by variables is now an updatable project config setting.
+* Added new flag `--var-prefix`/`-p` to allow overriding the
+variable prefix to commands `morc send`, `morc exec`, and `morc oneoff`.
+* Added alternative way of specifying project location using a file called
+`.MORC_PROJECT` in the working directory of the command.
+* All commands now give some kind of output.
+* Added new `--quiet`/`-q` flag to all commands to suppress unnecessary output.
+* Fixed `--project-file` in `morc vars` and docs being incorrectly set to
+`--project_file`.
+* Updated error reporting in `morc vars` to clearly note why an operation
+failed and what flags could be used to perform the operation if desired.
+* `morc vars` now supports `--default` during deletion.
+* `morc vars` now supports `--all` during value retrieval.
+* Added automated functional tests to cover additional functions:
+  * `morc vars` is now covered.
+  * `morc send` is now covered.
+* Functional tests will now read and write the project files to memory buffers
+rather than to a file unless explicitly testing file writing.
 * Refactored all arg-parsing code to use a common pattern to aid in debugging.
 
 

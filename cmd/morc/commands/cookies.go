@@ -183,7 +183,7 @@ func invokeCookiesList(io cmdio.IO, projFile string, url *url.URL) error {
 	}
 
 	if len(p.Session.Cookies) == 0 {
-		io.Println("(no cookies)")
+		io.PrintLoudln("(no cookies)")
 		return nil
 	}
 
@@ -193,7 +193,7 @@ func invokeCookiesList(io cmdio.IO, projFile string, url *url.URL) error {
 		cookies := p.CookiesForURL(url)
 
 		if len(cookies) == 0 {
-			io.Println("(no cookies)")
+			io.PrintLoudln("(no cookies)")
 			return nil
 		}
 

@@ -32,6 +32,7 @@ var oneoffCmd = &cobra.Command{
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
+		io.Quiet = flags.BQuiet
 
 		return makeOneoffRequest(io, args)
 	},
@@ -56,6 +57,7 @@ func addOneoffRequestFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringArrayVarP(&flags.CaptureVars, "capture-var", "C", []string{}, "Get a variable's value from the response. Argument is in format `VAR:SPEC`. The SPEC part has format ':START,END' for byte offset (note the leading colon, resulting in 'VAR::START,END'), or 'path[0].to.value' (jq-ish syntax) for JSON body data.")
 	cmd.PersistentFlags().StringArrayVarP(&flags.Vars, "var", "V", []string{}, "Temporarily set a variable's value for the current request only. Format is `VAR=VALUE`.")
 	cmd.PersistentFlags().BoolVarP(&flags.BInsecure, "insecure", "k", false, "Disable all verification of server certificates when sending requests over TLS (HTTPS)")
+	cmd.PersistentFlags().BoolVarP(&flags.BQuiet, "quiet", "q", false, "Suppress all unnecessary output.")
 
 	addRequestOutputFlags(cmd)
 }
@@ -84,6 +86,7 @@ func addQuickMethodCommand(method string) {
 			// done checking args, don't show usage on error
 			cmd.SilenceUsage = true
 			io := cmdio.From(cmd)
+			io.Quiet = flags.BQuiet
 
 			return makeOneoffRequest(io, args)
 		},

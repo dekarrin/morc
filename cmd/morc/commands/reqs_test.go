@@ -50,6 +50,15 @@ func Test_Reqs_Delete(t *testing.T) {
 			expectStdoutOutput: "Deleted request req1\n",
 		},
 		{
+			name: "normal delete, quiet mode",
+			args: []string{"reqs", "-D", "req1", "-q"},
+			p:    testProject_singleReqWillAllPropertiesSet(),
+			expectP: morc.Project{
+				Templates: map[string]morc.RequestTemplate{},
+			},
+			expectStdoutOutput: "",
+		},
+		{
 			name: "in a flow - can't delete",
 			args: []string{"reqs", "-D", "req1"},
 			p: morc.Project{
@@ -170,6 +179,13 @@ func Test_Reqs_Edit(t *testing.T) {
 			p:                  testProject_withRequests(morc.RequestTemplate{Name: "req1", Body: []byte(`{"name":"JACK NOIR"}`)}),
 			expectP:            testProject_withRequests(morc.RequestTemplate{Name: "req1"}),
 			expectStdoutOutput: "Set request body to (none)\n",
+		},
+		{
+			name:               "remove body, quiet mode",
+			args:               []string{"reqs", "req1", "--remove-body", "-q"},
+			p:                  testProject_withRequests(morc.RequestTemplate{Name: "req1", Body: []byte(`{"name":"JACK NOIR"}`)}),
+			expectP:            testProject_withRequests(morc.RequestTemplate{Name: "req1"}),
+			expectStdoutOutput: "",
 		},
 		{
 			name: "add header (none present)",
@@ -344,6 +360,13 @@ func Test_Reqs_New(t *testing.T) {
 			expectStdoutOutput: "Created new request req1\n",
 		},
 		{
+			name:               "method and url defaulted, quiet mode",
+			args:               []string{"reqs", "--new", "req1", "-q"},
+			p:                  morc.Project{},
+			expectP:            testProject_withRequests(morc.RequestTemplate{Name: "req1", Method: "GET", URL: "http://example.com"}),
+			expectStdoutOutput: "",
+		},
+		{
 			name:               "method and url explicitly blank",
 			args:               []string{"reqs", "--new", "req1", "-X", "", "-u", ""},
 			p:                  morc.Project{},
@@ -468,6 +491,12 @@ func Test_Reqs_Get(t *testing.T) {
 			expectStdoutOutput: "GET\n",
 		},
 		{
+			name:               "get method, quiet mode still prints",
+			args:               []string{"reqs", "req1", "--get", "METHOD", "-q"},
+			p:                  testProject_singleReqWillAllPropertiesSet(),
+			expectStdoutOutput: "GET\n",
+		},
+		{
 			name:               "get URL",
 			args:               []string{"reqs", "req1", "--get", "UrL"},
 			p:                  testProject_singleReqWillAllPropertiesSet(),
@@ -579,6 +608,21 @@ func Test_Reqs_Show(t *testing.T) {
 				"VAR CAPTURES: (none)\n" +
 				"\n" +
 				"AUTH FLOW: (none)\n",
+		},
+		{
+			name: "req is present, quiet mode",
+			args: []string{"reqs", "req1", "-q"},
+			p:    testProject_nRequests(1),
+			expectStdoutOutput: "" +
+				"GET https://example.com\n" +
+				"\n" +
+				"HEADERS:\n" +
+				"\n" +
+				"BODY:\n" +
+				"\n" +
+				"VAR CAPTURES:\n" +
+				"\n" +
+				"AUTH FLOW:\n",
 		},
 		{
 			name: "req is present, has only name set",
@@ -711,6 +755,12 @@ func Test_Reqs_List(t *testing.T) {
 			expectStdoutOutput: "(none)\n",
 		},
 		{
+			name:               "no reqs present - empty project, quiet mode",
+			args:               []string{"reqs", "-q"},
+			p:                  morc.Project{},
+			expectStdoutOutput: "",
+		},
+		{
 			name:               "no reqs present - empty RequsetTemplates",
 			args:               []string{"reqs"},
 			p:                  morc.Project{Templates: map[string]morc.RequestTemplate{}},
@@ -791,6 +841,7 @@ func resetReqsFlags() {
 	flags.URL = ""
 	flags.Name = ""
 	flags.BForce = false
+	flags.BQuiet = false
 
 	reqsCmd.Flags().VisitAll(func(fl *pflag.Flag) {
 		fl.Changed = false

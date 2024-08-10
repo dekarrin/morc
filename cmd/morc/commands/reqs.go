@@ -60,6 +60,7 @@ var reqsCmd = &cobra.Command{
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
+		io.Quiet = flags.BQuiet
 
 		switch args.action {
 		case reqsActionList:
@@ -94,6 +95,7 @@ func init() {
 	reqsCmd.PersistentFlags().StringVarP(&flags.URL, "url", "u", "http://example.com", "Specify the `URL` for the request.")
 	reqsCmd.PersistentFlags().BoolVarP(&flags.BRemoveBody, "remove-body", "R", false, "Delete all existing body data from the request")
 	reqsCmd.PersistentFlags().BoolVarP(&flags.BForce, "force", "f", false, "Force deletion of the request template even if it is used in flows. Only valid with --delete/-D.")
+	reqsCmd.PersistentFlags().BoolVarP(&flags.BQuiet, "quiet", "q", false, "Suppress all unnecessary output.")
 
 	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "get-header", "name")
 	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "get-header", "remove-header")
@@ -400,7 +402,9 @@ func invokeReqsShow(io cmdio.IO, projFile, reqName string) error {
 			}
 		}
 	} else {
-		io.Printf("HEADERS: (none)\n")
+		io.Printf("HEADERS:")
+		io.PrintLoudf(" (none)")
+		io.Printf("\n")
 	}
 	io.Printf("\n")
 
@@ -408,7 +412,9 @@ func invokeReqsShow(io cmdio.IO, projFile, reqName string) error {
 		io.Printf("BODY:\n")
 		io.Printf("%s\n", string(req.Body))
 	} else {
-		io.Printf("BODY: (none)\n")
+		io.Printf("BODY:")
+		io.PrintLoudf(" (none)")
+		io.Printf("\n")
 	}
 	io.Printf("\n")
 
@@ -427,12 +433,16 @@ func invokeReqsShow(io cmdio.IO, projFile, reqName string) error {
 			io.Printf("%s%s\n", p.VarPrefix(), cap.String())
 		}
 	} else {
-		io.Printf("VAR CAPTURES: (none)\n")
+		io.Printf("VAR CAPTURES:")
+		io.PrintLoudf(" (none)")
+		io.Printf("\n")
 	}
 	io.Printf("\n")
 
 	if req.AuthFlow == "" {
-		io.Printf("AUTH FLOW: (none)\n")
+		io.Printf("AUTH FLOW:")
+		io.PrintLoudf(" (none)")
+		io.Printf("\n")
 	} else {
 		io.Printf("AUTH FLOW: %s\n", req.AuthFlow)
 	}
@@ -447,7 +457,7 @@ func invokeReqsList(io cmdio.IO, projFile string) error {
 	}
 
 	if len(p.Templates) == 0 {
-		io.Println("(none)")
+		io.PrintLoudln("(none)")
 	} else {
 		// alphabetize the templates
 		var sortedNames []string

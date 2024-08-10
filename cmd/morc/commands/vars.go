@@ -50,6 +50,7 @@ var varsCmd = &cobra.Command{
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
+		io.Quiet = flags.BQuiet
 
 		switch args.action {
 		case varsActionList:
@@ -73,6 +74,7 @@ func init() {
 	varsCmd.PersistentFlags().BoolVarP(&flags.BDefault, "default", "", false, "Apply to the default environment.")
 	varsCmd.PersistentFlags().BoolVarP(&flags.BCurrent, "current", "", false, "Apply only to current environment. This is the same as --env followed by the name of the current environment.")
 	varsCmd.PersistentFlags().BoolVarP(&flags.BAll, "all", "a", false, "Apply to all environments. The meaning varies based on the operation being performed. When deleting, this will delete the variable from all environments. When getting, this will list all values of the variable in each env that defines it. When setting, it sets the value of the variable in all environments to the given value.")
+	varsCmd.PersistentFlags().BoolVarP(&flags.BQuiet, "quiet", "q", false, "Suppress all unnecessary output.")
 
 	// mark the env and default flags as mutually exclusive
 	varsCmd.MarkFlagsMutuallyExclusive("env", "default", "all", "current")
@@ -139,7 +141,7 @@ func invokeVarGet(io cmdio.IO, projFile string, env envSelection, varName string
 		}
 
 		if len(inEnvs) == 0 {
-			io.PrintErrf("(no values defined)\n")
+			io.PrintLoudErrf("(no values defined)\n")
 			return nil
 		}
 
@@ -404,7 +406,7 @@ func invokeVarList(io cmdio.IO, projFile string, env envSelection) error {
 	sort.Strings(vars)
 
 	if len(vars) == 0 {
-		io.Println("(none)")
+		io.PrintLoudln("(none)")
 	} else {
 		var v string
 		for _, name := range vars {

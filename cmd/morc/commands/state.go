@@ -10,10 +10,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func init() {
-	rootCmd.AddCommand(stateCmd)
-}
-
 var stateCmd = &cobra.Command{
 	Use:   "state FILE",
 	Short: "Read oneshot state data",
@@ -25,8 +21,16 @@ var stateCmd = &cobra.Command{
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
+		io.Quiet = flags.BQuiet
+
 		return invokeStateShow(io, filename)
 	},
+}
+
+func init() {
+	stateCmd.PersistentFlags().BoolVarP(&flags.BQuiet, "quiet", "q", false, "Suppress all unnecessary output.")
+
+	rootCmd.AddCommand(stateCmd)
 }
 
 func invokeStateShow(io cmdio.IO, filename string) error {
@@ -50,7 +54,7 @@ func invokeStateShow(io cmdio.IO, filename string) error {
 	io.Printf("State data file %s:\n", filename)
 	io.Printf("Cookies:\n")
 	if len(state.Cookies) == 0 {
-		io.Printf("(none)\n")
+		io.PrintLoudf("(none)\n")
 	} else {
 		for _, v := range state.Cookies {
 			io.Printf(" * %s:\n", v.URL)
@@ -61,7 +65,7 @@ func invokeStateShow(io cmdio.IO, filename string) error {
 	}
 	io.Printf("Variables:\n")
 	if len(state.Vars) == 0 {
-		io.Printf("(none)\n")
+		io.PrintLoudf("(none)\n")
 	} else {
 		for k, v := range state.Vars {
 			io.Printf(" * %s: %s\n", k, v)

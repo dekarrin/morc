@@ -104,6 +104,12 @@ func Test_Vars_List(t *testing.T) {
 			expectStdoutOutput: "(none)\n",
 		},
 		{
+			name:               "empty project, quiet mode",
+			args:               []string{"vars", "-q"},
+			p:                  morc.Project{},
+			expectStdoutOutput: "",
+		},
+		{
 			name: "vars in default env",
 			args: []string{"vars"},
 			p: morc.Project{
@@ -277,6 +283,17 @@ func Test_Vars_List(t *testing.T) {
 			},
 			expectStdoutOutput: "${EXTRA} = \"data\"\n${HOST} = \"internal-test.example.com\"\n${SCHEME} = \"http\"\n",
 		},
+		{
+			name: "alt var prefix in project",
+			args: []string{"vars", "--default"},
+			p: morc.Project{
+				Vars: testVarStore("", test_3EnvVarsMap),
+				Config: morc.Settings{
+					VarPrefix: "@",
+				},
+			},
+			expectStdoutOutput: "@{EXTRA} = \"data\"\n@{HOST} = \"internal-test.example.com\"\n@{SCHEME} = \"http\"\n",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -341,6 +358,13 @@ func Test_Vars_Delete(t *testing.T) {
 			expectStdoutOutput: "Deleted ${EXTRA}\n",
 		},
 		{
+			name:               "var is present in current (default) and no others, quiet mode",
+			args:               []string{"vars", "-D", "EXTRA", "-q"},
+			p:                  testProject_vars("", test_3EnvVarsMap),
+			expectP:            testProject_vars("", test_3EnvVarsMap_noExtra),
+			expectStdoutOutput: "",
+		},
+		{
 			name:      "var is present in current (default) and one other",
 			args:      []string{"vars", "-D", "EXTRA"},
 			p:         testProject_vars("", test_3EnvVarsMap_debugHasExtra),
@@ -358,6 +382,13 @@ func Test_Vars_Delete(t *testing.T) {
 			p:                  testProject_vars("PROD", test_3EnvVarsMap),
 			expectP:            testProject_vars("PROD", test_3EnvVarsMap_noExtra),
 			expectStdoutOutput: "Deleted ${EXTRA} from the default environment\n",
+		},
+		{
+			name:               "var not present in current (non-default), is present in default, not present in others, quiet mode",
+			args:               []string{"vars", "-D", "EXTRA", "-q"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap),
+			expectP:            testProject_vars("PROD", test_3EnvVarsMap_noExtra),
+			expectStdoutOutput: "",
 		},
 		{
 			name:      "var not present in current (non-default), not present in default",
@@ -390,6 +421,13 @@ func Test_Vars_Delete(t *testing.T) {
 			p:                  testProject_vars("PROD", test_3EnvVarsMap),
 			expectP:            testProject_vars("PROD", test_3EnvVarsMap_prodNoHost),
 			expectStdoutOutput: "Deleted ${HOST} from the current environment\n",
+		},
+		{
+			name:               "--current, var is present in current (non-default), quiet mode",
+			args:               []string{"vars", "-D", "HOST", "--current", "-q"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap),
+			expectP:            testProject_vars("PROD", test_3EnvVarsMap_prodNoHost),
+			expectStdoutOutput: "",
 		},
 		{
 			name:               "--current, var is present in current (default) and no others",
@@ -429,6 +467,13 @@ func Test_Vars_Delete(t *testing.T) {
 			p:                  testProject_vars("", test_3EnvVarsMap),
 			expectP:            testProject_vars("", test_3EnvVarsMap_prodNoHost),
 			expectStdoutOutput: "Deleted ${HOST} from environment PROD\n",
+		},
+		{
+			name:               "--env=other, cur is default, var is present in other, quiet mode",
+			args:               []string{"vars", "-D", "HOST", "--env", "PROD", "-q"},
+			p:                  testProject_vars("", test_3EnvVarsMap),
+			expectP:            testProject_vars("", test_3EnvVarsMap_prodNoHost),
+			expectStdoutOutput: "",
 		},
 		{
 			name:      "--env=other, cur is default, var not present in other, is present in default",
@@ -488,6 +533,13 @@ func Test_Vars_Delete(t *testing.T) {
 			expectStdoutOutput: "Deleted ${EXTRA} from the default environment\n",
 		},
 		{
+			name:               "--default, current is non-default, var is present in default and no others, quiet mode",
+			args:               []string{"vars", "-D", "EXTRA", "--default", "-q"},
+			p:                  testProject_vars("PROD", test_3EnvVarsMap),
+			expectP:            testProject_vars("PROD", test_3EnvVarsMap_noExtra),
+			expectStdoutOutput: "",
+		},
+		{
 			name:      "--default, current is default, var is present in default and others",
 			args:      []string{"vars", "-D", "HOST", "--default"},
 			p:         testProject_vars("", test_3EnvVarsMap),
@@ -530,6 +582,13 @@ func Test_Vars_Delete(t *testing.T) {
 			p:                  testProject_vars("", test_3EnvVarsMap),
 			expectP:            testProject_vars("", test_3EnvVarsMap_noHost),
 			expectStdoutOutput: "Deleted ${HOST} from all environments\n",
+		},
+		{
+			name:               "--all, current is default, var is present in default and others, quiet mode",
+			args:               []string{"vars", "-D", "HOST", "--all", "-q"},
+			p:                  testProject_vars("", test_3EnvVarsMap),
+			expectP:            testProject_vars("", test_3EnvVarsMap_noHost),
+			expectStdoutOutput: "",
 		},
 		{
 			name:      "--all, current is non-default, var is not present in current, not present in others",
@@ -613,6 +672,12 @@ func Test_Vars_Get(t *testing.T) {
 		{
 			name:               "unspecified env, current=default, var is present",
 			args:               []string{"vars", "HOST"},
+			p:                  testProject_vars("", test_3EnvVarsMap),
+			expectStdoutOutput: test_3EnvVarsMap[""]["HOST"] + "\n",
+		},
+		{
+			name:               "unspecified env, current=default, var is present, quiet mode still prints",
+			args:               []string{"vars", "HOST", "-q"},
 			p:                  testProject_vars("", test_3EnvVarsMap),
 			expectStdoutOutput: test_3EnvVarsMap[""]["HOST"] + "\n",
 		},
@@ -782,6 +847,15 @@ func Test_Vars_Get(t *testing.T) {
 				`PROD:       "example.com"              ` + "\n",
 		},
 		{
+			name: "--all, var is present in all, quiet mode",
+			args: []string{"vars", "HOST", "--all", "-q"},
+			p:    testProject_vars("PROD", test_3EnvVarsMap),
+			expectStdoutOutput: "" +
+				`(default)  internal-test.example.com` + "\n" +
+				`DEBUG      invalid.example.com      ` + "\n" +
+				`PROD       example.com              ` + "\n",
+		},
+		{
 			name:               "--all, var is present in none",
 			args:               []string{"vars", "PASSWORD", "--all"},
 			p:                  testProject_vars("PROD", test_3EnvVarsMap_debugHasExtra),
@@ -839,6 +913,13 @@ func Test_Vars_Set(t *testing.T) {
 			p:                  morc.Project{},
 			expectP:            testProject_vars("", map[string]map[string]string{"": {"VAR1": "VRISKA"}}),
 			expectStdoutOutput: "Set ${VAR1} to \"VRISKA\"\n",
+		},
+		{
+			name:               "make a new var, quiet mode",
+			args:               []string{"vars", "var1", "VRISKA", "-q"},
+			p:                  morc.Project{},
+			expectP:            testProject_vars("", map[string]map[string]string{"": {"VAR1": "VRISKA"}}),
+			expectStdoutOutput: "",
 		},
 		{
 			name:               "unspecified env, current=default, var not present",
@@ -1070,6 +1151,7 @@ func resetVarsFlags() {
 	flags.BDefault = false
 	flags.BCurrent = false
 	flags.BAll = false
+	flags.BQuiet = false
 
 	varsCmd.Flags().VisitAll(func(fl *pflag.Flag) {
 		fl.Changed = false

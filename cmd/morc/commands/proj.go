@@ -32,6 +32,7 @@ var projCmd = &cobra.Command{
 		// done checking args, don't show usage on error
 		cmd.SilenceUsage = true
 		io := cmdio.From(cmd)
+		io.Quiet = flags.BQuiet
 
 		switch opts.action {
 		case projActionInfo:
@@ -59,6 +60,7 @@ func init() {
 	projCmd.PersistentFlags().StringVarP(&flags.RecordCookies, "cookies", "c", "", "Set whether cookie recording is enabled. `ON|OFF` must be one of 'ON' or 'OFF'. Setting this is equivalent to calling 'morc cookies --on' or 'morc cookies --off'")
 	projCmd.PersistentFlags().StringVarP(&flags.RecordHistory, "history", "R", "", "Set whether history recording is enabled. `ON|OFF` must be one of 'ON' or 'OFF'. Setting this is equivalent to calling 'morc history --on' or 'morc history --off'")
 	projCmd.PersistentFlags().StringVarP(&flags.VarPrefix, "var-prefix", "p", "", "Set the variable prefix string to `PREFIX`. It will be \"$\" by default.")
+	projCmd.PersistentFlags().BoolVarP(&flags.BQuiet, "quiet", "q", false, "Suppress all unnecessary output.")
 
 	projCmd.MarkFlagsMutuallyExclusive("new", "get")
 	projCmd.MarkFlagsMutuallyExclusive("cookies", "get")

@@ -68,7 +68,7 @@ var varsCmd = &cobra.Command{
 }
 
 func init() {
-	varsCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project_file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath)
+	varsCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath)
 	varsCmd.PersistentFlags().StringVarP(&flags.Delete, "delete", "D", "", "Delete the variable `VAR`")
 	varsCmd.PersistentFlags().StringVarP(&flags.Env, "env", "e", "", "Apply to environment `ENV` instead of the current one. Use --default instead to specify the default environment.")
 	varsCmd.PersistentFlags().BoolVarP(&flags.BDefault, "default", "", false, "Apply to the default environment.")

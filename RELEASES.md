@@ -1,3 +1,7 @@
+v0.4.0 - August 10, 2024
+* Refactored all arg-parsing code to use a common pattern to aid in debugging.
+
+
 v0.3.1 - June 5, 2024
 ---------------------
 * All `--project_file` flags have been updated to `--project-file`.

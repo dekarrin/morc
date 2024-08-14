@@ -18,9 +18,52 @@ func Test_Env_List(t *testing.T) {
 		expectStderrOutput string // set with expected output to stderr
 		expectStdoutOutput string // set with expected output to stdout
 	}{
-		// * no envs present, empty project
-		// * no envs present, nil project
-		// * envs present
+		{
+			name:               "no envs, empty project - default still exists",
+			args:               []string{"env", "--all"},
+			p:                  morc.Project{},
+			expectStdoutOutput: reservedDefaultEnvName + "\n",
+		},
+		{
+			name:               "no envs, empty project - default still exists, quiet mode still prints",
+			args:               []string{"env", "--all", "-q"},
+			p:                  morc.Project{},
+			expectStdoutOutput: reservedDefaultEnvName + "\n",
+		},
+		{
+			name: "envs are present",
+			args: []string{"env", "--all"},
+			p: morc.Project{
+				Vars: testVarStore("", map[string]map[string]string{
+					"env1": {
+						"var1": "1",
+					},
+					"": {
+						"var1": "2",
+					},
+				}),
+			},
+			expectStdoutOutput: `` +
+				reservedDefaultEnvName + "\n" +
+				"ENV1\n",
+		},
+		{
+			name: "envs are present, quiet mode still prints",
+			args: []string{"env", "--all", "-q"},
+			p: morc.Project{
+				Vars: testVarStore("", map[string]map[string]string{
+					"env1": {
+						"var1": "1",
+					},
+					"": {
+						"var1": "2",
+					},
+				}),
+			},
+			expectStdoutOutput: `` +
+				reservedDefaultEnvName + "\n" +
+				"ENV1\n",
+		},
 		// * quiet mode tests
 	}
 

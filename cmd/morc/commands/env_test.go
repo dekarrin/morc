@@ -64,7 +64,6 @@ func Test_Env_List(t *testing.T) {
 				reservedDefaultEnvName + "\n" +
 				"ENV1\n",
 		},
-		// * quiet mode tests
 	}
 
 	for _, tc := range testCases {
@@ -104,21 +103,134 @@ func Test_Env_Delete(t *testing.T) {
 		name               string
 		args               []string // DO NOT INCLUDE -F; it is automatically set to a project file
 		p                  morc.Project
+		expectNoModify     bool
 		expectP            morc.Project
 		expectErr          string // set if command.Execute expected to fail, with a string that would be in the error message
 		expectStderrOutput string // set with expected output to stderr
 		expectStdoutOutput string // set with expected output to stdout
 	}{
-		// * --delete unusable with --delete-all
-		// * --delete unusable with --all
-		// * --delete-all unusable with --all
-		// * explicit delete of default via constant fails
-		// * deleted does not exist
-		// * deleted does exist, other env
-		// * deleted does exist, current env
-		// * delete all, only default
-		// * delete all, default and other
-		// * quiet mode tests
+		{
+			name: "--delete and mutually-exclusive flag errors",
+			args: []string{"env", "--delete", "env1", "--delete-all"},
+			p: morc.Project{
+				Vars: testVarStore("env1", map[string]map[string]string{
+					"env1": {"var": "1"},
+				}),
+			},
+			expectErr: "if any flags in the group [all default delete delete-all] are set none of the others can be",
+		},
+		{
+			name: "using reserved constant to delete default errors",
+			args: []string{"env", "-D", reservedDefaultEnvName},
+			p: morc.Project{
+				Vars: testVarStore("env1", map[string]map[string]string{
+					"env1": {"var": "1"},
+				}),
+			},
+			expectErr: "cannot use reserved environment name \"" + reservedDefaultEnvName + "\"",
+		},
+		{
+			name: "deleted env exists",
+			args: []string{"env", "-D", "env1"},
+			p: morc.Project{
+				Vars: testVarStore("", map[string]map[string]string{
+					"":     {"var": "1"},
+					"env1": {"var": "2"},
+				}),
+			},
+			expectP: morc.Project{
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"var": "1"},
+				}),
+			},
+			expectStdoutOutput: "Deleted environment \"env1\"\n",
+		},
+		{
+			name: "deleted env exists, quiet mode",
+			args: []string{"env", "-D", "env1", "-q"},
+			p: morc.Project{
+				Vars: testVarStore("", map[string]map[string]string{
+					"":     {"var": "1"},
+					"env1": {"var": "2"},
+				}),
+			},
+			expectP: morc.Project{
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"var": "1"},
+				}),
+			},
+			expectStdoutOutput: "",
+		},
+		{
+			name: "deleted env does not exist",
+			args: []string{"env", "-D", "env2"},
+			p: morc.Project{
+				Vars: testVarStore("env1", map[string]map[string]string{
+					"":     {"var": "1"},
+					"env1": {"var": "2"},
+				}),
+			},
+			expectNoModify:     true,
+			expectStderrOutput: "Environment \"env2\" does not contain any variables\n",
+		},
+		{
+			name: "deleted env does not exist, quiet mode",
+			args: []string{"env", "-D", "env2", "-q"},
+			p: morc.Project{
+				Vars: testVarStore("env1", map[string]map[string]string{
+					"":     {"var": "1"},
+					"env1": {"var": "2"},
+				}),
+			},
+			expectNoModify:     true,
+			expectStderrOutput: "",
+		},
+		{
+			name: "delete all, only default exists",
+			args: []string{"env", "--delete-all"},
+			p: morc.Project{
+				Vars: testVarStore("env1", map[string]map[string]string{
+					"": {"var": "1"},
+				}),
+			},
+			expectP: morc.Project{
+				Vars: testVarStore("env1", map[string]map[string]string{
+					"": {},
+				}),
+			},
+			expectStdoutOutput: "Deleted all environments and variables\n",
+		},
+		{
+			name: "delete all, only default exists, quiet mode",
+			args: []string{"env", "--delete-all", "-q"},
+			p: morc.Project{
+				Vars: testVarStore("env1", map[string]map[string]string{
+					"": {"var": "1"},
+				}),
+			},
+			expectP: morc.Project{
+				Vars: testVarStore("env1", map[string]map[string]string{
+					"": {},
+				}),
+			},
+			expectStdoutOutput: "",
+		},
+		{
+			name: "delete all, default and other exists",
+			args: []string{"env", "--delete-all"},
+			p: morc.Project{
+				Vars: testVarStore("env1", map[string]map[string]string{
+					"env1": {"var": "2"},
+					"":     {"var": "1", "var2": "VRISKA"},
+				}),
+			},
+			expectP: morc.Project{
+				Vars: testVarStore("env1", map[string]map[string]string{
+					"": {},
+				}),
+			},
+			expectStdoutOutput: "Deleted all environments and variables\n",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -148,7 +260,11 @@ func Test_Env_Delete(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
 			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
 
-			assert_projectFilesInBuffersMatch(assert, tc.expectP)
+			if !tc.expectNoModify {
+				assert_projectFilesInBuffersMatch(assert, tc.expectP)
+			} else {
+				assert_noProjectMutations(assert)
+			}
 		})
 	}
 }

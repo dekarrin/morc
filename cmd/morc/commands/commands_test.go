@@ -328,6 +328,10 @@ func createTestProjectIO(t *testing.T, p morc.Project) string {
 func testVarStore(curEnv string, vars map[string]map[string]string) morc.VarStore {
 	vs := morc.NewVarStore()
 
+	// make sure that the default env exists as that matches how it loads
+	vs.Set("fake", "")
+	vs.Unset("fake")
+
 	for env, envVars := range vars {
 		for k, v := range envVars {
 			vs.SetIn(k, v, env)

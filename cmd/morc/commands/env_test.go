@@ -279,11 +279,107 @@ func Test_Env_Switch(t *testing.T) {
 		expectStderrOutput string // set with expected output to stderr
 		expectStdoutOutput string // set with expected output to stdout
 	}{
-		// * switch to new, doesn't exist yet
-		// * switch to default without --default fails
-		// * switch to default with --default succeeds
-		// * switch to current env
-		// * quiet mode tests
+
+		{
+			name: "swapping to default via value errors",
+			args: []string{"env", reservedDefaultEnvName},
+			p: morc.Project{
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"var": "1"},
+				}),
+			},
+			expectErr: "cannot specify reserved name \"" + reservedDefaultEnvName + "\"",
+		},
+		{
+			name: "swap to new environment",
+			args: []string{"env", "env1"},
+			p: morc.Project{
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"var": "1"},
+				}),
+			},
+			expectP: morc.Project{
+				Vars: testVarStore("env1", map[string]map[string]string{
+					"": {"var": "1"},
+				}),
+			},
+			expectStdoutOutput: "Switched to environment \"env1\"\n",
+		},
+		{
+			name: "swap to new environment, quiet mode",
+			args: []string{"env", "env1", "-q"},
+			p: morc.Project{
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"var": "1"},
+				}),
+			},
+			expectP: morc.Project{
+				Vars: testVarStore("env1", map[string]map[string]string{
+					"": {"var": "1"},
+				}),
+			},
+			expectStdoutOutput: "",
+		},
+		{
+			name: "swap to default env",
+			args: []string{"env", "--default"},
+			p: morc.Project{
+				Vars: testVarStore("env1", map[string]map[string]string{
+					"": {"var": "1"},
+				}),
+			},
+			expectP: morc.Project{
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"var": "1"},
+				}),
+			},
+			expectStdoutOutput: "Switched to the default environment\n",
+		},
+		{
+			name: "swap to default env, quiet mode",
+			args: []string{"env", "--default", "-q"},
+			p: morc.Project{
+				Vars: testVarStore("env1", map[string]map[string]string{
+					"": {"var": "1"},
+				}),
+			},
+			expectP: morc.Project{
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"var": "1"},
+				}),
+			},
+			expectStdoutOutput: "",
+		},
+		{
+			name: "swap to current environment",
+			args: []string{"env", "env1"},
+			p: morc.Project{
+				Vars: testVarStore("env1", map[string]map[string]string{
+					"": {"var": "1"},
+				}),
+			},
+			expectP: morc.Project{
+				Vars: testVarStore("env1", map[string]map[string]string{
+					"": {"var": "1"},
+				}),
+			},
+			expectStdoutOutput: "Switched to environment \"env1\"\n",
+		},
+		{
+			name: "swap to current environment, quiet mode",
+			args: []string{"env", "env1", "-q"},
+			p: morc.Project{
+				Vars: testVarStore("env1", map[string]map[string]string{
+					"": {"var": "1"},
+				}),
+			},
+			expectP: morc.Project{
+				Vars: testVarStore("env1", map[string]map[string]string{
+					"": {"var": "1"},
+				}),
+			},
+			expectStdoutOutput: "",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -306,6 +402,10 @@ func Test_Env_Switch(t *testing.T) {
 					t.Fatalf("expected returned error to contain %q, got %q", tc.expectErr, err)
 				}
 				return
+			}
+
+			if tc.expectErr != "" {
+				t.Fatalf("expected error %q, got none", tc.expectErr)
 			}
 
 			// assertions

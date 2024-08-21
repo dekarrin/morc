@@ -169,7 +169,12 @@ func invokeEnvSwitch(io cmdio.IO, projFile string, env envSelection) error {
 		return err
 	}
 
-	io.PrintLoudf("Switched to %s", env.String())
+	if env.useName != "" {
+		io.PrintLoudf("Switched to environment %q\n", env.useName)
+	} else {
+		io.PrintLoudf("Switched to %s\n", env.String())
+	}
+
 	return nil
 }
 
@@ -226,6 +231,9 @@ func parseEnvArgs(cmd *cobra.Command, posArgs []string, args *envArgs) error {
 			args.env.useDefault = true
 		} else {
 			args.env.useName = posArgs[0]
+			if args.env.useName == reservedDefaultEnvName {
+				return fmt.Errorf("cannot specify reserved name %q; use --default to select the default env", reservedDefaultEnvName)
+			}
 		}
 	case envActionShow:
 		// nothing else to grab

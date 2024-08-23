@@ -7,6 +7,7 @@ import (
 
 	"github.com/dekarrin/morc"
 	"github.com/dekarrin/morc/cmd/morc/cmdio"
+	"github.com/dekarrin/morc/internal/sliceops"
 	"github.com/spf13/cobra"
 )
 
@@ -126,6 +127,10 @@ func invokeEnvDelete(io cmdio.IO, projFile string, env envSelection) error {
 		}
 	} else if env.useName != "" {
 		// delete in the specified environment
+		if sliceops.Index(p.Vars.EnvNames(), strings.ToUpper(env.useName)) < 0 {
+			io.PrintLoudErrf("Environment %q does not contain any variables\n", env.useName)
+			return nil
+		}
 
 		allVars := p.Vars.DefinedIn(env.useName)
 
@@ -143,9 +148,9 @@ func invokeEnvDelete(io cmdio.IO, projFile string, env envSelection) error {
 	}
 
 	if env.useAll {
-		io.PrintLoudf("Deleted all environments and variables")
+		io.PrintLoudf("Deleted all environments and variables\n")
 	} else {
-		io.PrintLoudf("Deleted environment %q", env.useName)
+		io.PrintLoudf("Deleted environment %q\n", env.useName)
 	}
 
 	return nil
@@ -164,7 +169,12 @@ func invokeEnvSwitch(io cmdio.IO, projFile string, env envSelection) error {
 		return err
 	}
 
-	io.PrintLoudf("Switched to %s", env.String())
+	if env.useName != "" {
+		io.PrintLoudf("Switched to environment %q\n", env.useName)
+	} else {
+		io.PrintLoudf("Switched to %s\n", env.String())
+	}
+
 	return nil
 }
 
@@ -221,6 +231,9 @@ func parseEnvArgs(cmd *cobra.Command, posArgs []string, args *envArgs) error {
 			args.env.useDefault = true
 		} else {
 			args.env.useName = posArgs[0]
+			if args.env.useName == reservedDefaultEnvName {
+				return fmt.Errorf("cannot specify reserved name %q; use --default to select the default env", reservedDefaultEnvName)
+			}
 		}
 	case envActionShow:
 		// nothing else to grab

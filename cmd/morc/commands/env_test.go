@@ -279,7 +279,6 @@ func Test_Env_Switch(t *testing.T) {
 		expectStderrOutput string // set with expected output to stderr
 		expectStdoutOutput string // set with expected output to stdout
 	}{
-
 		{
 			name: "swapping to default via value errors",
 			args: []string{"env", reservedDefaultEnvName},
@@ -427,9 +426,46 @@ func Test_Env_ShowCurrent(t *testing.T) {
 		expectStderrOutput string // set with expected output to stderr
 		expectStdoutOutput string // set with expected output to stdout
 	}{
-		// * current is default
-		// * current is not default
-		// * quiet mode variants
+		{
+			name: "current is the default",
+			args: []string{"env"},
+			p: morc.Project{
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"var": "1"},
+				}),
+			},
+			expectStdoutOutput: reservedDefaultEnvName + "\n",
+		},
+		{
+			name: "current is the default, quiet still prints",
+			args: []string{"env", "-q"},
+			p: morc.Project{
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"var": "1"},
+				}),
+			},
+			expectStdoutOutput: reservedDefaultEnvName + "\n",
+		},
+		{
+			name: "current is not the default",
+			args: []string{"env"},
+			p: morc.Project{
+				Vars: testVarStore("other", map[string]map[string]string{
+					"": {"var": "1"},
+				}),
+			},
+			expectStdoutOutput: "OTHER\n",
+		},
+		{
+			name: "current is not the default, quiet still prints",
+			args: []string{"env", "-q"},
+			p: morc.Project{
+				Vars: testVarStore("other", map[string]map[string]string{
+					"": {"var": "1"},
+				}),
+			},
+			expectStdoutOutput: "OTHER\n",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -454,10 +490,14 @@ func Test_Env_ShowCurrent(t *testing.T) {
 				return
 			}
 
+			if tc.expectErr != "" {
+				t.Fatalf("expected error %q, got none", tc.expectErr)
+			}
+
 			// assertions
 
-			assert.Equal(tc.expectStdoutOutput, output)
-			assert.Equal(tc.expectStderrOutput, outputErr)
+			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
+			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
 
 			assert_noProjectMutations(assert)
 		})

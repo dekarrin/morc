@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/dekarrin/morc"
@@ -9,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// TODO: consistency between giving --new or -N, --delete or -D, --get or -G, across all commands
 var capsCmd = &cobra.Command{
 	Use: "caps REQ [VAR]",
 	Annotations: map[string]string{
@@ -312,7 +314,15 @@ func invokeCapsList(io cmdio.IO, projFile string, reqName string) error {
 	if len(req.Captures) == 0 {
 		io.PrintLoudln("(none)")
 	} else {
-		for _, cap := range req.Captures {
+		// sort the output for consistency
+		sortedKeys := make([]string, 0, len(req.Captures))
+		for key := range req.Captures {
+			sortedKeys = append(sortedKeys, key)
+		}
+		sort.Strings(sortedKeys)
+
+		for _, capName := range sortedKeys {
+			cap := req.Captures[capName]
 			io.Printf("%s\n", cap)
 		}
 	}

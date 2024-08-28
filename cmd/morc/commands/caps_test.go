@@ -18,11 +18,144 @@ func Test_Caps_List(t *testing.T) {
 		expectStderrOutput string // set with expected output to stderr
 		expectStdoutOutput string // set with expected output to stdout
 	}{
-		// * req does not exist
-		// * req has no caps
-		// * req has one cap
-		// * req has multiple caps
-		// * quiet variants
+		{
+			name:      "req does not exist",
+			args:      []string{"caps", "req1"},
+			p:         morc.Project{},
+			expectErr: "no request template req1",
+		},
+		{
+			name:      "req does not exist, quiet still errors",
+			args:      []string{"caps", "req1", "-q"},
+			p:         morc.Project{},
+			expectErr: "no request template req1",
+		},
+		{
+			name:               "req has no caps",
+			args:               []string{"caps", "req1"},
+			p:                  testProject_withRequests(morc.RequestTemplate{Name: "req1"}),
+			expectStdoutOutput: "(none)\n",
+		},
+		{
+			name:               "req has no caps, quiet",
+			args:               []string{"caps", "req1", "-q"},
+			p:                  testProject_withRequests(morc.RequestTemplate{Name: "req1"}),
+			expectStdoutOutput: "",
+		},
+		{
+			name: "req has 1 cap",
+			args: []string{"caps", "req1"},
+			p: testProject_withRequests(morc.RequestTemplate{
+				Name: "req1",
+				Captures: map[string]morc.VarScraper{
+					"troll": {
+						Name: "troll",
+						Steps: []morc.TraversalStep{
+							{Key: "data"},
+							{Key: "people"},
+							{Index: 0},
+							{Key: "name"},
+							{Key: "first"},
+						},
+					},
+				},
+			}),
+			expectStdoutOutput: "TROLL from .data.people[0].name.first\n",
+		},
+		{
+			name: "req has 1 cap, quiet still prints",
+			args: []string{"caps", "req1", "-q"},
+			p: testProject_withRequests(morc.RequestTemplate{
+				Name: "req1",
+				Captures: map[string]morc.VarScraper{
+					"troll": {
+						Name: "troll",
+						Steps: []morc.TraversalStep{
+							{Key: "data"},
+							{Key: "people"},
+							{Index: 0},
+							{Key: "name"},
+							{Key: "first"},
+						},
+					},
+				},
+			}),
+			expectStdoutOutput: "TROLL from .data.people[0].name.first\n",
+		},
+		{
+			name: "req has multiple caps",
+			args: []string{"caps", "req1"},
+			p: testProject_withRequests(morc.RequestTemplate{
+				Name: "req1",
+				Captures: map[string]morc.VarScraper{
+					"troll": {
+						Name: "troll",
+						Steps: []morc.TraversalStep{
+							{Key: "data"},
+							{Key: "people"},
+							{Index: 0},
+							{Key: "name"},
+							{Key: "first"},
+						},
+					},
+					"villain": {
+						Name:        "villain",
+						OffsetStart: 28,
+						OffsetEnd:   36,
+					},
+					"lakhs": {
+						Name: "lakhs",
+						Steps: []morc.TraversalStep{
+							{Key: "data"},
+							{Key: "people"},
+							{Index: 13},
+							{Key: "salary"},
+						},
+					},
+				},
+			}),
+			expectStdoutOutput: "" +
+				"LAKHS from .data.people[13].salary\n" +
+				"TROLL from .data.people[0].name.first\n" +
+				"VILLAIN from offset 28,36\n",
+		},
+		{
+			name: "req has multiple caps, quiet still prints",
+			args: []string{"caps", "req1", "-q"},
+			p: testProject_withRequests(morc.RequestTemplate{
+				Name: "req1",
+				Captures: map[string]morc.VarScraper{
+					"troll": {
+						Name: "troll",
+						Steps: []morc.TraversalStep{
+							{Key: "data"},
+							{Key: "people"},
+							{Index: 0},
+							{Key: "name"},
+							{Key: "first"},
+						},
+					},
+					"villain": {
+						Name:        "villain",
+						OffsetStart: 28,
+						OffsetEnd:   36,
+					},
+					"lakhs": {
+						Name: "lakhs",
+						Steps: []morc.TraversalStep{
+							{Key: "data"},
+							{Key: "people"},
+							{Index: 13},
+							{Key: "salary"},
+						},
+					},
+				},
+			}),
+			expectStdoutOutput: "" +
+				"LAKHS from .data.people[13].salary\n" +
+				"TROLL from .data.people[0].name.first\n" +
+				"VILLAIN from offset 28,36\n",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -74,6 +207,7 @@ func Test_Caps_New(t *testing.T) {
 	}{
 		// * req does not exist
 		// * var already exists
+		// * var is new, but spec not given
 		// * var is new, bad spec errors
 		// * var is new, good spec
 		// * quiet mode variants

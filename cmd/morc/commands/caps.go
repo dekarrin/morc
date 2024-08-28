@@ -414,7 +414,7 @@ func parseCapsArgs(cmd *cobra.Command, posArgs []string, args *capsArgs) error {
 		}
 
 		// still need to parse the new name, above func won't hit it
-		name, err := morc.ParseVarName(flags.VarName)
+		name, err := morc.ParseVarName(flags.New)
 		if err != nil {
 			return fmt.Errorf("--new/-N: %w", err)
 		}

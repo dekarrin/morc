@@ -238,7 +238,8 @@ func Test_Caps_New(t *testing.T) {
 				},
 			),
 			expectErr: "request req1 already captures to $TROLL",
-		}, {
+		},
+		{
 			name: "var already exists, quiet still errors",
 			args: []string{"caps", "req1", "-N", "troll", "-s", "data.people[0].name.first", "-q"},
 			p: testProject_withRequests(
@@ -270,7 +271,8 @@ func Test_Caps_New(t *testing.T) {
 				},
 			),
 			expectErr: "--new/-N requires --spec/-s",
-		}, {
+		},
+		{
 			name: "spec is required, quiet still errors",
 			args: []string{"caps", "req1", "-N", "troll", "-q"},
 			p: testProject_withRequests(
@@ -381,7 +383,8 @@ func Test_Caps_New(t *testing.T) {
 				},
 			),
 			expectStdoutOutput: "Added new capture from response byte offset to $TROLL on req1\n",
-		}, {
+		},
+		{
 			name: "happy path - offset, quiet mode",
 			args: []string{"caps", "req1", "-N", "troll", "-s", ":28,32", "-q"},
 			p: testProject_withRequests(
@@ -948,7 +951,6 @@ func Test_Caps_Show(t *testing.T) {
 			),
 			expectErr: "no capture to $TROLL exists on request template req1",
 		},
-
 		{
 			name: "happy path - json path",
 			args: []string{"caps", "req1", "troll"},
@@ -1009,7 +1011,8 @@ func Test_Caps_Show(t *testing.T) {
 				},
 			),
 			expectStdoutOutput: "$TROLL from offset 28,32\n",
-		}, {
+		},
+		{
 			name: "happy path - offset, quiet mode",
 			args: []string{"caps", "req1", "troll", "-q"},
 			p: testProject_withRequests(

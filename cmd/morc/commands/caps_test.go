@@ -205,6 +205,34 @@ func Test_Caps_New(t *testing.T) {
 		expectStderrOutput string // set with expected output to stderr
 		expectStdoutOutput string // set with expected output to stdout
 	}{
+		{
+			name:      "req does not exist",
+			args:      []string{"caps", "req1", "-N", "troll", "-s", ".data.people[0].name.first"},
+			p:         morc.Project{},
+			expectErr: "no request template req1",
+		},
+		{
+			name: "var already exists",
+			args: []string{"caps", "req1", "-N", "troll", "-s", "data.people[0].name.first"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"troll": {
+							Name: "troll",
+							Steps: []morc.TraversalStep{
+								{Key: "data"},
+								{Key: "people"},
+								{Index: 0},
+								{Key: "name"},
+								{Key: "first"},
+							},
+						},
+					},
+				},
+			),
+			expectErr: "capture to var TROLL already exists on REQ1",
+		},
 		// * req does not exist
 		// * var already exists
 		// * var is new, but spec not given

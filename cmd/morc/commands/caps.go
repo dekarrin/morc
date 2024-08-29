@@ -227,7 +227,7 @@ func invokeCapsGet(io cmdio.IO, projFile, reqName, capName string, getItem capKe
 	capName = strings.ToUpper(capName)
 	cap, ok := req.Captures[capName]
 	if !ok {
-		return fmt.Errorf("no capture to %s exists on request template %s", capName, reqName)
+		return fmt.Errorf("no capture to %s%s exists on request template %s", p.VarPrefix(), capName, reqName)
 	}
 
 	switch getItem {
@@ -350,12 +350,11 @@ func invokeCapsShow(io cmdio.IO, projFile, reqName, capName string) error {
 	capName = strings.ToUpper(capName)
 	cap, ok := req.Captures[capName]
 	if !ok {
-		return fmt.Errorf("no capture to %s exists on request template %s", capName, reqName)
+		return fmt.Errorf("no capture to %s%s exists on request template %s", p.VarPrefix(), capName, reqName)
 	}
 
-	fmt.Printf("%s%s\n", p.VarPrefix(), cap.String())
-
-	io.PrintLoudln(cap)
+	io.Printf("%s", p.VarPrefix())
+	io.Println(cap)
 	return nil
 }
 

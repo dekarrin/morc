@@ -904,11 +904,128 @@ func Test_Caps_Show(t *testing.T) {
 		expectStderrOutput string // set with expected output to stderr
 		expectStdoutOutput string // set with expected output to stdout
 	}{
-		// * req does not exist
-		// * var does not exist
-		// * req and var exists, path spec
-		// * req and var exists, offset spec
-		// * quiet mode variants
+		{
+			name: "req does not exist",
+			args: []string{"caps", "req1", "troll"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name:     "req2",
+					Captures: map[string]morc.VarScraper{},
+				},
+			),
+			expectErr: "no request template req1",
+		},
+		{
+			name: "req does not exist, quiet still errors",
+			args: []string{"caps", "req1", "troll"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name:     "req2",
+					Captures: map[string]morc.VarScraper{},
+				},
+			),
+			expectErr: "no request template req1",
+		},
+		{
+			name: "var does not exist",
+			args: []string{"caps", "req1", "troll"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name:     "req1",
+					Captures: map[string]morc.VarScraper{},
+				},
+			),
+			expectErr: "no capture to $TROLL exists on request template req1",
+		},
+		{
+			name: "var does not exist, quiet still errors",
+			args: []string{"caps", "req1", "troll"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name:     "req1",
+					Captures: map[string]morc.VarScraper{},
+				},
+			),
+			expectErr: "no capture to $TROLL exists on request template req1",
+		},
+
+		{
+			name: "happy path - json path",
+			args: []string{"caps", "req1", "troll"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL": {
+							Name: "TROLL",
+							Steps: []morc.TraversalStep{
+								{Key: "data"},
+								{Key: "people"},
+								{Index: 0},
+								{Key: "name"},
+								{Key: "first"},
+							},
+						},
+					},
+				},
+			),
+			expectStdoutOutput: "$TROLL from .data.people[0].name.first\n",
+		},
+		{
+			name: "happy path - json path, quiet mode",
+			args: []string{"caps", "req1", "troll", "-q"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL": {
+							Name: "TROLL",
+							Steps: []morc.TraversalStep{
+								{Key: "data"},
+								{Key: "people"},
+								{Index: 0},
+								{Key: "name"},
+								{Key: "first"},
+							},
+						},
+					},
+				},
+			),
+			expectStdoutOutput: "$TROLL from .data.people[0].name.first\n",
+		},
+		{
+			name: "happy path - offset",
+			args: []string{"caps", "req1", "troll"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL": {
+							Name:        "TROLL",
+							OffsetStart: 28,
+							OffsetEnd:   32,
+						},
+					},
+				},
+			),
+			expectStdoutOutput: "$TROLL from offset 28,32\n",
+		}, {
+			name: "happy path - offset, quiet mode",
+			args: []string{"caps", "req1", "troll", "-q"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL": {
+							Name:        "TROLL",
+							OffsetStart: 28,
+							OffsetEnd:   32,
+						},
+					},
+				},
+			),
+			expectStdoutOutput: "$TROLL from offset 28,32\n",
+		},
 	}
 
 	for _, tc := range testCases {

@@ -175,18 +175,20 @@ func invokeCapsEdit(io cmdio.IO, projFile, reqName, varName string, attrs capAtt
 
 			// add the new one; we will update the name when we save it back to
 			// the project
-			cap.Name = attrs.capVar.v
+			cap.Name = newNameUpper
 
-			modifiedVals[capKeyVar] = attrs.capVar.v
+			modifiedVals[capKeyVar] = p.VarPrefix() + newNameUpper
 		} else {
-			noChangeVals[capKeyVar] = varUpper
+			noChangeVals[capKeyVar] = p.VarPrefix() + varUpper
 		}
 	}
 
 	// if we have a spec change, apply that next
 	if attrs.spec.set {
 		if !cap.EqualSpec(attrs.spec.v) {
+			existingName := cap.Name
 			cap = attrs.spec.v
+			cap.Name = existingName
 			modifiedVals[capKeySpec] = attrs.spec.v.Spec()
 		} else {
 			noChangeVals[capKeySpec] = cap.Spec()

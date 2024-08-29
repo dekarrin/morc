@@ -547,7 +547,6 @@ func Test_Caps_Delete(t *testing.T) {
 			),
 			expectStdoutOutput: "",
 		},
-		// * quiet mode variants
 	}
 
 	for _, tc := range testCases {
@@ -600,12 +599,264 @@ func Test_Caps_Edit(t *testing.T) {
 		expectStderrOutput string // set with expected output to stderr
 		expectStdoutOutput string // set with expected output to stdout
 	}{
-		// * req does not exist
-		// * var does not exist
-		// * var exists, change spec
-		// * var exists, change var
-		// * var exists, change both spec and var
-		// * quiet mode variants
+		{
+			name: "req does not exist",
+			args: []string{"caps", "req1", "troll", "-s", ":28,32"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name:     "req2",
+					Captures: map[string]morc.VarScraper{},
+				},
+			),
+			expectErr: "no request template req1",
+		},
+		{
+			name: "req does not exist, quiet still errors",
+			args: []string{"caps", "req1", "troll", "-s", ":28,32", "-q"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name:     "req2",
+					Captures: map[string]morc.VarScraper{},
+				},
+			),
+			expectErr: "no request template req1",
+		},
+		{
+			name: "var does not exist",
+			args: []string{"caps", "req1", "troll", "-s", ":28,32"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name:     "req1",
+					Captures: map[string]morc.VarScraper{},
+				},
+			),
+			expectErr: "no capture to variable $TROLL exists in request req1",
+		},
+		{
+			name: "var does not exist, quiet still errors",
+			args: []string{"caps", "req1", "troll", "-s", ":28,32", "-q"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name:     "req1",
+					Captures: map[string]morc.VarScraper{},
+				},
+			),
+			expectErr: "no capture to variable $TROLL exists in request req1",
+		},
+		{
+			name: "alter spec",
+			args: []string{"caps", "req1", "troll", "-s", ":28,32"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL": {
+							Name: "TROLL",
+							Steps: []morc.TraversalStep{
+								{Key: "data"},
+								{Key: "people"},
+								{Index: 0},
+								{Key: "name"},
+								{Key: "first"},
+							},
+						},
+					},
+				},
+			),
+			expectP: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL": {
+							Name:        "TROLL",
+							OffsetStart: 28,
+							OffsetEnd:   32,
+						},
+					},
+				},
+			),
+			expectStdoutOutput: "Set capture specification to offset 28,32\n",
+		},
+		{
+			name: "alter spec, quiet",
+			args: []string{"caps", "req1", "troll", "-s", ":28,32", "-q"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL": {
+							Name: "TROLL",
+							Steps: []morc.TraversalStep{
+								{Key: "data"},
+								{Key: "people"},
+								{Index: 0},
+								{Key: "name"},
+								{Key: "first"},
+							},
+						},
+					},
+				},
+			),
+			expectP: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL": {
+							Name:        "TROLL",
+							OffsetStart: 28,
+							OffsetEnd:   32,
+						},
+					},
+				},
+			),
+			expectStdoutOutput: "",
+		},
+		{
+			name: "alter var",
+			args: []string{"caps", "req1", "troll", "-V", "troll_name"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL": {
+							Name: "TROLL",
+							Steps: []morc.TraversalStep{
+								{Key: "data"},
+								{Key: "people"},
+								{Index: 0},
+								{Key: "name"},
+								{Key: "first"},
+							},
+						},
+					},
+				},
+			),
+			expectP: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL_NAME": {
+							Name: "TROLL_NAME",
+							Steps: []morc.TraversalStep{
+								{Key: "data"},
+								{Key: "people"},
+								{Index: 0},
+								{Key: "name"},
+								{Key: "first"},
+							},
+						},
+					},
+				},
+			),
+			expectStdoutOutput: "Set captured-to variable to $TROLL_NAME\n",
+		},
+		{
+			name: "alter var, quiet",
+			args: []string{"caps", "req1", "troll", "-V", "troll_name", "-q"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL": {
+							Name: "TROLL",
+							Steps: []morc.TraversalStep{
+								{Key: "data"},
+								{Key: "people"},
+								{Index: 0},
+								{Key: "name"},
+								{Key: "first"},
+							},
+						},
+					},
+				},
+			),
+			expectP: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL_NAME": {
+							Name: "TROLL_NAME",
+							Steps: []morc.TraversalStep{
+								{Key: "data"},
+								{Key: "people"},
+								{Index: 0},
+								{Key: "name"},
+								{Key: "first"},
+							},
+						},
+					},
+				},
+			),
+			expectStdoutOutput: "",
+		},
+		{
+			name: "alter var and spec",
+			args: []string{"caps", "req1", "troll", "-V", "troll_name", "-s", ":28,32"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL": {
+							Name: "TROLL",
+							Steps: []morc.TraversalStep{
+								{Key: "data"},
+								{Key: "people"},
+								{Index: 0},
+								{Key: "name"},
+								{Key: "first"},
+							},
+						},
+					},
+				},
+			),
+			expectP: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL_NAME": {
+							Name:        "TROLL_NAME",
+							OffsetStart: 28,
+							OffsetEnd:   32,
+						},
+					},
+				},
+			),
+			expectStdoutOutput: "Set captured-to variable to $TROLL_NAME and capture specification to offset 28,32\n",
+		},
+		{
+			name: "alter var and spec, quiet",
+			args: []string{"caps", "req1", "troll", "-V", "troll_name", "-s", ":28,32", "-q"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL": {
+							Name: "TROLL",
+							Steps: []morc.TraversalStep{
+								{Key: "data"},
+								{Key: "people"},
+								{Index: 0},
+								{Key: "name"},
+								{Key: "first"},
+							},
+						},
+					},
+				},
+			),
+			expectP: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL_NAME": {
+							Name:        "TROLL_NAME",
+							OffsetStart: 28,
+							OffsetEnd:   32,
+						},
+					},
+				},
+			),
+			expectStdoutOutput: "",
+		},
 	}
 
 	for _, tc := range testCases {

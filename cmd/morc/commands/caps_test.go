@@ -330,7 +330,8 @@ func Test_Caps_New(t *testing.T) {
 				},
 			),
 			expectStdoutOutput: "Added new capture from JSON response body to $TROLL on req1\n",
-		}, {
+		},
+		{
 			name: "happy path - json path, quiet mode",
 			args: []string{"caps", "req1", "-N", "troll", "-s", "data.people[0].name.first", "-q"},
 			p: testProject_withRequests(
@@ -456,9 +457,96 @@ func Test_Caps_Delete(t *testing.T) {
 		expectStderrOutput string // set with expected output to stderr
 		expectStdoutOutput string // set with expected output to stdout
 	}{
-		// * req does not exist
-		// * var does not exist
-		// * var and req exists
+		{
+			name: "req does not exist",
+			args: []string{"caps", "req1", "-D", "troll"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name:     "req2",
+					Captures: map[string]morc.VarScraper{},
+				},
+			),
+			expectErr: "no request template req1",
+		},
+		{
+			name: "req does not exist, quiet still errors",
+			args: []string{"caps", "req1", "-D", "troll", "-q"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name:     "req2",
+					Captures: map[string]morc.VarScraper{},
+				},
+			),
+			expectErr: "no request template req1",
+		},
+		{
+			name: "var does not exist",
+			args: []string{"caps", "req1", "-D", "troll"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name:     "req1",
+					Captures: map[string]morc.VarScraper{},
+				},
+			),
+			expectErr: "no capture defined for $TROLL in req1",
+		},
+		{
+			name: "var does not exist, quiet still errors",
+			args: []string{"caps", "req1", "-D", "troll", "-q"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name:     "req1",
+					Captures: map[string]morc.VarScraper{},
+				},
+			),
+			expectErr: "no capture defined for $TROLL in req1",
+		},
+		{
+			name: "var exists",
+			args: []string{"caps", "REQ1", "-D", "troll"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL": {
+							Name:        "TROLL",
+							OffsetStart: 28,
+							OffsetEnd:   32,
+						},
+					},
+				},
+			),
+			expectP: testProject_withRequests(
+				morc.RequestTemplate{
+					Name:     "req1",
+					Captures: map[string]morc.VarScraper{},
+				},
+			),
+			expectStdoutOutput: "Deleted capture to $TROLL from req1\n",
+		},
+		{
+			name: "var exists, quiet mode",
+			args: []string{"caps", "REQ1", "-D", "troll", "-q"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL": {
+							Name:        "TROLL",
+							OffsetStart: 28,
+							OffsetEnd:   32,
+						},
+					},
+				},
+			),
+			expectP: testProject_withRequests(
+				morc.RequestTemplate{
+					Name:     "req1",
+					Captures: map[string]morc.VarScraper{},
+				},
+			),
+			expectStdoutOutput: "",
+		},
 		// * quiet mode variants
 	}
 

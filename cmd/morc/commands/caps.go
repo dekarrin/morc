@@ -104,11 +104,12 @@ func invokeCapsDelete(io cmdio.IO, projFile string, reqName, varName string) err
 
 	// var name normalized to upper case
 	varUpper := strings.ToUpper(varName)
-	if len(req.Captures) > 0 {
-		if _, ok := req.Captures[varUpper]; !ok {
-			// TODO: standardize "not-found" error messages
-			return fmt.Errorf("no capture defined for %s in %s", reqName, varUpper)
-		}
+	if len(req.Captures) == 0 {
+		// TODO: standardize "not-found" error messages
+		return fmt.Errorf("no capture defined for %s%s in %s", p.VarPrefix(), varUpper, reqName)
+	}
+	if _, ok := req.Captures[varUpper]; !ok {
+		return fmt.Errorf("no capture defined for %s%s in %s", p.VarPrefix(), varUpper, reqName)
 	}
 
 	// remove the capture
@@ -121,7 +122,7 @@ func invokeCapsDelete(io cmdio.IO, projFile string, reqName, varName string) err
 		return err
 	}
 
-	io.PrintLoudf("Deleted capture to %s from %s", varUpper, reqName)
+	io.PrintLoudf("Deleted capture to %s%s from %s\n", p.VarPrefix(), varUpper, reqName)
 
 	return nil
 }

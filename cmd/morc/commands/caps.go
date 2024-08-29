@@ -264,7 +264,7 @@ func invokeCapsNew(io cmdio.IO, projFile, reqName, varName string, attrs capAttr
 	varUpper := strings.ToUpper(varName)
 	if len(req.Captures) > 0 {
 		if _, ok := req.Captures[varUpper]; ok {
-			return fmt.Errorf("variable %s%s already has a capture", p.VarPrefix(), varUpper)
+			return fmt.Errorf("request %s already captures to %s%s", reqName, p.VarPrefix(), varUpper)
 		}
 	}
 
@@ -288,10 +288,10 @@ func invokeCapsNew(io cmdio.IO, projFile, reqName, varName string, attrs capAttr
 	if cap.IsJSONSpec() {
 		scrapeSource = "JSON response body"
 	} else if cap.IsOffsetSpec() {
-		scrapeSource = "byte offset in response"
+		scrapeSource = "response byte offset"
 	}
 
-	io.PrintLoudf("Added new capture from %s to %s on %s", scrapeSource, varUpper, reqName)
+	io.PrintLoudf("Added new capture from %s to %s%s on %s\n", scrapeSource, p.VarPrefix(), varUpper, reqName)
 
 	return nil
 }

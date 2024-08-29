@@ -1,3 +1,19 @@
+v0.4.1 - August 29, 2024
+------------------------
+* Fixed bug where new captures could not be created due to caps command reading
+the variable name from the incorrect flag.
+* Fixed bug where creation of new variable capture would silently overwrite
+existing ones due to case.
+* `caps` and `env` output now end with newlines, and list output is
+alphabetized.
+* Request template names, flow names, and capture variable names will now have
+their case normalized on load.
+* Added automated functional tests to cover additional functions:
+  * `morc caps` is now covered.
+  * `morc env` is now covered.
+* Added Go 1.23 to list of versions to run automated testing against.
+
+
 v0.4.0 - August 10, 2024
 ------------------------
 * The prefix used by variables is now an updatable project config setting.

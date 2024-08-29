@@ -8,7 +8,10 @@ existing ones due to case.
 alphabetized.
 * Request template names, flow names, and capture variable names will now have
 their case normalized on load.
-* We now additionally test against Go 1.23.
+* Added automated functional tests to cover additional functions:
+  * `morc caps` is now covered.
+  * `morc env` is now covered.
+* Added Go 1.23 to list of versions to run automated testing against.
 
 
 v0.4.0 - August 10, 2024

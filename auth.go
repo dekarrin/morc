@@ -1,7 +1,9 @@
 package morc
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 )
 
 type AuthProofType string
@@ -89,7 +91,56 @@ type Auth interface {
 // req data model, static-based:
 // - static true
 // - type: "http basic" or such or "custom"
-// - if not custom, other props that are then used for initing the auth
-// - if custom, need placement target and value.
+// - credentials: gives the credentials, custom obj.
+// - if custom, need placement target.
 
-type HTTPBasicAuth struct{}
+type marshaledAuthConfig struct {
+	Static      bool
+	Type        string
+	Credentials map[string]any
+	Target      Placement
+
+	// TODO: flow-based things
+
+}
+
+type AuthLocation string
+
+const (
+	AuthLocationHeader AuthLocation = "header"
+	AuthLocationCookie AuthLocation = "cookie"
+	AuthLocationQuery  AuthLocation = "query"
+)
+
+type Placement struct {
+	Location AuthLocation
+	Key      string
+}
+
+func unmarshalAuthConfig(data map[string]any) (Auth, error) {
+	if data == nil {
+		return nil
+	}
+
+	// check for well-known field names
+	var static bool
+	var typeStr string
+
+	for k, v := range data {
+		switch strings.ToLower(k) {
+		case "static":
+			boolV, ok := v.(bool)
+			if !ok {
+				return nil, fmt.Errorf("static: must be a boolean")
+			}
+			static = boolV
+		case "type":
+			strV, ok := v.(string)
+			if !ok {
+				return nil, fmt.Errorf("type: must be a string")
+			}
+
+			typeStr = strV
+		}
+	}
+}

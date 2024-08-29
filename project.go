@@ -358,6 +358,31 @@ func LoadProject(projR, seshR, histR io.Reader) (Project, error) {
 		Config:    m.Config,
 	}
 
+	// force req, cap, flow names to upper-case.
+	// Vars automatically handles case insensitivity so does not need this.
+	// TODO: make flows, templates, caps access pass through accessors and
+	// therefore be able to handle case insensitivity even when used via
+	// programmatic interface.
+	for reqName, req := range p.Templates {
+		req.Name = strings.ToLower(req.Name)
+
+		for capName, cap := range req.Captures {
+			cap.Name = strings.ToUpper(cap.Name)
+
+			delete(req.Captures, capName)
+			req.Captures[strings.ToUpper(capName)] = cap
+		}
+
+		delete(p.Templates, reqName)
+		p.Templates[strings.ToLower(reqName)] = req
+	}
+	for flowName, flow := range p.Flows {
+		flow.Name = strings.ToLower(flow.Name)
+
+		delete(p.Flows, flowName)
+		p.Flows[strings.ToLower(flowName)] = flow
+	}
+
 	if seshR != nil {
 		p.Session, err = LoadSession(seshR)
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -396,6 +421,31 @@ func LoadProjectFromDisk(projFilename string, all bool) (Project, error) {
 		Flows:     m.Flows,
 		Vars:      m.Vars,
 		Config:    m.Config,
+	}
+
+	// force req, cap, flow names to upper-case.
+	// Vars automatically handles case insensitivity so does not need this.
+	// TODO: make flows, templates, caps access pass through accessors and
+	// therefore be able to handle case insensitivity even when used via
+	// programmatic interface.
+	for reqName, req := range p.Templates {
+		req.Name = strings.ToLower(req.Name)
+
+		for capName, cap := range req.Captures {
+			cap.Name = strings.ToUpper(cap.Name)
+
+			delete(req.Captures, capName)
+			req.Captures[strings.ToUpper(capName)] = cap
+		}
+
+		delete(p.Templates, reqName)
+		p.Templates[strings.ToLower(reqName)] = req
+	}
+	for flowName, flow := range p.Flows {
+		flow.Name = strings.ToLower(flow.Name)
+
+		delete(p.Flows, flowName)
+		p.Flows[strings.ToLower(flowName)] = flow
 	}
 
 	// set current project file path to the one we just read from

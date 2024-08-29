@@ -192,6 +192,8 @@ func ParseVarScraperSpec(name, spec string) (VarScraper, error) {
 				currentStep = TraversalStep{}
 				curSymbol.Reset()
 				curMode = none
+			} else {
+				curSymbol.WriteRune(ch)
 			}
 		default:
 			// should never happen

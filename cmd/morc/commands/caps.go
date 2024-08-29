@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/dekarrin/morc"
@@ -9,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// TODO: consistency between giving --new or -N, --delete or -D, --get or -G, across all commands
 var capsCmd = &cobra.Command{
 	Use: "caps REQ [VAR]",
 	Annotations: map[string]string{
@@ -102,11 +104,12 @@ func invokeCapsDelete(io cmdio.IO, projFile string, reqName, varName string) err
 
 	// var name normalized to upper case
 	varUpper := strings.ToUpper(varName)
-	if len(req.Captures) > 0 {
-		if _, ok := req.Captures[varUpper]; !ok {
-			// TODO: standardize "not-found" error messages
-			return fmt.Errorf("no capture defined for %s in %s", reqName, varUpper)
-		}
+	if len(req.Captures) == 0 {
+		// TODO: standardize "not-found" error messages
+		return fmt.Errorf("no capture defined for %s%s in %s", p.VarPrefix(), varUpper, reqName)
+	}
+	if _, ok := req.Captures[varUpper]; !ok {
+		return fmt.Errorf("no capture defined for %s%s in %s", p.VarPrefix(), varUpper, reqName)
 	}
 
 	// remove the capture
@@ -119,7 +122,7 @@ func invokeCapsDelete(io cmdio.IO, projFile string, reqName, varName string) err
 		return err
 	}
 
-	io.PrintLoudf("Deleted capture to %s from %s", varUpper, reqName)
+	io.PrintLoudf("Deleted capture to %s%s from %s\n", p.VarPrefix(), varUpper, reqName)
 
 	return nil
 }
@@ -172,18 +175,20 @@ func invokeCapsEdit(io cmdio.IO, projFile, reqName, varName string, attrs capAtt
 
 			// add the new one; we will update the name when we save it back to
 			// the project
-			cap.Name = attrs.capVar.v
+			cap.Name = newNameUpper
 
-			modifiedVals[capKeyVar] = attrs.capVar.v
+			modifiedVals[capKeyVar] = p.VarPrefix() + newNameUpper
 		} else {
-			noChangeVals[capKeyVar] = varUpper
+			noChangeVals[capKeyVar] = p.VarPrefix() + varUpper
 		}
 	}
 
 	// if we have a spec change, apply that next
 	if attrs.spec.set {
 		if !cap.EqualSpec(attrs.spec.v) {
+			existingName := cap.Name
 			cap = attrs.spec.v
+			cap.Name = existingName
 			modifiedVals[capKeySpec] = attrs.spec.v.Spec()
 		} else {
 			noChangeVals[capKeySpec] = cap.Spec()
@@ -222,7 +227,7 @@ func invokeCapsGet(io cmdio.IO, projFile, reqName, capName string, getItem capKe
 	capName = strings.ToUpper(capName)
 	cap, ok := req.Captures[capName]
 	if !ok {
-		return fmt.Errorf("no capture to %s exists on request template %s", capName, reqName)
+		return fmt.Errorf("no capture to %s%s exists on request template %s", p.VarPrefix(), capName, reqName)
 	}
 
 	switch getItem {
@@ -262,7 +267,7 @@ func invokeCapsNew(io cmdio.IO, projFile, reqName, varName string, attrs capAttr
 	varUpper := strings.ToUpper(varName)
 	if len(req.Captures) > 0 {
 		if _, ok := req.Captures[varUpper]; ok {
-			return fmt.Errorf("variable %s%s already has a capture", p.VarPrefix(), varUpper)
+			return fmt.Errorf("request %s already captures to %s%s", reqName, p.VarPrefix(), varUpper)
 		}
 	}
 
@@ -286,10 +291,10 @@ func invokeCapsNew(io cmdio.IO, projFile, reqName, varName string, attrs capAttr
 	if cap.IsJSONSpec() {
 		scrapeSource = "JSON response body"
 	} else if cap.IsOffsetSpec() {
-		scrapeSource = "byte offset in response"
+		scrapeSource = "response byte offset"
 	}
 
-	io.PrintLoudf("Added new capture from %s to %s on %s", scrapeSource, varUpper, reqName)
+	io.PrintLoudf("Added new capture from %s to %s%s on %s\n", scrapeSource, p.VarPrefix(), varUpper, reqName)
 
 	return nil
 }
@@ -312,7 +317,15 @@ func invokeCapsList(io cmdio.IO, projFile string, reqName string) error {
 	if len(req.Captures) == 0 {
 		io.PrintLoudln("(none)")
 	} else {
-		for _, cap := range req.Captures {
+		// sort the output for consistency
+		sortedKeys := make([]string, 0, len(req.Captures))
+		for key := range req.Captures {
+			sortedKeys = append(sortedKeys, key)
+		}
+		sort.Strings(sortedKeys)
+
+		for _, capName := range sortedKeys {
+			cap := req.Captures[capName]
 			io.Printf("%s\n", cap)
 		}
 	}
@@ -337,12 +350,11 @@ func invokeCapsShow(io cmdio.IO, projFile, reqName, capName string) error {
 	capName = strings.ToUpper(capName)
 	cap, ok := req.Captures[capName]
 	if !ok {
-		return fmt.Errorf("no capture to %s exists on request template %s", capName, reqName)
+		return fmt.Errorf("no capture to %s%s exists on request template %s", p.VarPrefix(), capName, reqName)
 	}
 
-	fmt.Printf("%s%s\n", p.VarPrefix(), cap.String())
-
-	io.PrintLoudln(cap)
+	io.Printf("%s", p.VarPrefix())
+	io.Println(cap)
 	return nil
 }
 
@@ -404,7 +416,7 @@ func parseCapsArgs(cmd *cobra.Command, posArgs []string, args *capsArgs) error {
 		}
 
 		// still need to parse the new name, above func won't hit it
-		name, err := morc.ParseVarName(flags.VarName)
+		name, err := morc.ParseVarName(flags.New)
 		if err != nil {
 			return fmt.Errorf("--new/-N: %w", err)
 		}

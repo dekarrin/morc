@@ -1,3 +1,17 @@
+v0.4.2 - August 30, 2024
+------------------------
+* Var capture specs may now specify an end offset of 0 to indicate an offset of
+the end of the response, however long it is.
+* Var capture specs may now specify a negative end offset to indicate an end
+offset that many bytes away from the end of the response, however long that is.
+* Var capture specs may omit the START or END parameter to indicate an offset of
+0.
+* Var capture specs now require a leading dot when giving a JSON path.
+* Var capture specs may specify capturing the entire response with the special
+keyword "raw"; this is equivalent to an offset that specifies a START and END of
+zero.
+
+
 v0.4.1 - August 29, 2024
 ------------------------
 * Fixed bug where new captures could not be created due to caps command reading

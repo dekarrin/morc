@@ -219,7 +219,7 @@ func Test_Caps_New(t *testing.T) {
 		},
 		{
 			name: "var already exists",
-			args: []string{"caps", "req1", "-N", "troll", "-s", "data.people[0].name.first"},
+			args: []string{"caps", "req1", "-N", "troll", "-s", ".data.people[0].name.first"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
@@ -241,7 +241,7 @@ func Test_Caps_New(t *testing.T) {
 		},
 		{
 			name: "var already exists, quiet still errors",
-			args: []string{"caps", "req1", "-N", "troll", "-s", "data.people[0].name.first", "-q"},
+			args: []string{"caps", "req1", "-N", "troll", "-s", ".data.people[0].name.first", "-q"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
@@ -285,7 +285,7 @@ func Test_Caps_New(t *testing.T) {
 		},
 		{
 			name: "invalid spec",
-			args: []string{"caps", "req1", "-N", "troll", "-s", "data["},
+			args: []string{"caps", "req1", "-N", "troll", "-s", ".data["},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
@@ -296,7 +296,7 @@ func Test_Caps_New(t *testing.T) {
 		},
 		{
 			name: "invalid spec, quiet still errors",
-			args: []string{"caps", "req1", "-N", "troll", "-s", "data[", "-q"},
+			args: []string{"caps", "req1", "-N", "troll", "-s", ".data[", "-q"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
@@ -307,7 +307,7 @@ func Test_Caps_New(t *testing.T) {
 		},
 		{
 			name: "happy path - json path",
-			args: []string{"caps", "req1", "-N", "troll", "-s", "data.people[0].name.first"},
+			args: []string{"caps", "req1", "-N", "troll", "-s", ".data.people[0].name.first"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
@@ -335,7 +335,7 @@ func Test_Caps_New(t *testing.T) {
 		},
 		{
 			name: "happy path - json path, quiet mode",
-			args: []string{"caps", "req1", "-N", "troll", "-s", "data.people[0].name.first", "-q"},
+			args: []string{"caps", "req1", "-N", "troll", "-s", ".data.people[0].name.first", "-q"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",

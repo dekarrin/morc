@@ -80,14 +80,10 @@ func ParseVarScraperSpec(name, spec string) (VarScraper, error) {
 			if err != nil {
 				return VarScraper{}, fmt.Errorf("%q: end offset: %w", spec, err)
 			}
-
-			if end < 0 {
-				return VarScraper{}, fmt.Errorf("%q: end offset cannot be negative", spec)
-			}
 		}
 
-		// only matters if end is greater than 0; 0 means "to the end"
-		if end <= start && end != 0 {
+		// only matters if end is greater than 0; 0 means "to the end", -1 means 1 from the end, etc.
+		if end <= start && end > 0 {
 			return VarScraper{}, fmt.Errorf("end offset %d is less than or equal to start offset %d", end, start)
 		}
 
@@ -343,6 +339,8 @@ func (v VarScraper) Spec() string {
 
 			if v.OffsetEnd == 0 {
 				s += "<END>"
+			} else if v.OffsetEnd < 0 {
+				s += fmt.Sprintf("<END%d>", v.OffsetEnd)
 			} else {
 				s += fmt.Sprintf("%d", v.OffsetEnd)
 			}
@@ -361,6 +359,13 @@ func (v VarScraper) Scrape(data []byte) (string, error) {
 		// if end is 0, return the rest of the data
 		if v.OffsetEnd == 0 {
 			return string(data[v.OffsetStart:]), nil
+		} else if v.OffsetEnd < 0 {
+			// bounds check
+			actualEnd := len(data) + v.OffsetEnd
+			if actualEnd < v.OffsetStart {
+				return "", fmt.Errorf("effective end offset of %d (%d) is less than start offset %d", v.OffsetEnd, actualEnd, v.OffsetStart)
+			}
+			return string(data[v.OffsetStart:actualEnd]), nil
 		} else {
 			return string(data[v.OffsetStart:v.OffsetEnd]), nil
 		}

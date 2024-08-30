@@ -37,7 +37,8 @@ var capsCmd = &cobra.Command{
 		"A capture is removed from a request by providing --delete and the VAR of the capture to be deleted.\n\n" +
 		"Capture specifications can be given in one of three formats. They can be in format ':START,END' for a byte " +
 		"offset (ex: \":4,20\"). In this format, either START or END may be omitted to indicate '0'; if 0 is used for " +
-		"END, it includes all bytes from START to end of the response. Alternatively, the keyword format 'raw' may be " +
+		"END, it includes all bytes from START to end of the response, and if a negative number is used for END, it " +
+		"refers to that many bytes from the end of the response. Alternatively, the keyword format 'raw' may be " +
 		"used as shorthand for :0,0, and will capture the entire response body. Finally, the spec may be a jq-ish path " +
 		"with only keys and array indexes (ex: \".records[1].auth.token\"); this must start with a . character.",
 	Args: cobra.MinimumNArgs(1),

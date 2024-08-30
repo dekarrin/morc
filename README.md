@@ -550,13 +550,15 @@ where in the response to retrieve the value from, and supports byte offsets in
 format `:START,END` where START and END are byte offsets, or in format of a JSON
 path specified by giving keys and array slices needed to navigate from the top
 level of a JSON body in the response to the desired value, such as
-`.top-level-key.next-level-key.some_array[3].item`.
+`.top-level-key.next-level-key.some_array[3].item`. Alternatively, to capture
+the entire request, you can give an offset with START and END omitted, like
+`:,`, or by using the keyword `raw` as the spec.
 
 In this example, we will add a new cap that gets its value from the 'id' field
 of the JSON object in the response:
 
 ```shell
-morc caps create-user --new USER_ID -s .id   # or just id with no period; the leading period is not required
+morc caps create-user --new USER_ID -s .id
 ```
 
 Then, it will be created:

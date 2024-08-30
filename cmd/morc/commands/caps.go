@@ -287,14 +287,14 @@ func invokeCapsNew(io cmdio.IO, projFile, reqName, varName string, attrs capAttr
 		return err
 	}
 
-	scrapeSource := "response"
+	var scrapeSource string
 	if cap.IsJSONSpec() {
-		scrapeSource = "JSON response body"
+		scrapeSource = "path " + cap.Spec()
 	} else if cap.IsOffsetSpec() {
-		scrapeSource = "response byte offset"
+		scrapeSource = cap.Spec()
 	}
 
-	io.PrintLoudf("Added new capture from %s to %s%s on %s\n", scrapeSource, p.VarPrefix(), varUpper, reqName)
+	io.PrintLoudf("Added capture from %s to %s%s on %s\n", scrapeSource, p.VarPrefix(), varUpper, reqName)
 
 	return nil
 }

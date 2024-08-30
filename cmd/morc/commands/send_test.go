@@ -252,6 +252,44 @@ func Test_Send(t *testing.T) {
 			expectSessionSaved: false,
 		},
 		{
+			name:   "send saves body captures - entire request",
+			args:   []string{"send", "testreq"},
+			respFn: respFnJSONBodyOK,
+			p: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {
+						Name:   "testreq",
+						Method: "GET",
+						URL:    "/",
+						Captures: map[string]morc.VarScraper{
+							"TEST": {Name: "TEST"},
+						},
+					},
+				},
+			},
+			expectP: morc.Project{
+				Templates: map[string]morc.RequestTemplate{
+					"testreq": {
+						Name:   "testreq",
+						Method: "GET",
+						URL:    "/",
+						Captures: map[string]morc.VarScraper{
+							"TEST": {Name: "TEST"},
+						},
+					},
+				},
+				Vars: testVarStore("", map[string]map[string]string{
+					"": {"TEST": `{"name":{"first":"VRISKA","last":"SERKET"}}`},
+				}),
+			},
+			expectStdoutOutput: `HTTP/1.1 200 OK
+{"name":{"first":"VRISKA","last":"SERKET"}}
+`,
+			expectProjectSaved: true,
+			expectHistorySaved: false,
+			expectSessionSaved: false,
+		},
+		{
 			name:   "request has a body",
 			args:   []string{"send", "testreq"},
 			respFn: respFnNoBodyOK,

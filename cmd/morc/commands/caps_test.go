@@ -63,6 +63,47 @@ func Test_Caps_List(t *testing.T) {
 			expectStdoutOutput: "TROLL from .data.people[0].name.first\n",
 		},
 		{
+			name: "req has 1 cap, full request",
+			args: []string{"caps", "req1"},
+			p: testProject_withRequests(morc.RequestTemplate{
+				Name: "req1",
+				Captures: map[string]morc.VarScraper{
+					"troll": {
+						Name: "troll",
+					},
+				},
+			}),
+			expectStdoutOutput: "TROLL from entire response\n",
+		},
+		{
+			name: "req has 1 cap, negative end",
+			args: []string{"caps", "req1"},
+			p: testProject_withRequests(morc.RequestTemplate{
+				Name: "req1",
+				Captures: map[string]morc.VarScraper{
+					"troll": {
+						Name:      "troll",
+						OffsetEnd: -1,
+					},
+				},
+			}),
+			expectStdoutOutput: "TROLL from offset 0,<END-1>\n",
+		},
+		{
+			name: "req has 1 cap, omitted end",
+			args: []string{"caps", "req1"},
+			p: testProject_withRequests(morc.RequestTemplate{
+				Name: "req1",
+				Captures: map[string]morc.VarScraper{
+					"troll": {
+						Name:        "troll",
+						OffsetStart: 12,
+					},
+				},
+			}),
+			expectStdoutOutput: "TROLL from offset 12,<END>\n",
+		},
+		{
 			name: "req has 1 cap, quiet still prints",
 			args: []string{"caps", "req1", "-q"},
 			p: testProject_withRequests(morc.RequestTemplate{
@@ -219,7 +260,7 @@ func Test_Caps_New(t *testing.T) {
 		},
 		{
 			name: "var already exists",
-			args: []string{"caps", "req1", "-N", "troll", "-s", "data.people[0].name.first"},
+			args: []string{"caps", "req1", "-N", "troll", "-s", ".data.people[0].name.first"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
@@ -241,7 +282,7 @@ func Test_Caps_New(t *testing.T) {
 		},
 		{
 			name: "var already exists, quiet still errors",
-			args: []string{"caps", "req1", "-N", "troll", "-s", "data.people[0].name.first", "-q"},
+			args: []string{"caps", "req1", "-N", "troll", "-s", ".data.people[0].name.first", "-q"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
@@ -285,7 +326,7 @@ func Test_Caps_New(t *testing.T) {
 		},
 		{
 			name: "invalid spec",
-			args: []string{"caps", "req1", "-N", "troll", "-s", "data["},
+			args: []string{"caps", "req1", "-N", "troll", "-s", ".data["},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
@@ -296,7 +337,7 @@ func Test_Caps_New(t *testing.T) {
 		},
 		{
 			name: "invalid spec, quiet still errors",
-			args: []string{"caps", "req1", "-N", "troll", "-s", "data[", "-q"},
+			args: []string{"caps", "req1", "-N", "troll", "-s", ".data[", "-q"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
@@ -307,7 +348,7 @@ func Test_Caps_New(t *testing.T) {
 		},
 		{
 			name: "happy path - json path",
-			args: []string{"caps", "req1", "-N", "troll", "-s", "data.people[0].name.first"},
+			args: []string{"caps", "req1", "-N", "troll", "-s", ".data.people[0].name.first"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
@@ -331,11 +372,11 @@ func Test_Caps_New(t *testing.T) {
 					},
 				},
 			),
-			expectStdoutOutput: "Added new capture from JSON response body to $TROLL on req1\n",
+			expectStdoutOutput: "Added capture from path .data.people[0].name.first to $TROLL on req1\n",
 		},
 		{
 			name: "happy path - json path, quiet mode",
-			args: []string{"caps", "req1", "-N", "troll", "-s", "data.people[0].name.first", "-q"},
+			args: []string{"caps", "req1", "-N", "troll", "-s", ".data.people[0].name.first", "-q"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
@@ -362,6 +403,117 @@ func Test_Caps_New(t *testing.T) {
 			expectStdoutOutput: "",
 		},
 		{
+			name: "happy path - offset missing end",
+			args: []string{"caps", "req1", "-N", "troll", "-s", ":28,"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name:     "req1",
+					Captures: map[string]morc.VarScraper{},
+				},
+			),
+			expectP: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL": {
+							Name:        "TROLL",
+							OffsetStart: 28,
+							OffsetEnd:   0,
+						},
+					},
+				},
+			),
+			expectStdoutOutput: "Added capture from offset 28,<END> to $TROLL on req1\n",
+		},
+		{
+			name: "happy path - negative end offset",
+			args: []string{"caps", "req1", "-N", "troll", "-s", ":,-32"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name:     "req1",
+					Captures: map[string]morc.VarScraper{},
+				},
+			),
+			expectP: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL": {
+							Name:        "TROLL",
+							OffsetStart: 0,
+							OffsetEnd:   -32,
+						},
+					},
+				},
+			),
+			expectStdoutOutput: "Added capture from offset 0,<END-32> to $TROLL on req1\n",
+		},
+		{
+			name: "happy path - offset missing start",
+			args: []string{"caps", "req1", "-N", "troll", "-s", ":,32"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name:     "req1",
+					Captures: map[string]morc.VarScraper{},
+				},
+			),
+			expectP: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL": {
+							Name:        "TROLL",
+							OffsetStart: 0,
+							OffsetEnd:   32,
+						},
+					},
+				},
+			),
+			expectStdoutOutput: "Added capture from offset 0,32 to $TROLL on req1\n",
+		},
+		{
+			name: "happy path - offset missing both",
+			args: []string{"caps", "req1", "-N", "troll", "-s", ":,"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name:     "req1",
+					Captures: map[string]morc.VarScraper{},
+				},
+			),
+			expectP: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL": {
+							Name: "TROLL",
+						},
+					},
+				},
+			),
+			expectStdoutOutput: "Added capture from entire response to $TROLL on req1\n",
+		},
+		{
+			name: "happy path - raw",
+			args: []string{"caps", "req1", "-N", "troll", "-s", "raw"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name:     "req1",
+					Captures: map[string]morc.VarScraper{},
+				},
+			),
+			expectP: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL": {
+							Name: "TROLL",
+						},
+					},
+				},
+			),
+			expectStdoutOutput: "Added capture from entire response to $TROLL on req1\n",
+		},
+		{
 			name: "happy path - offset",
 			args: []string{"caps", "req1", "-N", "troll", "-s", ":28,32"},
 			p: testProject_withRequests(
@@ -382,7 +534,7 @@ func Test_Caps_New(t *testing.T) {
 					},
 				},
 			),
-			expectStdoutOutput: "Added new capture from response byte offset to $TROLL on req1\n",
+			expectStdoutOutput: "Added capture from offset 28,32 to $TROLL on req1\n",
 		},
 		{
 			name: "happy path - offset, quiet mode",
@@ -1214,6 +1366,21 @@ func Test_Caps_Get(t *testing.T) {
 				},
 			),
 			expectStdoutOutput: "offset 28,32\n",
+		},
+		{
+			name: "get var spec, raw spec",
+			args: []string{"caps", "req1", "troll", "-G", "SPEC"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL": {
+							Name: "TROLL",
+						},
+					},
+				},
+			),
+			expectStdoutOutput: "entire response\n",
 		},
 		{
 			name: "get var spec, offset spec, quiet still prints",

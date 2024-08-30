@@ -61,17 +61,33 @@ func ParseVarScraperSpec(name, spec string) (VarScraper, error) {
 			return VarScraper{}, fmt.Errorf("%q is not in :START,END format", spec)
 		}
 
-		start, err := strconv.Atoi(offsets[0])
-		if err != nil {
-			return VarScraper{}, fmt.Errorf("%q: start offset: %w", spec, err)
+		var start, end int
+		var err error
+
+		if len(offsets[0]) > 0 {
+			start, err = strconv.Atoi(offsets[0])
+			if err != nil {
+				return VarScraper{}, fmt.Errorf("%q: start offset: %w", spec, err)
+			}
+
+			if start < 0 {
+				return VarScraper{}, fmt.Errorf("%q: start offset cannot be negative", spec)
+			}
 		}
 
-		end, err := strconv.Atoi(offsets[1])
-		if err != nil {
-			return VarScraper{}, fmt.Errorf("%q: end offset: %w", spec, err)
+		if len(offsets[1]) > 0 {
+			end, err = strconv.Atoi(offsets[1])
+			if err != nil {
+				return VarScraper{}, fmt.Errorf("%q: end offset: %w", spec, err)
+			}
+
+			if end < 0 {
+				return VarScraper{}, fmt.Errorf("%q: end offset cannot be negative", spec)
+			}
 		}
 
-		if end <= start {
+		// only matters if end is greater than 0; 0 means "to the end"
+		if end <= start && end != 0 {
 			return VarScraper{}, fmt.Errorf("end offset %d is less than or equal to start offset %d", end, start)
 		}
 
@@ -82,144 +98,153 @@ func ParseVarScraperSpec(name, spec string) (VarScraper, error) {
 		}, nil
 	}
 
-	// otherwise, it must be a JSON traversal. Use . as the path separator, and
+	// otherwise, . indicates a JSON traversal. Use . as the path separator, and
 	// [index] to for array indexes. Space chars and dots in keys are only
 	// allowed if key is quoted with double-quotes. Unquoted keys can contain
 	// any other character. Indexes must be integers. Quoted keys may contain a
 	// backslash to escape a quote or backslash.
 
 	// to make it easier, ensure that spec starts with a dot.
-	if !strings.HasPrefix(spec, ".") {
-		spec = "." + spec
-	}
+	if strings.HasPrefix(spec, ".") {
 
-	steps := []TraversalStep{}
-	var currentStep TraversalStep
+		steps := []TraversalStep{}
+		var currentStep TraversalStep
 
-	type mode int64
+		type mode int64
 
-	const (
-		none mode = iota
-		inKey
-		inQuotedKey
-		inIndex
-	)
+		const (
+			none mode = iota
+			inKey
+			inQuotedKey
+			inIndex
+		)
 
-	var curMode mode
+		var curMode mode
 
-	var curSymbol strings.Builder
+		var curSymbol strings.Builder
 
-	specR := []rune(spec)
-	for i := 0; i < len(specR); i++ {
-		ch := specR[i]
+		specR := []rune(spec)
+		for i := 0; i < len(specR); i++ {
+			ch := specR[i]
 
-		switch curMode {
-		case none:
-			if ch == '.' {
-				// lookahead to see if in quote
-				if i+1 < len(specR) && specR[i+1] == '"' {
-					curMode = inQuotedKey
-					i++
+			switch curMode {
+			case none:
+				if ch == '.' {
+					// lookahead to see if in quote
+					if i+1 < len(specR) && specR[i+1] == '"' {
+						curMode = inQuotedKey
+						i++
+					} else {
+						curMode = inKey
+					}
+				} else if ch == '[' {
+					curMode = inIndex
 				} else {
-					curMode = inKey
+					return VarScraper{}, fmt.Errorf("invalid character %q at position %d; should be either '.' to specify a key or '[' to specify an index", ch, i)
 				}
-			} else if ch == '[' {
-				curMode = inIndex
-			} else {
-				return VarScraper{}, fmt.Errorf("invalid character %q at position %d; should be either '.' to specify a key or '[' to specify an index", ch, i)
+			case inKey:
+				if ch == '.' || ch == '[' {
+					// at end of the key, add it to the steps, reset mode, and continue
+					// parsing at this index
+					symStr := curSymbol.String()
+					if symStr == "" {
+						return VarScraper{}, fmt.Errorf("missing key at position %d", i)
+					}
+					currentStep.Key = symStr
+					steps = append(steps, currentStep)
+					currentStep = TraversalStep{}
+					curSymbol.Reset()
+					curMode = none
+					i--
+				} else if ch == '\\' {
+					// escape character; consume next character
+					i++
+					if i >= len(specR) {
+						return VarScraper{}, fmt.Errorf("escape character at end of string")
+					}
+					curSymbol.WriteRune(specR[i])
+				} else if unicode.IsSpace(ch) {
+					return VarScraper{}, fmt.Errorf("unescaped whitespace character in key at position %d; quote key name or escape whitespace with '\\'", i)
+				} else {
+					curSymbol.WriteRune(ch)
+				}
+			case inQuotedKey:
+				if ch == '"' {
+					// end of quoted key
+					symStr := curSymbol.String()
+					if symStr == "" {
+						return VarScraper{}, fmt.Errorf("missing key at position %d", i)
+					}
+					currentStep.Key = symStr
+					steps = append(steps, currentStep)
+					currentStep = TraversalStep{}
+					curSymbol.Reset()
+					curMode = none
+				} else if ch == '\\' {
+					// escape character; consume next character
+					i++
+					if i >= len(specR) {
+						return VarScraper{}, fmt.Errorf("escape character at end of string")
+					}
+					curSymbol.WriteRune(specR[i])
+				} else {
+					curSymbol.WriteRune(ch)
+				}
+			case inIndex:
+				if ch == ']' {
+					// end of index
+					symStr := curSymbol.String()
+					if symStr == "" {
+						return VarScraper{}, fmt.Errorf("missing index at position %d", i)
+					}
+					index, err := strconv.Atoi(symStr)
+					if err != nil {
+						return VarScraper{}, fmt.Errorf("invalid index %q: %w", symStr, err)
+					}
+					currentStep.Index = index
+					steps = append(steps, currentStep)
+					currentStep = TraversalStep{}
+					curSymbol.Reset()
+					curMode = none
+				} else {
+					curSymbol.WriteRune(ch)
+				}
+			default:
+				// should never happen
+				return VarScraper{}, fmt.Errorf("invalid mode %d", curMode)
 			}
-		case inKey:
-			if ch == '.' || ch == '[' {
-				// at end of the key, add it to the steps, reset mode, and continue
-				// parsing at this index
-				symStr := curSymbol.String()
-				if symStr == "" {
-					return VarScraper{}, fmt.Errorf("missing key at position %d", i)
-				}
-				currentStep.Key = symStr
-				steps = append(steps, currentStep)
-				currentStep = TraversalStep{}
-				curSymbol.Reset()
-				curMode = none
-				i--
-			} else if ch == '\\' {
-				// escape character; consume next character
-				i++
-				if i >= len(specR) {
-					return VarScraper{}, fmt.Errorf("escape character at end of string")
-				}
-				curSymbol.WriteRune(specR[i])
-			} else if unicode.IsSpace(ch) {
-				return VarScraper{}, fmt.Errorf("unescaped whitespace character in key at position %d; quote key name or escape whitespace with '\\'", i)
-			} else {
-				curSymbol.WriteRune(ch)
-			}
-		case inQuotedKey:
-			if ch == '"' {
-				// end of quoted key
-				symStr := curSymbol.String()
-				if symStr == "" {
-					return VarScraper{}, fmt.Errorf("missing key at position %d", i)
-				}
-				currentStep.Key = symStr
-				steps = append(steps, currentStep)
-				currentStep = TraversalStep{}
-				curSymbol.Reset()
-				curMode = none
-			} else if ch == '\\' {
-				// escape character; consume next character
-				i++
-				if i >= len(specR) {
-					return VarScraper{}, fmt.Errorf("escape character at end of string")
-				}
-				curSymbol.WriteRune(specR[i])
-			} else {
-				curSymbol.WriteRune(ch)
-			}
-		case inIndex:
-			if ch == ']' {
-				// end of index
-				symStr := curSymbol.String()
-				if symStr == "" {
-					return VarScraper{}, fmt.Errorf("missing index at position %d", i)
-				}
-				index, err := strconv.Atoi(symStr)
-				if err != nil {
-					return VarScraper{}, fmt.Errorf("invalid index %q: %w", symStr, err)
-				}
-				currentStep.Index = index
-				steps = append(steps, currentStep)
-				currentStep = TraversalStep{}
-				curSymbol.Reset()
-				curMode = none
-			} else {
-				curSymbol.WriteRune(ch)
-			}
-		default:
-			// should never happen
-			return VarScraper{}, fmt.Errorf("invalid mode %d", curMode)
 		}
+
+		// we should be in mode none at the end, but it is valid to be in mode inKey
+		// as well
+		if curMode == inKey {
+			symStr := curSymbol.String()
+			if symStr == "" {
+				return VarScraper{}, fmt.Errorf("missing key at end of string")
+			}
+			currentStep.Key = symStr
+			steps = append(steps, currentStep)
+		} else if curMode == inQuotedKey {
+			return VarScraper{}, fmt.Errorf("unterminated quoted key at end of string")
+		} else if curMode == inIndex {
+			return VarScraper{}, fmt.Errorf("unterminated index at end of string")
+		}
+
+		return VarScraper{
+			Name:  name,
+			Steps: steps,
+		}, nil
 	}
 
-	// we should be in mode none at the end, but it is valid to be in mode inKey
-	// as well
-	if curMode == inKey {
-		symStr := curSymbol.String()
-		if symStr == "" {
-			return VarScraper{}, fmt.Errorf("missing key at end of string")
-		}
-		currentStep.Key = symStr
-		steps = append(steps, currentStep)
-	} else if curMode == inQuotedKey {
-		return VarScraper{}, fmt.Errorf("unterminated quoted key at end of string")
-	} else if curMode == inIndex {
-		return VarScraper{}, fmt.Errorf("unterminated index at end of string")
+	// else, check shorthand names for captures
+	switch strings.ToLower(spec) {
+	case "raw":
+		return VarScraper{
+			Name: name,
+		}, nil
+	default:
+		return VarScraper{}, fmt.Errorf("invalid var scraper spec %q", spec)
 	}
-
-	return VarScraper{
-		Name:  name,
-		Steps: steps,
-	}, nil
 }
 
 func ParseVarName(name string) (string, error) {
@@ -311,7 +336,17 @@ func (v VarScraper) Spec() string {
 			s += step.String()
 		}
 	} else {
-		s += fmt.Sprintf("offset %d,%d", v.OffsetStart, v.OffsetEnd)
+		if v.OffsetStart == 0 && v.OffsetEnd == 0 {
+			s += "entire response"
+		} else {
+			s += fmt.Sprintf("offset %d,", v.OffsetStart)
+
+			if v.OffsetEnd == 0 {
+				s += "<END>"
+			} else {
+				s += fmt.Sprintf("%d", v.OffsetEnd)
+			}
+		}
 	}
 	return s
 }
@@ -319,10 +354,16 @@ func (v VarScraper) Spec() string {
 func (v VarScraper) Scrape(data []byte) (string, error) {
 	if len(v.Steps) < 1 {
 		// binary offset only, just do a bounds check
-		if v.OffsetEnd > len(data) {
+		if v.OffsetEnd > 0 && v.OffsetEnd > len(data) {
 			return "", fmt.Errorf("end offset is %d but data length is only %d", v.OffsetEnd, len(data))
 		}
-		return string(data[v.OffsetStart:v.OffsetEnd]), nil
+
+		// if end is 0, return the rest of the data
+		if v.OffsetEnd == 0 {
+			return string(data[v.OffsetStart:]), nil
+		} else {
+			return string(data[v.OffsetStart:v.OffsetEnd]), nil
+		}
 	}
 
 	// otherwise, perform the traversal. hopefully we got either a JSON map or a

@@ -76,6 +76,20 @@ func Test_Caps_List(t *testing.T) {
 			expectStdoutOutput: "TROLL from entire response\n",
 		},
 		{
+			name: "req has 1 cap, negative end",
+			args: []string{"caps", "req1"},
+			p: testProject_withRequests(morc.RequestTemplate{
+				Name: "req1",
+				Captures: map[string]morc.VarScraper{
+					"troll": {
+						Name:      "troll",
+						OffsetEnd: -1,
+					},
+				},
+			}),
+			expectStdoutOutput: "TROLL from offset 0,<END-1>\n",
+		},
+		{
 			name: "req has 1 cap, omitted end",
 			args: []string{"caps", "req1"},
 			p: testProject_withRequests(morc.RequestTemplate{
@@ -410,6 +424,29 @@ func Test_Caps_New(t *testing.T) {
 				},
 			),
 			expectStdoutOutput: "Added capture from offset 28,<END> to $TROLL on req1\n",
+		},
+		{
+			name: "happy path - negative end offset",
+			args: []string{"caps", "req1", "-N", "troll", "-s", ":,-32"},
+			p: testProject_withRequests(
+				morc.RequestTemplate{
+					Name:     "req1",
+					Captures: map[string]morc.VarScraper{},
+				},
+			),
+			expectP: testProject_withRequests(
+				morc.RequestTemplate{
+					Name: "req1",
+					Captures: map[string]morc.VarScraper{
+						"TROLL": {
+							Name:        "TROLL",
+							OffsetStart: 0,
+							OffsetEnd:   -32,
+						},
+					},
+				},
+			),
+			expectStdoutOutput: "Added capture from offset 0,<END-32> to $TROLL on req1\n",
 		},
 		{
 			name: "happy path - offset missing start",

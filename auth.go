@@ -29,39 +29,39 @@ type AuthProof interface {
 	Type() AuthProofType
 }
 
-type basicAuth struct {
+type HTTPBasicCredentials struct {
 	username string
 	password string
 }
 
-func (b basicAuth) Apply(req *http.Request) error {
+func (b HTTPBasicCredentials) Apply(req *http.Request) error {
 	req.SetBasicAuth(b.username, b.password)
 	return nil
 }
 
-func (b basicAuth) Valid() bool {
+func (b HTTPBasicCredentials) Valid() bool {
 	return true
 }
 
-func (b basicAuth) Export() map[string]any {
+func (b HTTPBasicCredentials) Export() map[string]any {
 	return map[string]any{
 		"username": b.username,
 		"password": b.password,
 	}
 }
 
-func (b basicAuth) Type() AuthProofType {
+func (b HTTPBasicCredentials) Type() AuthProofType {
 	return AuthProofHTTPBasic
 }
 
-func NewHTTPBasicAuth(username, password string) AuthProof {
-	return basicAuth{
+func NewHTTPBasicCredentials(username, password string) AuthProof {
+	return HTTPBasicCredentials{
 		username: username,
 		password: password,
 	}
 }
 
-type oauth2Token struct {
+type Oauth2Token struct {
 	accessToken  string
 	tokenType    string // TODO: should support "bearer" and "mac".
 	refreshToken string
@@ -69,7 +69,7 @@ type oauth2Token struct {
 	Scope        []string
 }
 
-func (t oauth2Token) Apply(req *http.Request) error {
+func (t Oauth2Token) Apply(req *http.Request) error {
 	if t.tokenType == "bearer" {
 		req.Header.Set("Authorization", "Bearer "+t.accessToken)
 	} else if t.tokenType == "mac" {
@@ -81,7 +81,7 @@ func (t oauth2Token) Apply(req *http.Request) error {
 	return nil
 }
 
-func (t oauth2Token) Valid() bool {
+func (t Oauth2Token) Valid() bool {
 	if t.expiresAt.IsZero() {
 		return true
 	}
@@ -89,7 +89,7 @@ func (t oauth2Token) Valid() bool {
 	return time.Now().Before(t.expiresAt)
 }
 
-func (t oauth2Token) Export() map[string]any {
+func (t Oauth2Token) Export() map[string]any {
 	m := map[string]any{
 		"access_token": t.accessToken,
 		"token_type":   t.tokenType,
@@ -107,11 +107,21 @@ func (t oauth2Token) Export() map[string]any {
 	return m
 }
 
-func (t oauth2Token) Type() AuthProofType {
+func (t Oauth2Token) Type() AuthProofType {
 	return AuthProofOAuth2
 }
 
-func ImportHTTPBasicAuth(exported map[string]any) (AuthProof, error) {
+func NewOAuth2Token(accessToken, tokenType string, expiresAt time.Time, refreshToken string, scope []string) AuthProof {
+	return Oauth2Token{
+		accessToken:  accessToken,
+		tokenType:    tokenType,
+		expiresAt:    expiresAt,
+		refreshToken: refreshToken,
+		Scope:        scope,
+	}
+}
+
+func ImportHTTPBasicCreds(exported map[string]any) (AuthProof, error) {
 	var username string
 	var password string
 
@@ -132,7 +142,7 @@ func ImportHTTPBasicAuth(exported map[string]any) (AuthProof, error) {
 		return nil, errors.New("missing password")
 	}
 
-	return basicAuth{
+	return HTTPBasicCredentials{
 		username: username,
 		password: password,
 	}, nil
@@ -198,7 +208,7 @@ func ImportOAuth2Token(exported map[string]any) (AuthProof, error) {
 		}
 	}
 
-	return oauth2Token{
+	return Oauth2Token{
 		accessToken:  accessToken,
 		tokenType:    tokenType,
 		expiresAt:    expTime,
@@ -210,7 +220,7 @@ func ImportOAuth2Token(exported map[string]any) (AuthProof, error) {
 func ImportAuthProof(t AuthProofType, exported map[string]any) (AuthProof, error) {
 	switch t {
 	case AuthProofHTTPBasic:
-		return ImportHTTPBasicAuth(exported)
+		return ImportHTTPBasicCreds(exported)
 	case AuthProofOAuth2:
 		return ImportOAuth2Token(exported)
 	default:
@@ -219,7 +229,26 @@ func ImportAuthProof(t AuthProofType, exported map[string]any) (AuthProof, error
 }
 
 type Auth interface {
-	GetAuth() AuthProof // runs an auth flow if dynamic, or returns the static proof if static
+	GetAuth() (AuthProof, error) // runs an auth flow if dynamic, or returns the static proof if static
+	Static() bool
+}
+
+type HTTPBasicAuth struct {
+	proof HTTPBasicCredentials
+}
+
+func (ba HTTPBasicAuth) Static() bool {
+	return true
+}
+
+func (sa HTTPBasicAuth) GetAuth() (AuthProof, error) {
+	return sa.proof, nil
+}
+
+func NewHTTPBasicAuth(creds HTTPBasicCredentials) HTTPBasicAuth {
+	return HTTPBasicAuth{
+		proof: creds,
+	}
 }
 
 // everything below this point is very old and only POC level sketches. Trying a

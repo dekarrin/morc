@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -276,71 +275,6 @@ func (oa2 OAuth2AuthCodeGrantAuth) GetAuth() (AuthProof, error) {
 //
 // ALGO FLOW for password to token (NON OAuth2)-
 //
-
-type SpecType int
-
-const (
-	SpecBodyJSON SpecType = iota
-	SpecBodyOffset
-	SpecHeader
-	SpecCookie
-	SpecTrailer
-)
-
-// TODO: make everything that takes a BodyScraper actually take a Scraper. This
-// will be fairly non-trivial, make sure all types are accounted for.
-type Scraper interface {
-	String() string
-	Spec() string
-	Scrape(resp *http.Response, preReadBody []byte) (string, error)
-	Type() SpecType
-	EqualSpec(other Scraper) bool
-	VarName() string
-}
-
-type HeaderScraper struct {
-	Name  string
-	Key   string
-	Index int
-}
-
-func (hs HeaderScraper) VarName() string {
-	return hs.Name
-}
-
-func (hs HeaderScraper) String() string {
-	s := fmt.Sprintf("%s from ", strings.ToUpper(hs.Name))
-	s += hs.Spec()
-	return s
-}
-
-func (hs HeaderScraper) Spec() string {
-	return fmt.Sprintf("header %s[%d]", hs.Key, hs.Index)
-}
-
-func (hs HeaderScraper) Type() SpecType {
-	return SpecHeader
-}
-
-func (hs HeaderScraper) Scrape(resp *http.Response, preReadBody []byte) (string, error) {
-	vals := resp.Header.Values(hs.Key)
-
-	if len(vals) < 1 {
-		return "", fmt.Errorf("header %s is not present in response", hs.Key)
-	}
-
-	// neg header indexes specify from the end of the list
-	actualIndex := hs.Index
-	if actualIndex < 0 {
-		actualIndex = len(vals) + actualIndex
-	}
-
-	if len(vals) <= actualIndex {
-		return "", fmt.Errorf("header %s does not have a %d'th value; only %d values are present", hs.Key, hs.Index, len(vals))
-	}
-
-	return vals[actualIndex], nil
-}
 
 type DynamicAuth struct {
 	proof AuthProof // TODO: fill concrete type later

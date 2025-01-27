@@ -27,6 +27,64 @@ type Scraper interface {
 	VarName() string
 }
 
+type CookieScraper struct {
+	Name       string
+	CookieName string
+}
+
+func (cs CookieScraper) EqualSpec(other Scraper) bool {
+	if other == nil {
+		return false
+	}
+
+	if other.Type() != cs.Type() {
+		return false
+	}
+
+	ocs, ok := other.(CookieScraper)
+	if !ok {
+		return false
+	}
+
+	return cs.CookieName == ocs.CookieName
+}
+
+func (cs CookieScraper) Type() SpecType {
+	return SpecCookie
+}
+
+func (cs CookieScraper) VarName() string {
+	return cs.Name
+}
+
+func (cs CookieScraper) Spec() string {
+	return fmt.Sprintf("cookie %s", cs.CookieName)
+}
+
+func (cs CookieScraper) String() string {
+	s := fmt.Sprintf("%s from ", strings.ToUpper(cs.Name))
+	s += cs.Spec()
+	return s
+}
+
+func (cs CookieScraper) Scrape(resp *http.Response, preReadBody []byte) (string, error) {
+	var selectedCookie *http.Cookie
+
+	cookies := resp.Cookies()
+	for _, c := range cookies {
+		if strings.ToLower(c.Name) == strings.ToLower(cs.CookieName) {
+			selectedCookie = c
+			break
+		}
+	}
+
+	if selectedCookie == nil {
+		return "", fmt.Errorf("cookie %s is not present in response", cs.CookieName)
+	}
+
+	return selectedCookie.Value, nil
+}
+
 // HeaderScraper supports scraping from headers and trailers.
 type HeaderScraper struct {
 	Name    string

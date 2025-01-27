@@ -2,7 +2,6 @@ package commands
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/dekarrin/morc"
@@ -126,79 +125,32 @@ func parseSendArgs(cmd *cobra.Command, posArgs []string, args *sendArgs) error {
 }
 
 func sendTemplate(p *morc.Project, tmpl morc.RequestTemplate, vars map[string]string, skipVerify bool, varSymbol string, oc morc.OutputControl) (morc.SendResult, error) {
-	// TODO: flows will call this and persist on EVERY request which is probably not needed.
+	// TODO: flows will call this and persist on EVERY request which is probably not needed;
+	// consider directly calling p.Send and persisting only after everything.
 
-	if tmpl.Method == "" {
-		return morc.SendResult{}, fmt.Errorf("request template %s has no method set", tmpl.Name)
-	}
-
-	if tmpl.URL == "" {
-		return morc.SendResult{}, fmt.Errorf("request template %s has no URL set", tmpl.Name)
-	}
-
-	sendOpts := morc.SendOptions{
-		Vars:               vars,
-		Body:               tmpl.Body,
-		Headers:            tmpl.Headers,
-		Output:             oc,
-		CookieLifetime:     p.Config.CookieLifetime,
-		InsecureSkipVerify: skipVerify,
-	}
-
-	capVarNames := []string{}
-	for k := range tmpl.Captures {
-		capVarNames = append(capVarNames, k)
-	}
-	sort.Strings(capVarNames)
-	for _, k := range capVarNames {
-		sendOpts.Captures = append(sendOpts.Captures, tmpl.Captures[k])
-	}
-
-	if len(p.Session.Cookies) > 0 {
-		sendOpts.Cookies = p.Session.Cookies
-	}
-
-	// inject the http client, in case we are to use a specific one
-	sendOpts.Client = cmdio.HTTPClient
-
-	result, err := morc.Send(tmpl.Method, tmpl.URL, varSymbol, sendOpts)
+	result, err := p.Send(tmpl, vars, skipVerify, varSymbol, cmdio.HTTPClient, oc)
 	if err != nil {
 		return result, err
 	}
 
 	// if any variable changes occurred, persist to disk
 	if len(result.Captures) > 0 {
-		for k, v := range result.Captures {
-			p.Vars.Set(k, v)
-		}
 		err := writeProject(*p, false)
 		if err != nil {
 			return result, fmt.Errorf("save project to disk: %w", err)
 		}
 	}
 
-	// persist history
+	// persist history to disk
 	if p.Config.RecordHistory {
-		entry := morc.HistoryEntry{
-			Template: tmpl.Name,
-			ReqTime:  result.SendTime,
-			RespTime: result.RecvTime,
-			Request:  result.Request,
-			Response: result.Response,
-			Captures: result.Captures,
-		}
-
-		p.History = append(p.History, entry)
 		err := writeHistory(*p)
 		if err != nil {
 			return result, fmt.Errorf("save history to disk: %w", err)
 		}
 	}
 
-	// persist cookies
+	// persist cookies to disk, if any
 	if p.Config.RecordSession && len(result.Cookies) > 0 {
-		p.Session.Cookies = result.Cookies
-
 		err := writeSession(*p)
 		if err != nil {
 			return result, fmt.Errorf("save session to disk: %w", err)

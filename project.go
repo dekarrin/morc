@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -147,7 +148,6 @@ func (p Project) Dump(w io.Writer) error {
 
 // CookiesForURL returns the cookies that would be sent with a request to the
 // given URL made from the project.
-
 func (p Project) CookiesForURL(u *url.URL) []*http.Cookie {
 	if len(p.Session.Cookies) == 0 {
 		return nil
@@ -303,6 +303,77 @@ func (p Project) PersistToDisk(all bool) error {
 	}
 
 	return nil
+}
+
+// Send sends the request template and mutates the project accordingly. If
+// client is set, that is used as the client for the request and generally this
+// is only done during testing.
+func (p *Project) Send(tmpl RequestTemplate, vars map[string]string, skipVerify bool, varSymbol string, client *http.Client, oc OutputControl) (SendResult, error) {
+	if tmpl.Method == "" {
+		return SendResult{}, fmt.Errorf("request template %s has no method set", tmpl.Name)
+	}
+
+	if tmpl.URL == "" {
+		return SendResult{}, fmt.Errorf("request template %s has no URL set", tmpl.Name)
+	}
+
+	sendOpts := SendOptions{
+		Vars:               vars,
+		Body:               tmpl.Body,
+		Headers:            tmpl.Headers,
+		Output:             oc,
+		CookieLifetime:     p.Config.CookieLifetime,
+		InsecureSkipVerify: skipVerify,
+	}
+
+	capVarNames := []string{}
+	for k := range tmpl.Captures {
+		capVarNames = append(capVarNames, k)
+	}
+	sort.Strings(capVarNames)
+	for _, k := range capVarNames {
+		sendOpts.Captures = append(sendOpts.Captures, tmpl.Captures[k])
+	}
+
+	if len(p.Session.Cookies) > 0 {
+		sendOpts.Cookies = p.Session.Cookies
+	}
+
+	// inject the http client, in case we are to use a specific one
+	sendOpts.Client = client
+
+	result, err := Send(tmpl.Method, tmpl.URL, varSymbol, sendOpts)
+	if err != nil {
+		return result, err
+	}
+
+	// persist var captures
+	if len(result.Captures) > 0 {
+		for k, v := range result.Captures {
+			p.Vars.Set(k, v)
+		}
+	}
+
+	// persist history
+	if p.Config.RecordHistory {
+		entry := HistoryEntry{
+			Template: tmpl.Name,
+			ReqTime:  result.SendTime,
+			RespTime: result.RecvTime,
+			Request:  result.Request,
+			Response: result.Response,
+			Captures: result.Captures,
+		}
+
+		p.History = append(p.History, entry)
+	}
+
+	// persist cookies
+	if p.Config.RecordSession && len(result.Cookies) > 0 {
+		p.Session.Cookies = result.Cookies
+	}
+
+	return result, nil
 }
 
 func dumpToFile(path string, dumpFunc func(io.Writer) error) error {

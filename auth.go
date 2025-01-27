@@ -17,7 +17,7 @@ const (
 type AuthProof interface {
 	Apply(req *http.Request) error
 
-	// Valid returns false in the future.
+	// Valid returns whether the AuthProof is still valid.
 	Valid() bool
 
 	// Export returns a JSON-encodable map that can be used to recreate this
@@ -251,8 +251,64 @@ func NewHTTPBasicAuth(creds HTTPBasicCredentials) HTTPBasicAuth {
 	}
 }
 
-// everything below this point is very old and only POC level sketches. Trying a
-// more top-down approach now with code defined first.
+// TODO: when adding other grant types, consider if they can be combined into a
+// single type
+//
+// oauth flow doesn't really work great with CLI, look into grant types
+// that are betta and do those first
+type OAuth2AuthCodeGrantAuth struct {
+	clientID     string
+	clientSecret string
+}
+
+func (oa2 OAuth2AuthCodeGrantAuth) Static() bool {
+	return false
+}
+
+func (oa2 OAuth2AuthCodeGrantAuth) GetAuth() (AuthProof, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// ALGO FLOW for basic auth -
+//
+// * if basic auth, send the creds every time.
+//
+// ALGO FLOW for password to token (NON OAuth2)-
+//
+
+type DynamicAuth struct {
+	proof AuthProof // TODO: fill concrete type later
+
+	execFlow     string // either execFlow or execTemplate must be set
+	execTemplate string
+}
+
+func (da DynamicAuth) Static() bool {
+	return false
+}
+
+func (da DynamicAuth) GetAuth(p *Project) (AuthProof, error) {
+	if da.proof.Valid() {
+		return da.proof, nil
+	}
+
+	//   N: proceed to get one
+	//   Y: is it expired?
+	//	 	Y: proceed to get one.
+	//      N, OR cannot determine: Attempt to use it on the request.
+	// * Getting a new token:
+	//   *
+
+	// TODO: fallback needs to be implemented at some level to decide that a
+	// previously valid proof is not valid and could be re-obtained, but that's
+	// probably going to need to be at caller-level.
+	return nil, fmt.Errorf("not implemented")
+}
+
+// BASIC ALGO FLOW -
+//
+// 1. Does my proof need renewal?
+//    * That is, is the proof missing? OR is it present but expired?
 
 // req data model, flow-based:
 // - static: false (or omitted)

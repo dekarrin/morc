@@ -42,6 +42,7 @@ func (t TraversalStep) String() string {
 }
 
 func (t TraversalStep) Traverse(data interface{}) (interface{}, error) {
+	// TODO: what happens if given key/index is not present?
 	switch data := data.(type) {
 	case map[string]interface{}:
 		return data[t.Key], nil
@@ -284,45 +285,53 @@ type BodyScraper struct {
 	Steps       []TraversalStep // if non-nil, OffsetStart and OffsetEnd are ignored
 }
 
+func (bs BodyScraper) VarName() string {
+	return bs.Name
+}
+
 func (bs BodyScraper) String() string {
 	s := fmt.Sprintf("%s from ", strings.ToUpper(bs.Name))
 	s += bs.Spec()
 	return s
 }
 
-func (bs BodyScraper) IsOffsetSpec() bool {
-	return len(bs.Steps) == 0
+func (bs BodyScraper) Type() SpecType {
+	if len(bs.Steps) > 0 {
+		return SpecBodyJSON
+	}
+	return SpecBodyOffset
 }
 
-func (bs BodyScraper) IsJSONSpec() bool {
-	return len(bs.Steps) > 0
-}
-
-func (bs BodyScraper) EqualSpec(other BodyScraper) bool {
-	if bs.IsJSONSpec() {
-		if !other.IsJSONSpec() {
-			return false
-		}
-
-		for i := range bs.Steps {
-			if bs.Steps[i] != other.Steps[i] {
-				return false
-			}
-		}
-	} else if bs.IsOffsetSpec() {
-		if !other.IsOffsetSpec() {
-			return false
-		}
-
-		if bs.OffsetStart != other.OffsetStart || bs.OffsetEnd != other.OffsetEnd {
-			return false
-		}
-	} else {
-		// not comprable
+func (bs BodyScraper) EqualSpec(other Scraper) bool {
+	if other == nil {
 		return false
 	}
 
-	return true
+	var otherBodyScraper BodyScraper
+	var ok bool
+
+	if otherBodyScraper, ok = other.(BodyScraper); !ok {
+		return false
+	}
+
+	if otherBodyScraper.Type() != bs.Type() {
+		return false
+	}
+
+	if bs.Type() == SpecBodyJSON {
+		for i := range bs.Steps {
+			if bs.Steps[i] != otherBodyScraper.Steps[i] {
+				return false
+			}
+		}
+	} else if bs.Type() == SpecBodyOffset {
+		if bs.OffsetStart != otherBodyScraper.OffsetStart || bs.OffsetEnd != otherBodyScraper.OffsetEnd {
+			return false
+		}
+	}
+
+	// not comprable
+	return false
 }
 
 func (bs BodyScraper) Spec() string {
@@ -349,7 +358,9 @@ func (bs BodyScraper) Spec() string {
 	return s
 }
 
-func (bs BodyScraper) Scrape(data []byte) (string, error) {
+func (bs BodyScraper) Scrape(resp *http.Response, preReadBody []byte) (string, error) {
+	data := preReadBody
+
 	if len(bs.Steps) < 1 {
 		// binary offset only, just do a bounds check
 		if bs.OffsetEnd > 0 && bs.OffsetEnd > len(data) {
@@ -549,7 +560,7 @@ func (r *RESTClient) SendRequest(req *http.Request) (*http.Response, map[string]
 	// scrape vars from response
 	capturedVars := make(map[string]string)
 	for _, scraper := range r.Scrapers {
-		value, err := scraper.Scrape(respBody)
+		value, err := scraper.Scrape(resp, respBody)
 		if err != nil {
 			return resp, nil, fmt.Errorf("scrape %s: %w", scraper.Name, err)
 		}

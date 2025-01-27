@@ -292,9 +292,9 @@ func invokeCapsNew(io cmdio.IO, projFile, reqName, varName string, attrs capAttr
 	}
 
 	var scrapeSource string
-	if cap.IsJSONSpec() {
+	if cap.Type() == morc.SpecBodyJSON {
 		scrapeSource = "path " + cap.Spec()
-	} else if cap.IsOffsetSpec() {
+	} else if cap.Type() == morc.SpecBodyOffset {
 		scrapeSource = cap.Spec()
 	}
 

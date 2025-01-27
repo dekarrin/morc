@@ -56,19 +56,14 @@ func invokeSend(io cmdio.IO, projFile, reqName string, varOverrides map[string]s
 		return err
 	}
 
-	// case doesn't matter for request template names
-	reqName = strings.ToLower(reqName)
-
-	// check if the project already has a request with the same name
-	tmpl, ok := p.Templates[reqName]
-	if !ok {
-		return fmt.Errorf("no request template %s", reqName)
-	}
-
 	oc.Writer = io.Out
 
-	_, err = sendTemplate(&p, tmpl, p.Vars.MergedSet(varOverrides), skipVerify, prefixOverride.Or(p.VarPrefix()), oc)
-	return err
+	results, err := p.Send(reqName, varOverrides, skipVerify, prefixOverride.Or(""), cmdio.HTTPClient, oc)
+	if err != nil {
+		return err
+	}
+
+	return persistSendResults(p, len(results.Captures) > 0, len(results.Cookies) > 0)
 }
 
 type sendArgs struct {
@@ -124,38 +119,30 @@ func parseSendArgs(cmd *cobra.Command, posArgs []string, args *sendArgs) error {
 	return nil
 }
 
-func sendTemplate(p *morc.Project, tmpl morc.RequestTemplate, vars map[string]string, skipVerify bool, varSymbol string, oc morc.OutputControl) (morc.SendResult, error) {
-	// TODO: flows will call this and persist on EVERY request which is probably not needed;
-	// consider directly calling p.Send and persisting only after everything.
-
-	result, err := p.Send(tmpl, vars, skipVerify, varSymbol, cmdio.HTTPClient, oc)
-	if err != nil {
-		return result, err
-	}
-
+func persistSendResults(p morc.Project, varsWereSet, cookiesWereSet bool) error {
 	// if any variable changes occurred, persist to disk
-	if len(result.Captures) > 0 {
-		err := writeProject(*p, false)
+	if varsWereSet {
+		err := writeProject(p, false)
 		if err != nil {
-			return result, fmt.Errorf("save project to disk: %w", err)
+			return fmt.Errorf("save project to disk: %w", err)
 		}
 	}
 
 	// persist history to disk
 	if p.Config.RecordHistory {
-		err := writeHistory(*p)
+		err := writeHistory(p)
 		if err != nil {
-			return result, fmt.Errorf("save history to disk: %w", err)
+			return fmt.Errorf("save history to disk: %w", err)
 		}
 	}
 
 	// persist cookies to disk, if any
-	if p.Config.RecordSession && len(result.Cookies) > 0 {
-		err := writeSession(*p)
+	if p.Config.RecordSession && cookiesWereSet {
+		err := writeSession(p)
 		if err != nil {
-			return result, fmt.Errorf("save session to disk: %w", err)
+			return fmt.Errorf("save session to disk: %w", err)
 		}
 	}
 
-	return result, nil
+	return nil
 }

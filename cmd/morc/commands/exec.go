@@ -54,53 +54,14 @@ func invokeExec(io cmdio.IO, projFile, flowName string, initialVarOverrides map[
 		return err
 	}
 
-	// case doesn't matter for flow names
-	flowName = strings.ToLower(flowName)
-
-	// check if the project even has a flow with that name
-	flow, ok := p.Flows[flowName]
-	if !ok {
-		return fmt.Errorf("no flow named %s", flowName)
-	}
-
-	// now get all the templates and ensure they are valid
-	var templates []morc.RequestTemplate
-	for i, step := range flow.Steps {
-		tmpl, ok := p.Templates[strings.ToLower(step.Template)]
-		if !ok {
-			return fmt.Errorf("flow %s calls non-existent request template %q in step #%d", flowName, step.Template, i-1)
-		}
-		if !tmpl.Sendable() {
-			return fmt.Errorf("flow %s calls incomplete request template %s in step #%d", flowName, step.Template, i-1)
-		}
-
-		templates = append(templates, tmpl)
-	}
-
-	varOverrides := make(map[string]string)
-	// copy in the one-time vars
-	for k, v := range initialVarOverrides {
-		varOverrides[strings.ToUpper(k)] = v
-	}
-
-	varPrefix := prefixOverride.Or(p.VarPrefix())
-
 	oc.Writer = io.Out
-	for i, tmpl := range templates {
-		// persistence should be covered in sendTemplate
-		result, err := sendTemplate(&p, tmpl, p.Vars.MergedSet(varOverrides), skipVerify, varPrefix, oc)
-		if err != nil {
-			return fmt.Errorf("step #%d: %w", i, err)
-		}
 
-		// okay, need to update the varOverrides because if any were just
-		// captured, THAT is the new canonical value of the var
-		for k := range result.Captures {
-			delete(varOverrides, strings.ToUpper(k))
-		}
+	varsSet, cookiesSet, err := p.Exec(flowName, initialVarOverrides, skipVerify, prefixOverride.Or(""), cmdio.HTTPClient, oc)
+	if err != nil {
+		return err
 	}
 
-	return nil
+	return persistSendResults(p, varsSet, cookiesSet)
 }
 
 type execArgs struct {

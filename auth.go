@@ -292,12 +292,7 @@ func (da DynamicAuth) GetAuth(p *Project) (AuthProof, error) {
 		return da.proof, nil
 	}
 
-	//   N: proceed to get one
-	//   Y: is it expired?
-	//	 	Y: proceed to get one.
-	//      N, OR cannot determine: Attempt to use it on the request.
-	// * Getting a new token:
-	//   *
+	if da.
 
 	// TODO: fallback needs to be implemented at some level to decide that a
 	// previously valid proof is not valid and could be re-obtained, but that's

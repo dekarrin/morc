@@ -305,10 +305,93 @@ func (p Project) PersistToDisk(all bool) error {
 	return nil
 }
 
-// Send sends the request template and mutates the project accordingly. If
+// Exec sends the given flow by name and mutates the project accordingly.
+func (p *Project) Exec(flowName string, initialVarOverrides map[string]string, skipVerify bool, prefixOverride string, httpClient *http.Client, oc OutputControl) (varsSet bool, cookiesSet bool, err error) {
+	// case doesn't matter for flow names
+	flowName = strings.ToLower(flowName)
+
+	// check if the project even has a flow with that name
+	flow, ok := p.Flows[flowName]
+	if !ok {
+		return false, false, fmt.Errorf("no flow named %s", flowName)
+	}
+
+	// now get all the templates and ensure they are valid
+	var templates []RequestTemplate
+	for i, step := range flow.Steps {
+		tmpl, ok := p.Templates[strings.ToLower(step.Template)]
+		if !ok {
+			return false, false, fmt.Errorf("flow %s calls non-existent request template %q in step #%d", flowName, step.Template, i-1)
+		}
+		if !tmpl.Sendable() {
+			return false, false, fmt.Errorf("flow %s calls incomplete request template %s in step #%d", flowName, step.Template, i-1)
+		}
+
+		templates = append(templates, tmpl)
+	}
+
+	varOverrides := make(map[string]string)
+	// copy in the one-time vars
+	for k, v := range initialVarOverrides {
+		varOverrides[strings.ToUpper(k)] = v
+	}
+
+	prefix := p.VarPrefix()
+	if prefixOverride != "" {
+		prefix = prefixOverride
+	}
+
+	for i, tmpl := range templates {
+		// persistence is not covered in sendTemplate
+		result, err := p.SendTemplate(tmpl, p.Vars.MergedSet(varOverrides), skipVerify, prefix, httpClient, oc)
+		// TODO: persist? else caller needs to do it.
+
+		if err != nil {
+			return false, false, fmt.Errorf("step #%d: %w", i, err)
+		}
+
+		if len(result.Captures) > 0 {
+			varsSet = true
+		}
+
+		if len(result.Cookies) > 0 {
+			cookiesSet = true
+		}
+
+		// okay, need to update the varOverrides because if any were just
+		// captured, THAT is the new canonical value of the var
+		for k := range result.Captures {
+			delete(varOverrides, strings.ToUpper(k))
+		}
+	}
+
+	return varsSet, cookiesSet, nil
+}
+
+// Send sends the given request template by name and mutates the project
+// accordingly.
+func (p *Project) Send(reqName string, varOverrides map[string]string, skipVerify bool, prefixOverride string, httpClient *http.Client, oc OutputControl) (SendResult, error) {
+	// case doesn't matter for request template names
+	reqName = strings.ToLower(reqName)
+
+	// check if the project already has a request with the same name
+	tmpl, ok := p.Templates[reqName]
+	if !ok {
+		return SendResult{}, fmt.Errorf("no request template %s", reqName)
+	}
+
+	prefix := p.VarPrefix()
+	if prefixOverride != "" {
+		prefix = prefixOverride
+	}
+
+	return p.SendTemplate(tmpl, p.Vars.MergedSet(varOverrides), skipVerify, prefix, httpClient, oc)
+}
+
+// SendTemplate sends the request template and mutates the project accordingly. If
 // client is set, that is used as the client for the request and generally this
 // is only done during testing.
-func (p *Project) Send(tmpl RequestTemplate, vars map[string]string, skipVerify bool, varSymbol string, client *http.Client, oc OutputControl) (SendResult, error) {
+func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, skipVerify bool, varSymbol string, httpClient *http.Client, oc OutputControl) (SendResult, error) {
 	if tmpl.Method == "" {
 		return SendResult{}, fmt.Errorf("request template %s has no method set", tmpl.Name)
 	}
@@ -324,6 +407,7 @@ func (p *Project) Send(tmpl RequestTemplate, vars map[string]string, skipVerify 
 		Output:             oc,
 		CookieLifetime:     p.Config.CookieLifetime,
 		InsecureSkipVerify: skipVerify,
+		Client:             httpClient,
 	}
 
 	capVarNames := []string{}
@@ -338,9 +422,6 @@ func (p *Project) Send(tmpl RequestTemplate, vars map[string]string, skipVerify 
 	if len(p.Session.Cookies) > 0 {
 		sendOpts.Cookies = p.Session.Cookies
 	}
-
-	// inject the http client, in case we are to use a specific one
-	sendOpts.Client = client
 
 	result, err := Send(tmpl.Method, tmpl.URL, varSymbol, sendOpts)
 	if err != nil {

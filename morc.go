@@ -52,13 +52,13 @@ func (t TraversalStep) Traverse(data interface{}) (interface{}, error) {
 	}
 }
 
-func ParseVarScraperSpec(name, spec string) (VarScraper, error) {
+func ParseVarScraperSpec(name, spec string) (BodyScraper, error) {
 	// okay, are we looking at a byte offset or a JSON traversal?
 	if strings.HasPrefix(spec, ":") {
 		// it is a byte offset of the form ":START,END"
 		offsets := strings.SplitN(spec[1:], ",", 2)
 		if len(offsets) != 2 {
-			return VarScraper{}, fmt.Errorf("%q is not in :START,END format", spec)
+			return BodyScraper{}, fmt.Errorf("%q is not in :START,END format", spec)
 		}
 
 		var start, end int
@@ -67,27 +67,27 @@ func ParseVarScraperSpec(name, spec string) (VarScraper, error) {
 		if len(offsets[0]) > 0 {
 			start, err = strconv.Atoi(offsets[0])
 			if err != nil {
-				return VarScraper{}, fmt.Errorf("%q: start offset: %w", spec, err)
+				return BodyScraper{}, fmt.Errorf("%q: start offset: %w", spec, err)
 			}
 
 			if start < 0 {
-				return VarScraper{}, fmt.Errorf("%q: start offset cannot be negative", spec)
+				return BodyScraper{}, fmt.Errorf("%q: start offset cannot be negative", spec)
 			}
 		}
 
 		if len(offsets[1]) > 0 {
 			end, err = strconv.Atoi(offsets[1])
 			if err != nil {
-				return VarScraper{}, fmt.Errorf("%q: end offset: %w", spec, err)
+				return BodyScraper{}, fmt.Errorf("%q: end offset: %w", spec, err)
 			}
 		}
 
 		// only matters if end is greater than 0; 0 means "to the end", -1 means 1 from the end, etc.
 		if end <= start && end > 0 {
-			return VarScraper{}, fmt.Errorf("end offset %d is less than or equal to start offset %d", end, start)
+			return BodyScraper{}, fmt.Errorf("end offset %d is less than or equal to start offset %d", end, start)
 		}
 
-		return VarScraper{
+		return BodyScraper{
 			Name:        name,
 			OffsetStart: start,
 			OffsetEnd:   end,
@@ -136,7 +136,7 @@ func ParseVarScraperSpec(name, spec string) (VarScraper, error) {
 				} else if ch == '[' {
 					curMode = inIndex
 				} else {
-					return VarScraper{}, fmt.Errorf("invalid character %q at position %d; should be either '.' to specify a key or '[' to specify an index", ch, i)
+					return BodyScraper{}, fmt.Errorf("invalid character %q at position %d; should be either '.' to specify a key or '[' to specify an index", ch, i)
 				}
 			case inKey:
 				if ch == '.' || ch == '[' {
@@ -144,7 +144,7 @@ func ParseVarScraperSpec(name, spec string) (VarScraper, error) {
 					// parsing at this index
 					symStr := curSymbol.String()
 					if symStr == "" {
-						return VarScraper{}, fmt.Errorf("missing key at position %d", i)
+						return BodyScraper{}, fmt.Errorf("missing key at position %d", i)
 					}
 					currentStep.Key = symStr
 					steps = append(steps, currentStep)
@@ -156,11 +156,11 @@ func ParseVarScraperSpec(name, spec string) (VarScraper, error) {
 					// escape character; consume next character
 					i++
 					if i >= len(specR) {
-						return VarScraper{}, fmt.Errorf("escape character at end of string")
+						return BodyScraper{}, fmt.Errorf("escape character at end of string")
 					}
 					curSymbol.WriteRune(specR[i])
 				} else if unicode.IsSpace(ch) {
-					return VarScraper{}, fmt.Errorf("unescaped whitespace character in key at position %d; quote key name or escape whitespace with '\\'", i)
+					return BodyScraper{}, fmt.Errorf("unescaped whitespace character in key at position %d; quote key name or escape whitespace with '\\'", i)
 				} else {
 					curSymbol.WriteRune(ch)
 				}
@@ -169,7 +169,7 @@ func ParseVarScraperSpec(name, spec string) (VarScraper, error) {
 					// end of quoted key
 					symStr := curSymbol.String()
 					if symStr == "" {
-						return VarScraper{}, fmt.Errorf("missing key at position %d", i)
+						return BodyScraper{}, fmt.Errorf("missing key at position %d", i)
 					}
 					currentStep.Key = symStr
 					steps = append(steps, currentStep)
@@ -180,7 +180,7 @@ func ParseVarScraperSpec(name, spec string) (VarScraper, error) {
 					// escape character; consume next character
 					i++
 					if i >= len(specR) {
-						return VarScraper{}, fmt.Errorf("escape character at end of string")
+						return BodyScraper{}, fmt.Errorf("escape character at end of string")
 					}
 					curSymbol.WriteRune(specR[i])
 				} else {
@@ -191,11 +191,11 @@ func ParseVarScraperSpec(name, spec string) (VarScraper, error) {
 					// end of index
 					symStr := curSymbol.String()
 					if symStr == "" {
-						return VarScraper{}, fmt.Errorf("missing index at position %d", i)
+						return BodyScraper{}, fmt.Errorf("missing index at position %d", i)
 					}
 					index, err := strconv.Atoi(symStr)
 					if err != nil {
-						return VarScraper{}, fmt.Errorf("invalid index %q: %w", symStr, err)
+						return BodyScraper{}, fmt.Errorf("invalid index %q: %w", symStr, err)
 					}
 					currentStep.Index = index
 					steps = append(steps, currentStep)
@@ -207,7 +207,7 @@ func ParseVarScraperSpec(name, spec string) (VarScraper, error) {
 				}
 			default:
 				// should never happen
-				return VarScraper{}, fmt.Errorf("invalid mode %d", curMode)
+				return BodyScraper{}, fmt.Errorf("invalid mode %d", curMode)
 			}
 		}
 
@@ -216,17 +216,17 @@ func ParseVarScraperSpec(name, spec string) (VarScraper, error) {
 		if curMode == inKey {
 			symStr := curSymbol.String()
 			if symStr == "" {
-				return VarScraper{}, fmt.Errorf("missing key at end of string")
+				return BodyScraper{}, fmt.Errorf("missing key at end of string")
 			}
 			currentStep.Key = symStr
 			steps = append(steps, currentStep)
 		} else if curMode == inQuotedKey {
-			return VarScraper{}, fmt.Errorf("unterminated quoted key at end of string")
+			return BodyScraper{}, fmt.Errorf("unterminated quoted key at end of string")
 		} else if curMode == inIndex {
-			return VarScraper{}, fmt.Errorf("unterminated index at end of string")
+			return BodyScraper{}, fmt.Errorf("unterminated index at end of string")
 		}
 
-		return VarScraper{
+		return BodyScraper{
 			Name:  name,
 			Steps: steps,
 		}, nil
@@ -235,11 +235,11 @@ func ParseVarScraperSpec(name, spec string) (VarScraper, error) {
 	// else, check shorthand names for captures
 	switch strings.ToLower(spec) {
 	case "raw":
-		return VarScraper{
+		return BodyScraper{
 			Name: name,
 		}, nil
 	default:
-		return VarScraper{}, fmt.Errorf("invalid var scraper spec %q", spec)
+		return BodyScraper{}, fmt.Errorf("invalid var scraper spec %q", spec)
 	}
 }
 
@@ -257,7 +257,7 @@ func ParseVarName(name string) (string, error) {
 	return name, nil
 }
 
-func ParseVarScraper(s string) (VarScraper, error) {
+func ParseVarScraper(s string) (BodyScraper, error) {
 	// Parse var scraper specification strings of the form "NAME::START,END" for
 	// byte offsets and "NAME:key1.key2[index1]...keyN" for JSON traversal with array
 	// indexes and object keys in a syntax similar to jq.
@@ -265,56 +265,56 @@ func ParseVarScraper(s string) (VarScraper, error) {
 	// first, split name from spec:
 	parts := strings.SplitN(s, ":", 2)
 	if len(parts) != 2 {
-		return VarScraper{}, fmt.Errorf("not in NAME:SPEC format")
+		return BodyScraper{}, fmt.Errorf("not in NAME:SPEC format")
 	}
 
 	name, err := ParseVarName(parts[0])
 	if err != nil {
-		return VarScraper{}, err
+		return BodyScraper{}, err
 	}
 	spec := parts[1]
 
 	return ParseVarScraperSpec(name, spec)
 }
 
-type VarScraper struct {
+type BodyScraper struct {
 	Name        string
 	OffsetStart int
 	OffsetEnd   int
 	Steps       []TraversalStep // if non-nil, OffsetStart and OffsetEnd are ignored
 }
 
-func (v VarScraper) String() string {
-	s := fmt.Sprintf("%s from ", strings.ToUpper(v.Name))
-	s += v.Spec()
+func (bs BodyScraper) String() string {
+	s := fmt.Sprintf("%s from ", strings.ToUpper(bs.Name))
+	s += bs.Spec()
 	return s
 }
 
-func (v VarScraper) IsOffsetSpec() bool {
-	return len(v.Steps) == 0
+func (bs BodyScraper) IsOffsetSpec() bool {
+	return len(bs.Steps) == 0
 }
 
-func (v VarScraper) IsJSONSpec() bool {
-	return len(v.Steps) > 0
+func (bs BodyScraper) IsJSONSpec() bool {
+	return len(bs.Steps) > 0
 }
 
-func (v VarScraper) EqualSpec(other VarScraper) bool {
-	if v.IsJSONSpec() {
+func (bs BodyScraper) EqualSpec(other BodyScraper) bool {
+	if bs.IsJSONSpec() {
 		if !other.IsJSONSpec() {
 			return false
 		}
 
-		for i := range v.Steps {
-			if v.Steps[i] != other.Steps[i] {
+		for i := range bs.Steps {
+			if bs.Steps[i] != other.Steps[i] {
 				return false
 			}
 		}
-	} else if v.IsOffsetSpec() {
+	} else if bs.IsOffsetSpec() {
 		if !other.IsOffsetSpec() {
 			return false
 		}
 
-		if v.OffsetStart != other.OffsetStart || v.OffsetEnd != other.OffsetEnd {
+		if bs.OffsetStart != other.OffsetStart || bs.OffsetEnd != other.OffsetEnd {
 			return false
 		}
 	} else {
@@ -325,49 +325,49 @@ func (v VarScraper) EqualSpec(other VarScraper) bool {
 	return true
 }
 
-func (v VarScraper) Spec() string {
+func (bs BodyScraper) Spec() string {
 	s := ""
-	if len(v.Steps) > 0 {
-		for _, step := range v.Steps {
+	if len(bs.Steps) > 0 {
+		for _, step := range bs.Steps {
 			s += step.String()
 		}
 	} else {
-		if v.OffsetStart == 0 && v.OffsetEnd == 0 {
+		if bs.OffsetStart == 0 && bs.OffsetEnd == 0 {
 			s += "entire response"
 		} else {
-			s += fmt.Sprintf("offset %d,", v.OffsetStart)
+			s += fmt.Sprintf("offset %d,", bs.OffsetStart)
 
-			if v.OffsetEnd == 0 {
+			if bs.OffsetEnd == 0 {
 				s += "<END>"
-			} else if v.OffsetEnd < 0 {
-				s += fmt.Sprintf("<END%d>", v.OffsetEnd)
+			} else if bs.OffsetEnd < 0 {
+				s += fmt.Sprintf("<END%d>", bs.OffsetEnd)
 			} else {
-				s += fmt.Sprintf("%d", v.OffsetEnd)
+				s += fmt.Sprintf("%d", bs.OffsetEnd)
 			}
 		}
 	}
 	return s
 }
 
-func (v VarScraper) Scrape(data []byte) (string, error) {
-	if len(v.Steps) < 1 {
+func (bs BodyScraper) Scrape(data []byte) (string, error) {
+	if len(bs.Steps) < 1 {
 		// binary offset only, just do a bounds check
-		if v.OffsetEnd > 0 && v.OffsetEnd > len(data) {
-			return "", fmt.Errorf("end offset is %d but data length is only %d", v.OffsetEnd, len(data))
+		if bs.OffsetEnd > 0 && bs.OffsetEnd > len(data) {
+			return "", fmt.Errorf("end offset is %d but data length is only %d", bs.OffsetEnd, len(data))
 		}
 
 		// if end is 0, return the rest of the data
-		if v.OffsetEnd == 0 {
-			return string(data[v.OffsetStart:]), nil
-		} else if v.OffsetEnd < 0 {
+		if bs.OffsetEnd == 0 {
+			return string(data[bs.OffsetStart:]), nil
+		} else if bs.OffsetEnd < 0 {
 			// bounds check
-			actualEnd := len(data) + v.OffsetEnd
-			if actualEnd < v.OffsetStart {
-				return "", fmt.Errorf("effective end offset of %d (%d) is less than start offset %d", v.OffsetEnd, actualEnd, v.OffsetStart)
+			actualEnd := len(data) + bs.OffsetEnd
+			if actualEnd < bs.OffsetStart {
+				return "", fmt.Errorf("effective end offset of %d (%d) is less than start offset %d", bs.OffsetEnd, actualEnd, bs.OffsetStart)
 			}
-			return string(data[v.OffsetStart:actualEnd]), nil
+			return string(data[bs.OffsetStart:actualEnd]), nil
 		} else {
-			return string(data[v.OffsetStart:v.OffsetEnd]), nil
+			return string(data[bs.OffsetStart:bs.OffsetEnd]), nil
 		}
 	}
 
@@ -406,11 +406,11 @@ func (v VarScraper) Scrape(data []byte) (string, error) {
 
 	// now that we have the parsed data, apply traversal steps
 	var err error
-	for idx, step := range v.Steps {
+	for idx, step := range bs.Steps {
 		jsonData, err = step.Traverse(jsonData)
 		if err != nil {
 			errSequence := ""
-			for _, oldStep := range v.Steps[:idx+1] {
+			for _, oldStep := range bs.Steps[:idx+1] {
 				errSequence += oldStep.String()
 			}
 			return "", fmt.Errorf("traversal error at %s: %w", errSequence, err)
@@ -432,7 +432,7 @@ type RESTClient struct {
 	VarOverrides map[string]string // Cleared after every call to SendRequest.
 	VarPrefix    string
 
-	Scrapers []VarScraper
+	Scrapers []BodyScraper
 
 	// cookie jar that records all SetCookies calls; this is a pointer to the
 	// same jar that is passed to HTTP
@@ -469,7 +469,7 @@ func NewRESTClient(cookieLifetime time.Duration, httpClient *http.Client) *RESTC
 		http:      httpClient,
 		Vars:      make(map[string]string),
 		VarPrefix: "$",
-		Scrapers:  make([]VarScraper, 0),
+		Scrapers:  make([]BodyScraper, 0),
 		jar:       cookies,
 	}
 }
@@ -918,7 +918,7 @@ type SendOptions struct {
 	// Captures is a list of variable scrapers that will be used to extract
 	// values from the response body. The captured values *will* be kept in any
 	// saved state (should state save be requested).
-	Captures []VarScraper
+	Captures []BodyScraper
 
 	// LoadStateFile is the path to a state file that should be loaded before
 	// sending the request. If this is set, the state file will be loaded and

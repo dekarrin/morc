@@ -279,8 +279,8 @@ func (oa2 OAuth2AuthCodeGrantAuth) GetAuth() (AuthProof, error) {
 type DynamicAuth struct {
 	proof AuthProof // TODO: fill concrete type later
 
-	execFlow     string // either execFlow or execTemplate must be set
-	execTemplate string
+	getAuthFlow     string // either execFlow or execTemplate must be set
+	getAuthTemplate string
 }
 
 func (da DynamicAuth) Static() bool {
@@ -292,11 +292,25 @@ func (da DynamicAuth) GetAuth(p *Project, skipVerify bool, httpClient *http.Clie
 		return da.proof, nil
 	}
 
-	if da.execFlow != "" {
+	var lastResult SendResult
+	var err error
+	if da.getAuthFlow != "" {
 		// TODO: pre-examine flow to ensure it doesn't itself end up calling
 		// itself recursively.
 
-		p.Exec(da.execFlow, nil, skipVerify, "", httpClient, oc)
+		res, err := p.Exec(da.getAuthFlow, nil, skipVerify, "", httpClient, oc)
+		if err != nil {
+			return nil, fmt.Errorf("auth flow %q failed: %w", da.getAuthFlow, err)
+		}
+		if len(res) == 0 {
+			return nil, fmt.Errorf("auth flow %q did not return any results", da.getAuthFlow)
+		}
+		lastResult = res[0]
+	} else if da.getAuthTemplate != "" {
+		lastResult, err = p.Send(da.getAuthTemplate, nil, skipVerify, "", httpClient, oc)
+		if err != nil {
+			return nil, fmt.Errorf("auth request template %q failed: %w", da.getAuthTemplate, err)
+		}
 	}
 
 	// TODO: fallback needs to be implemented at some level to decide that a

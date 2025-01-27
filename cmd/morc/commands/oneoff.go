@@ -124,7 +124,7 @@ type oneoffArgs struct {
 	stateFileIn  string
 	stateFileOut string
 	vars         map[string]string
-	captures     []morc.VarScraper
+	captures     []morc.BodyScraper
 	headers      http.Header
 	bodyData     []byte
 	outputCtrl   morc.OutputControl
@@ -159,7 +159,7 @@ func parseOneoffArgs(cmd *cobra.Command, posArgs []string, args *oneoffArgs) err
 
 	// check get vars
 	if len(flags.CaptureVars) > 0 {
-		scrapers := []morc.VarScraper{}
+		scrapers := []morc.BodyScraper{}
 
 		for idx, gv := range flags.CaptureVars {
 			scraper, err := morc.ParseVarScraper(gv)

@@ -179,7 +179,7 @@ func Test_Send(t *testing.T) {
 						Name:   "testreq",
 						Method: "GET",
 						URL:    "/",
-						Captures: map[string]morc.VarScraper{
+						Captures: map[string]morc.BodyScraper{
 							"TEST": {Name: "TEST", OffsetStart: 18, OffsetEnd: 24},
 						},
 					},
@@ -191,7 +191,7 @@ func Test_Send(t *testing.T) {
 						Name:   "testreq",
 						Method: "GET",
 						URL:    "/",
-						Captures: map[string]morc.VarScraper{
+						Captures: map[string]morc.BodyScraper{
 							"TEST": {Name: "TEST", OffsetStart: 18, OffsetEnd: 24},
 						},
 					},
@@ -217,7 +217,7 @@ func Test_Send(t *testing.T) {
 						Name:   "testreq",
 						Method: "GET",
 						URL:    "/",
-						Captures: map[string]morc.VarScraper{
+						Captures: map[string]morc.BodyScraper{
 							"TEST": {Name: "TEST", Steps: []morc.TraversalStep{
 								{Key: "name"},
 								{Key: "last"},
@@ -232,7 +232,7 @@ func Test_Send(t *testing.T) {
 						Name:   "testreq",
 						Method: "GET",
 						URL:    "/",
-						Captures: map[string]morc.VarScraper{
+						Captures: map[string]morc.BodyScraper{
 							"TEST": {Name: "TEST", Steps: []morc.TraversalStep{
 								{Key: "name"},
 								{Key: "last"},
@@ -261,7 +261,7 @@ func Test_Send(t *testing.T) {
 						Name:   "testreq",
 						Method: "GET",
 						URL:    "/",
-						Captures: map[string]morc.VarScraper{
+						Captures: map[string]morc.BodyScraper{
 							"TEST": {Name: "TEST"},
 						},
 					},
@@ -273,7 +273,7 @@ func Test_Send(t *testing.T) {
 						Name:   "testreq",
 						Method: "GET",
 						URL:    "/",
-						Captures: map[string]morc.VarScraper{
+						Captures: map[string]morc.BodyScraper{
 							"TEST": {Name: "TEST"},
 						},
 					},
@@ -298,7 +298,7 @@ func Test_Send(t *testing.T) {
 						Name:   "testreq",
 						Method: "GET",
 						URL:    "/",
-						Captures: map[string]morc.VarScraper{
+						Captures: map[string]morc.BodyScraper{
 							"TEST": {Name: "TEST", OffsetEnd: -2},
 						},
 					},
@@ -310,7 +310,7 @@ func Test_Send(t *testing.T) {
 						Name:   "testreq",
 						Method: "GET",
 						URL:    "/",
-						Captures: map[string]morc.VarScraper{
+						Captures: map[string]morc.BodyScraper{
 							"TEST": {Name: "TEST", OffsetEnd: -2},
 						},
 					},
@@ -453,7 +453,7 @@ Content-Length: 0
 						Name:   "testreq",
 						Method: "GET",
 						URL:    "/",
-						Captures: map[string]morc.VarScraper{
+						Captures: map[string]morc.BodyScraper{
 							"TEST": {Name: "TEST", OffsetStart: 18, OffsetEnd: 24},
 						},
 					},
@@ -465,7 +465,7 @@ Content-Length: 0
 						Name:   "testreq",
 						Method: "GET",
 						URL:    "/",
-						Captures: map[string]morc.VarScraper{
+						Captures: map[string]morc.BodyScraper{
 							"TEST": {Name: "TEST", OffsetStart: 18, OffsetEnd: 24},
 						},
 					},

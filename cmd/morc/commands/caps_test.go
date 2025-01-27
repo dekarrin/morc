@@ -47,7 +47,7 @@ func Test_Caps_List(t *testing.T) {
 			args: []string{"caps", "req1"},
 			p: testProject_withRequests(morc.RequestTemplate{
 				Name: "req1",
-				Captures: map[string]morc.VarScraper{
+				Captures: map[string]morc.BodyScraper{
 					"troll": {
 						Name: "troll",
 						Steps: []morc.TraversalStep{
@@ -67,7 +67,7 @@ func Test_Caps_List(t *testing.T) {
 			args: []string{"caps", "req1"},
 			p: testProject_withRequests(morc.RequestTemplate{
 				Name: "req1",
-				Captures: map[string]morc.VarScraper{
+				Captures: map[string]morc.BodyScraper{
 					"troll": {
 						Name: "troll",
 					},
@@ -80,7 +80,7 @@ func Test_Caps_List(t *testing.T) {
 			args: []string{"caps", "req1"},
 			p: testProject_withRequests(morc.RequestTemplate{
 				Name: "req1",
-				Captures: map[string]morc.VarScraper{
+				Captures: map[string]morc.BodyScraper{
 					"troll": {
 						Name:      "troll",
 						OffsetEnd: -1,
@@ -94,7 +94,7 @@ func Test_Caps_List(t *testing.T) {
 			args: []string{"caps", "req1"},
 			p: testProject_withRequests(morc.RequestTemplate{
 				Name: "req1",
-				Captures: map[string]morc.VarScraper{
+				Captures: map[string]morc.BodyScraper{
 					"troll": {
 						Name:        "troll",
 						OffsetStart: 12,
@@ -108,7 +108,7 @@ func Test_Caps_List(t *testing.T) {
 			args: []string{"caps", "req1", "-q"},
 			p: testProject_withRequests(morc.RequestTemplate{
 				Name: "req1",
-				Captures: map[string]morc.VarScraper{
+				Captures: map[string]morc.BodyScraper{
 					"troll": {
 						Name: "troll",
 						Steps: []morc.TraversalStep{
@@ -128,7 +128,7 @@ func Test_Caps_List(t *testing.T) {
 			args: []string{"caps", "req1"},
 			p: testProject_withRequests(morc.RequestTemplate{
 				Name: "req1",
-				Captures: map[string]morc.VarScraper{
+				Captures: map[string]morc.BodyScraper{
 					"troll": {
 						Name: "troll",
 						Steps: []morc.TraversalStep{
@@ -165,7 +165,7 @@ func Test_Caps_List(t *testing.T) {
 			args: []string{"caps", "req1", "-q"},
 			p: testProject_withRequests(morc.RequestTemplate{
 				Name: "req1",
-				Captures: map[string]morc.VarScraper{
+				Captures: map[string]morc.BodyScraper{
 					"troll": {
 						Name: "troll",
 						Steps: []morc.TraversalStep{
@@ -264,7 +264,7 @@ func Test_Caps_New(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"troll": {
 							Name: "troll",
 							Steps: []morc.TraversalStep{
@@ -286,7 +286,7 @@ func Test_Caps_New(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"troll": {
 							Name: "troll",
 							Steps: []morc.TraversalStep{
@@ -308,7 +308,7 @@ func Test_Caps_New(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectErr: "--new/-N requires --spec/-s",
@@ -319,7 +319,7 @@ func Test_Caps_New(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectErr: "--new/-N requires --spec/-s",
@@ -330,7 +330,7 @@ func Test_Caps_New(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectErr: "unterminated index at end of string",
@@ -341,7 +341,7 @@ func Test_Caps_New(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectErr: "unterminated index at end of string",
@@ -352,13 +352,13 @@ func Test_Caps_New(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectP: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name: "TROLL",
 							Steps: []morc.TraversalStep{
@@ -380,13 +380,13 @@ func Test_Caps_New(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectP: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name: "TROLL",
 							Steps: []morc.TraversalStep{
@@ -408,13 +408,13 @@ func Test_Caps_New(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectP: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name:        "TROLL",
 							OffsetStart: 28,
@@ -431,13 +431,13 @@ func Test_Caps_New(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectP: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name:        "TROLL",
 							OffsetStart: 0,
@@ -454,13 +454,13 @@ func Test_Caps_New(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectP: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name:        "TROLL",
 							OffsetStart: 0,
@@ -477,13 +477,13 @@ func Test_Caps_New(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectP: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name: "TROLL",
 						},
@@ -498,13 +498,13 @@ func Test_Caps_New(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectP: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name: "TROLL",
 						},
@@ -519,13 +519,13 @@ func Test_Caps_New(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectP: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name:        "TROLL",
 							OffsetStart: 28,
@@ -542,13 +542,13 @@ func Test_Caps_New(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectP: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name:        "TROLL",
 							OffsetStart: 28,
@@ -618,7 +618,7 @@ func Test_Caps_Delete(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req2",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectErr: "no request template req1",
@@ -629,7 +629,7 @@ func Test_Caps_Delete(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req2",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectErr: "no request template req1",
@@ -640,7 +640,7 @@ func Test_Caps_Delete(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectErr: "no capture defined for $TROLL in req1",
@@ -651,7 +651,7 @@ func Test_Caps_Delete(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectErr: "no capture defined for $TROLL in req1",
@@ -662,7 +662,7 @@ func Test_Caps_Delete(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name:        "TROLL",
 							OffsetStart: 28,
@@ -674,7 +674,7 @@ func Test_Caps_Delete(t *testing.T) {
 			expectP: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectStdoutOutput: "Deleted capture to $TROLL from req1\n",
@@ -685,7 +685,7 @@ func Test_Caps_Delete(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name:        "TROLL",
 							OffsetStart: 28,
@@ -697,7 +697,7 @@ func Test_Caps_Delete(t *testing.T) {
 			expectP: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectStdoutOutput: "",
@@ -760,7 +760,7 @@ func Test_Caps_Edit(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req2",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectErr: "no request template req1",
@@ -771,7 +771,7 @@ func Test_Caps_Edit(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req2",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectErr: "no request template req1",
@@ -782,7 +782,7 @@ func Test_Caps_Edit(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectErr: "no capture to variable $TROLL exists in request req1",
@@ -793,7 +793,7 @@ func Test_Caps_Edit(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectErr: "no capture to variable $TROLL exists in request req1",
@@ -804,7 +804,7 @@ func Test_Caps_Edit(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name: "TROLL",
 							Steps: []morc.TraversalStep{
@@ -821,7 +821,7 @@ func Test_Caps_Edit(t *testing.T) {
 			expectP: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name:        "TROLL",
 							OffsetStart: 28,
@@ -838,7 +838,7 @@ func Test_Caps_Edit(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name: "TROLL",
 							Steps: []morc.TraversalStep{
@@ -855,7 +855,7 @@ func Test_Caps_Edit(t *testing.T) {
 			expectP: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name:        "TROLL",
 							OffsetStart: 28,
@@ -872,7 +872,7 @@ func Test_Caps_Edit(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name: "TROLL",
 							Steps: []morc.TraversalStep{
@@ -889,7 +889,7 @@ func Test_Caps_Edit(t *testing.T) {
 			expectP: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL_NAME": {
 							Name: "TROLL_NAME",
 							Steps: []morc.TraversalStep{
@@ -911,7 +911,7 @@ func Test_Caps_Edit(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name: "TROLL",
 							Steps: []morc.TraversalStep{
@@ -928,7 +928,7 @@ func Test_Caps_Edit(t *testing.T) {
 			expectP: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL_NAME": {
 							Name: "TROLL_NAME",
 							Steps: []morc.TraversalStep{
@@ -950,7 +950,7 @@ func Test_Caps_Edit(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name: "TROLL",
 							Steps: []morc.TraversalStep{
@@ -967,7 +967,7 @@ func Test_Caps_Edit(t *testing.T) {
 			expectP: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL_NAME": {
 							Name:        "TROLL_NAME",
 							OffsetStart: 28,
@@ -984,7 +984,7 @@ func Test_Caps_Edit(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name: "TROLL",
 							Steps: []morc.TraversalStep{
@@ -1001,7 +1001,7 @@ func Test_Caps_Edit(t *testing.T) {
 			expectP: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL_NAME": {
 							Name:        "TROLL_NAME",
 							OffsetStart: 28,
@@ -1065,7 +1065,7 @@ func Test_Caps_Show(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req2",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectErr: "no request template req1",
@@ -1076,7 +1076,7 @@ func Test_Caps_Show(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req2",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectErr: "no request template req1",
@@ -1087,7 +1087,7 @@ func Test_Caps_Show(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectErr: "no capture to $TROLL exists on request template req1",
@@ -1098,7 +1098,7 @@ func Test_Caps_Show(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectErr: "no capture to $TROLL exists on request template req1",
@@ -1109,7 +1109,7 @@ func Test_Caps_Show(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name: "TROLL",
 							Steps: []morc.TraversalStep{
@@ -1131,7 +1131,7 @@ func Test_Caps_Show(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name: "TROLL",
 							Steps: []morc.TraversalStep{
@@ -1153,7 +1153,7 @@ func Test_Caps_Show(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name:        "TROLL",
 							OffsetStart: 28,
@@ -1170,7 +1170,7 @@ func Test_Caps_Show(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name:        "TROLL",
 							OffsetStart: 28,
@@ -1234,7 +1234,7 @@ func Test_Caps_Get(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req2",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectErr: "no request template req1",
@@ -1245,7 +1245,7 @@ func Test_Caps_Get(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req2",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectErr: "no request template req1",
@@ -1256,7 +1256,7 @@ func Test_Caps_Get(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectErr: "no capture to $TROLL exists on request template req1",
@@ -1267,7 +1267,7 @@ func Test_Caps_Get(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
-					Captures: map[string]morc.VarScraper{},
+					Captures: map[string]morc.BodyScraper{},
 				},
 			),
 			expectErr: "no capture to $TROLL exists on request template req1",
@@ -1278,7 +1278,7 @@ func Test_Caps_Get(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name:        "TROLL",
 							OffsetStart: 28,
@@ -1295,7 +1295,7 @@ func Test_Caps_Get(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name:        "TROLL",
 							OffsetStart: 28,
@@ -1312,7 +1312,7 @@ func Test_Caps_Get(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"troll": {
 							Name: "troll",
 							Steps: []morc.TraversalStep{
@@ -1334,7 +1334,7 @@ func Test_Caps_Get(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"troll": {
 							Name: "troll",
 							Steps: []morc.TraversalStep{
@@ -1356,7 +1356,7 @@ func Test_Caps_Get(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name:        "TROLL",
 							OffsetStart: 28,
@@ -1373,7 +1373,7 @@ func Test_Caps_Get(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name: "TROLL",
 						},
@@ -1388,7 +1388,7 @@ func Test_Caps_Get(t *testing.T) {
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
-					Captures: map[string]morc.VarScraper{
+					Captures: map[string]morc.BodyScraper{
 						"TROLL": {
 							Name:        "TROLL",
 							OffsetStart: 28,

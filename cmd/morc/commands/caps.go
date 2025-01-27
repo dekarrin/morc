@@ -280,7 +280,7 @@ func invokeCapsNew(io cmdio.IO, projFile, reqName, varName string, attrs capAttr
 
 	// otherwise, we have a valid capture, so add it to the request.
 	if req.Captures == nil {
-		req.Captures = make(map[string]morc.VarScraper)
+		req.Captures = make(map[string]morc.BodyScraper)
 		p.Templates[reqName] = req
 	}
 	req.Captures[varUpper] = cap
@@ -373,7 +373,7 @@ type capsArgs struct {
 
 type capAttrValues struct {
 	capVar optional[string]
-	spec   optional[morc.VarScraper]
+	spec   optional[morc.BodyScraper]
 }
 
 func parseCapsArgs(cmd *cobra.Command, posArgs []string, args *capsArgs) error {
@@ -518,7 +518,7 @@ func parseCapsSetFlags(cmd *cobra.Command, attrs *capAttrValues) error {
 			return fmt.Errorf("--spec/-s: %w", err)
 		}
 
-		attrs.spec = optional[morc.VarScraper]{set: true, v: spec}
+		attrs.spec = optional[morc.BodyScraper]{set: true, v: spec}
 	}
 
 	if cmd.Flags().Lookup("var").Changed {

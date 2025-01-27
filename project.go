@@ -783,7 +783,7 @@ func (s *Session) UnmarshalJSON(data []byte) error {
 
 type RequestTemplate struct {
 	Name     string
-	Captures map[string]VarScraper
+	Captures map[string]BodyScraper
 	Body     []byte
 	URL      string
 	Method   string

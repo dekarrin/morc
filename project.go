@@ -306,14 +306,14 @@ func (p Project) PersistToDisk(all bool) error {
 }
 
 // Exec sends the given flow by name and mutates the project accordingly.
-func (p *Project) Exec(flowName string, initialVarOverrides map[string]string, skipVerify bool, prefixOverride string, httpClient *http.Client, oc OutputControl) (varsSet bool, cookiesSet bool, err error) {
+func (p *Project) Exec(flowName string, initialVarOverrides map[string]string, skipVerify bool, prefixOverride string, httpClient *http.Client, oc OutputControl) ([]SendResult, error) {
 	// case doesn't matter for flow names
 	flowName = strings.ToLower(flowName)
 
 	// check if the project even has a flow with that name
 	flow, ok := p.Flows[flowName]
 	if !ok {
-		return false, false, fmt.Errorf("no flow named %s", flowName)
+		return nil, fmt.Errorf("no flow named %s", flowName)
 	}
 
 	// now get all the templates and ensure they are valid
@@ -321,10 +321,10 @@ func (p *Project) Exec(flowName string, initialVarOverrides map[string]string, s
 	for i, step := range flow.Steps {
 		tmpl, ok := p.Templates[strings.ToLower(step.Template)]
 		if !ok {
-			return false, false, fmt.Errorf("flow %s calls non-existent request template %q in step #%d", flowName, step.Template, i-1)
+			return nil, fmt.Errorf("flow %s calls non-existent request template %q in step #%d", flowName, step.Template, i-1)
 		}
 		if !tmpl.Sendable() {
-			return false, false, fmt.Errorf("flow %s calls incomplete request template %s in step #%d", flowName, step.Template, i-1)
+			return nil, fmt.Errorf("flow %s calls incomplete request template %s in step #%d", flowName, step.Template, i-1)
 		}
 
 		templates = append(templates, tmpl)
@@ -341,22 +341,16 @@ func (p *Project) Exec(flowName string, initialVarOverrides map[string]string, s
 		prefix = prefixOverride
 	}
 
+	var results []SendResult
+
 	for i, tmpl := range templates {
-		// persistence is not covered in sendTemplate
 		result, err := p.SendTemplate(tmpl, p.Vars.MergedSet(varOverrides), skipVerify, prefix, httpClient, oc)
-		// TODO: persist? else caller needs to do it.
 
 		if err != nil {
-			return false, false, fmt.Errorf("step #%d: %w", i, err)
+			return results, fmt.Errorf("step #%d: %w", i, err)
 		}
 
-		if len(result.Captures) > 0 {
-			varsSet = true
-		}
-
-		if len(result.Cookies) > 0 {
-			cookiesSet = true
-		}
+		results = append(results, result)
 
 		// okay, need to update the varOverrides because if any were just
 		// captured, THAT is the new canonical value of the var
@@ -365,7 +359,7 @@ func (p *Project) Exec(flowName string, initialVarOverrides map[string]string, s
 		}
 	}
 
-	return varsSet, cookiesSet, nil
+	return results, nil
 }
 
 // Send sends the given request template by name and mutates the project

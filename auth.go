@@ -287,12 +287,17 @@ func (da DynamicAuth) Static() bool {
 	return false
 }
 
-func (da DynamicAuth) GetAuth(p *Project) (AuthProof, error) {
+func (da DynamicAuth) GetAuth(p *Project, skipVerify bool, httpClient *http.Client, oc OutputControl) (AuthProof, error) {
 	if da.proof.Valid() {
 		return da.proof, nil
 	}
 
-	if da.
+	if da.execFlow != "" {
+		// TODO: pre-examine flow to ensure it doesn't itself end up calling
+		// itself recursively.
+
+		p.Exec(da.execFlow, nil, skipVerify, "", httpClient, oc)
+	}
 
 	// TODO: fallback needs to be implemented at some level to decide that a
 	// previously valid proof is not valid and could be re-obtained, but that's

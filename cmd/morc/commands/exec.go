@@ -56,9 +56,23 @@ func invokeExec(io cmdio.IO, projFile, flowName string, initialVarOverrides map[
 
 	oc.Writer = io.Out
 
-	varsSet, cookiesSet, err := p.Exec(flowName, initialVarOverrides, skipVerify, prefixOverride.Or(""), cmdio.HTTPClient, oc)
+	results, err := p.Exec(flowName, initialVarOverrides, skipVerify, prefixOverride.Or(""), cmdio.HTTPClient, oc)
 	if err != nil {
 		return err
+	}
+
+	var varsSet, cookiesSet bool
+	for _, r := range results {
+		if len(r.Captures) > 0 {
+			varsSet = true
+			break
+		}
+	}
+	for _, r := range results {
+		if len(r.Cookies) > 0 {
+			cookiesSet = true
+			break
+		}
 	}
 
 	return persistSendResults(p, varsSet, cookiesSet)

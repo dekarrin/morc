@@ -1,6 +1,8 @@
 package morc
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -123,6 +125,114 @@ func NewOAuth2Token(accessToken, tokenType string, expiresAt time.Time, refreshT
 	}
 }
 
+type ProofLocation string
+
+const (
+	ProofLocationHeader    ProofLocation = "header"
+	ProofDestinationCookie ProofLocation = "cookie"
+)
+
+type ProofFormatType string
+
+const (
+	ProofFormatTypeNone   ProofFormatType = ""
+	ProofFormatTypeBearer ProofFormatType = "bearer"
+)
+
+type dynamicProof struct {
+	value     string
+	dest      ProofDestination
+	expiresAt time.Time
+}
+
+func (dp dynamicProof) Apply(req *http.Request) error {
+	value := dp.value
+	if dp.dest.Format == ProofFormatTypeBearer {
+		value = "Bearer " + value
+	}
+
+	if dp.dest.Location == ProofLocationHeader {
+		req.Header.Set(dp.dest.Key, value)
+	} else if dp.dest.Location == ProofDestinationCookie {
+		req.AddCookie(&http.Cookie{
+			Name:  dp.dest.Key,
+			Value: value,
+		})
+	} else {
+		return errors.New("unknown destination")
+	}
+
+	return nil
+}
+
+func (dp dynamicProof) Valid() bool {
+	if dp.expiresAt.IsZero() {
+		return true
+	}
+
+	return time.Now().Before(dp.expiresAt)
+}
+
+func (dp dynamicProof) Export() map[string]any {
+	return map[string]any{
+		"expires_at": dp.expiresAt.Format(time.RFC3339),
+		"value":      dp.value,
+		"dest":       dp.dest.Export(),
+	}
+}
+
+// Type returns the type of AuthProof that this is. It is used for selecting
+// the correct constructor to recreate an AuthProof from an Exported string.
+func (dp dynamicProof) Type() AuthProofType {
+	return AuthProofCustom
+}
+
+func ImportDynamicProof(exported map[string]any) (AuthProof, error) {
+	var expiresAt time.Time
+	var value string
+	var dest ProofDestination
+
+	// ensure expected properties and types are present
+	if rawValue, ok := exported["value"]; ok {
+		if value, ok = rawValue.(string); !ok {
+			return nil, errors.New("value must be a string")
+		}
+	} else {
+		return nil, errors.New("missing value")
+	}
+
+	if rawDest, ok := exported["dest"]; ok {
+		if destMap, ok := rawDest.(map[string]any); ok {
+			var err error
+			dest, err = ImportProofDest(destMap)
+			if err != nil {
+				return nil, fmt.Errorf("dest: %w", err)
+			}
+		} else {
+			return nil, errors.New("dest must be an object")
+		}
+	} else {
+		return nil, errors.New("missing dest")
+	}
+
+	if rawExp, ok := exported["expires_at"]; ok {
+		var expStr string
+		if expStr, ok = rawExp.(string); !ok {
+			return nil, errors.New("expires_at must be a string containing an RFC-3339 date")
+		}
+		var err error
+		if expiresAt, err = time.Parse(time.RFC3339, expStr); err != nil {
+			return nil, fmt.Errorf("expires_at: %w", err)
+		}
+	}
+
+	return dynamicProof{
+		expiresAt: expiresAt,
+		value:     value,
+		dest:      dest,
+	}, nil
+}
+
 func ImportHTTPBasicCreds(exported map[string]any) (AuthProof, error) {
 	var username string
 	var password string
@@ -225,6 +335,8 @@ func ImportAuthProof(t AuthProofType, exported map[string]any) (AuthProof, error
 		return ImportHTTPBasicCreds(exported)
 	case AuthProofOAuth2:
 		return ImportOAuth2Token(exported)
+	case AuthProofCustom:
+		return ImportDynamicProof(exported)
 	default:
 		return nil, errors.New("unknown auth proof type")
 	}
@@ -239,6 +351,8 @@ type Auth interface {
 	// chance to invalidate its proof if it detects that it is no longer valid.
 	IsSuccessfulAuth(resp *http.Response) bool
 }
+
+type AuthType string
 
 type HTTPBasicAuth struct {
 	proof HTTPBasicCredentials
@@ -260,86 +374,6 @@ func NewHTTPBasicAuth(creds HTTPBasicCredentials) HTTPBasicAuth {
 	return HTTPBasicAuth{
 		proof: creds,
 	}
-}
-
-// TODO: when adding other grant types, consider if they can be combined into a
-// single type
-//
-// oauth flow doesn't really work great with CLI, look into grant types
-// that are betta and do those first
-type OAuth2AuthCodeGrantAuth struct {
-	clientID     string
-	clientSecret string
-}
-
-func (oa2 OAuth2AuthCodeGrantAuth) Static() bool {
-	return false
-}
-
-func (oa2 OAuth2AuthCodeGrantAuth) GetAuth() (AuthProof, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-// ALGO FLOW for basic auth -
-//
-// * if basic auth, send the creds every time.
-//
-// ALGO FLOW for password to token (NON OAuth2)-
-//
-
-type proofDest string
-
-const (
-	proofDestHeader proofDest = "header"
-	proofDestCookie proofDest = "cookie"
-)
-
-type dynamicProof struct {
-	expiresAt time.Time
-	value     string
-
-	dest    proofDest
-	destKey string
-}
-
-func (dp dynamicProof) Apply(req *http.Request) error {
-	if dp.dest == proofDestHeader {
-		req.Header.Set(dp.destKey, dp.value)
-	} else if dp.dest == proofDestCookie {
-		req.AddCookie(&http.Cookie{
-			Name:  dp.destKey,
-			Value: dp.value,
-		})
-	} else {
-		return errors.New("unknown destination")
-	}
-
-	return nil
-}
-
-func (dp dynamicProof) Valid() bool {
-	if dp.expiresAt.IsZero() {
-		return true
-	}
-
-	return time.Now().Before(dp.expiresAt)
-}
-
-func (dp dynamicProof) Export() map[string]any {
-	return map[string]any{
-		"expires_at": dp.expiresAt.Format(time.RFC3339),
-		"value":      dp.value,
-		"dest": map[string]any{
-			"type": string(dp.dest),
-			"key":  dp.destKey,
-		},
-	}
-}
-
-// Type returns the type of AuthProof that this is. It is used for selecting
-// the correct constructor to recreate an AuthProof from an Exported string.
-func (dp dynamicProof) Type() AuthProofType {
-	return AuthProofCustom
 }
 
 type Transformer func(string) (string, error)
@@ -398,7 +432,114 @@ func NewPairedCookieExpiresTransformer() TimeTransformer {
 	}
 }
 
+func NewJWTExpirationTransformer() TimeTransformer {
+	return func(s string) (time.Time, error) {
+		parts := strings.Split(s, ".")
+		if len(parts) != 3 {
+			return time.Time{}, fmt.Errorf("Not in xxxxx.yyyyy.zzzzz JWT format: %s", s)
+		}
+		encodedClaims := parts[1]
+		claimsStr, err := base64.RawURLEncoding.DecodeString(encodedClaims)
+		if err != nil {
+			return time.Time{}, fmt.Errorf("Failed to decode JWT claims: %w", err)
+		}
+
+		type justExp struct {
+			Exp int64 `json:"exp"`
+		}
+
+		var claims justExp
+		if err := json.Unmarshal(claimsStr, &claims); err != nil {
+			return time.Time{}, fmt.Errorf("Failed to parse JWT claims: %w", err)
+		}
+
+		if claims.Exp == 0 {
+			return time.Time{}, nil
+		}
+
+		return time.Unix(claims.Exp, 0), nil
+	}
+}
+
 // TODO: CLI transformer.
+
+type ProofDestination struct {
+	Location ProofLocation
+	Key      string
+	Format   ProofFormatType
+}
+
+func (pd ProofDestination) Export() map[string]any {
+	m := map[string]any{
+		"location": string(pd.Location),
+		"key":      pd.Key,
+	}
+
+	if pd.Format != ProofFormatTypeNone {
+		m["format"] = string(pd.Format)
+	}
+
+	return m
+}
+
+func ImportProofDest(exported map[string]any) (ProofDestination, error) {
+	var loc ProofLocation
+	var key string
+	var destFormat ProofFormatType = ProofFormatTypeNone
+
+	if rawType, ok := exported["location"]; ok {
+		if destStr, ok := rawType.(string); ok {
+			loc = ProofLocation(destStr)
+		} else {
+			return ProofDestination{}, errors.New("location: must be a string")
+		}
+
+		if loc != ProofLocationHeader && loc != ProofDestinationCookie {
+			return ProofDestination{}, errors.New("location: must be 'header' or 'cookie'")
+		}
+	} else {
+		return ProofDestination{}, errors.New("location: must be present")
+	}
+
+	if rawKey, ok := exported["key"]; ok {
+		if key, ok = rawKey.(string); !ok {
+			return ProofDestination{}, errors.New("key: must be a string")
+		}
+	} else {
+		return ProofDestination{}, errors.New("key: must be present")
+	}
+
+	if rawFormat, ok := exported["format"]; ok {
+		var destFormatStr string
+		if destFormatStr, ok = rawFormat.(string); !ok {
+			return ProofDestination{}, errors.New("format: must be a string")
+		}
+		destFormat = ProofFormatType(destFormatStr)
+		if destFormat != ProofFormatTypeNone && destFormat != ProofFormatTypeBearer {
+			return ProofDestination{}, errors.New("format: must be set to empty string or 'bearer'")
+		}
+	}
+
+	return ProofDestination{
+		Location: loc,
+		Key:      key,
+		Format:   destFormat,
+	}, nil
+}
+
+// ScrapeExtractor refers to a value from a Scraper and translates it to its
+// end string value using a Transformer.
+type ScrapeExtractor struct {
+	VarName   string
+	Transform Transformer
+}
+
+// ScrapeTimeExtractor refers to a value from a Scraper and translates it to its
+// end time.Time value using a TimeTransformer.
+type ScrapeTimeExtractor struct {
+	VarName   string
+	Transform TimeTransformer
+}
 
 type DynamicAuth struct {
 	proof AuthProof // TODO: fill concrete type later
@@ -408,14 +549,138 @@ type DynamicAuth struct {
 
 	caps []Scraper
 
-	valueScrapeName      string
-	valueScrapeTransform Transformer
+	valueExtractor   ScrapeExtractor
+	expiresExtractor ScrapeTimeExtractor
 
-	expiresScrapeName      string
-	expiresScrapeTransform TimeTransformer
+	dest ProofDestination
+}
 
-	destLoc proofDest
-	destKey string
+// NewJWTAuth returns a DynamicAuth that is configured to pull a JWT token from
+// the body of the response of the auth flow/template and place it in an
+// Authorization header with the Bearer scheme. The scraper must point to a
+// valid JWT token in the response body. Give flow or femplate, but not
+// both.
+func NewJWTAuth(flow, femplate string, scraper BodyScraper) (*DynamicAuth, error) {
+	if flow != "" && femplate != "" {
+		return &DynamicAuth{}, errors.New("flow and template cannot both be set")
+	}
+
+	if flow == "" && femplate == "" {
+		return &DynamicAuth{}, errors.New("either flow or template must be set")
+	}
+
+	// TODO: validate flow, template actually exist in caller.
+
+	return &DynamicAuth{
+		getAuthFlow:     flow,
+		getAuthTemplate: femplate,
+		caps:            []Scraper{scraper},
+		valueExtractor: ScrapeExtractor{
+			VarName:   scraper.VarName(),
+			Transform: NewIdentityStringTransformer(),
+		},
+		expiresExtractor: ScrapeTimeExtractor{
+			VarName:   scraper.VarName(),
+			Transform: NewJWTExpirationTransformer(),
+		},
+		dest: ProofDestination{
+			Location: ProofLocationHeader,
+			Key:      "Authorization",
+			Format:   ProofFormatTypeBearer,
+		},
+	}, nil
+}
+
+// NewTokenAuth returns a DynamicAuth that is configured to pull a simple token
+// using another flow/template. Expiration is optional and is
+// extracted via the expiresScraper, if present. If not present, expiration will
+// be detected only by auth failure. Give flow or femplate, but not both. Only a
+// single token value may be extracted. If expiresTimeLayout is set, it will be
+// used for parsing expires time, and if set to an empty string, it will default
+// to RFC3339.
+func NewTokenAuth(flow, femplate string, tokenScraper Scraper, dest ProofDestination, expiresScraper Scraper, expiresTimeLayout string) (*DynamicAuth, error) {
+	if flow != "" && femplate != "" {
+		return &DynamicAuth{}, errors.New("flow and template cannot both be set")
+	}
+
+	if flow == "" && femplate == "" {
+		return &DynamicAuth{}, errors.New("either flow or template must be set")
+	}
+
+	// TODO: validate flow, template actually exist in caller.
+
+	da := &DynamicAuth{
+		getAuthFlow:     flow,
+		getAuthTemplate: femplate,
+		caps:            []Scraper{tokenScraper},
+		valueExtractor: ScrapeExtractor{
+			VarName:   tokenScraper.VarName(),
+			Transform: NewIdentityStringTransformer(),
+		},
+		dest: dest,
+	}
+
+	if expiresScraper != nil {
+		da.expiresExtractor = ScrapeTimeExtractor{
+			VarName:   expiresScraper.VarName(),
+			Transform: NewParsedTimeTransformer(expiresTimeLayout),
+		}
+		da.caps = append(da.caps, expiresScraper)
+	}
+
+	return da, nil
+}
+
+// NewLoginCookieAuth returns a DynamicAuth that is configured to pull a cookie
+// containing the session ID from the response of the auth flow/template and use
+// it in authorized requests. The cookieName is the name of the cookie to pull.
+// Give flow or femplate, but not both. If expiration detection is set, this
+// Auth will always attempt to detect expiration info from the initial
+// set-cookie, but if it is not present, it will fallback to error response on
+// the auth'd request's response to detect expiration.
+func NewLoginCookieAuth(flow, femplate string, cookieName string, detectExpiration bool) (*DynamicAuth, error) {
+	if flow != "" && femplate != "" {
+		return nil, errors.New("flow and template cannot both be set")
+	}
+
+	if flow == "" && femplate == "" {
+		return nil, errors.New("either flow or template must be set")
+	}
+
+	const (
+		cookieVarName = "session-cookie"
+	)
+
+	da := &DynamicAuth{
+		getAuthFlow:     flow,
+		getAuthTemplate: femplate,
+		caps: []Scraper{
+			CookieScraper{
+				Name:        cookieVarName,
+				CookieName:  cookieName,
+				WithExpires: detectExpiration,
+			},
+		},
+		valueExtractor: ScrapeExtractor{
+			VarName:   cookieVarName,
+			Transform: NewIdentityStringTransformer(),
+		},
+		dest: ProofDestination{
+			Location: ProofDestinationCookie,
+			Key:      cookieName,
+			Format:   ProofFormatTypeNone,
+		},
+	}
+
+	if detectExpiration {
+		da.expiresExtractor = ScrapeTimeExtractor{
+			VarName:   cookieVarName,
+			Transform: NewPairedCookieExpiresTransformer(),
+		}
+		da.valueExtractor.Transform = NewPairedCookieValueTransformer()
+	}
+
+	return da, nil
 }
 
 func (da *DynamicAuth) IsSuccessfulAuth(resp *http.Response) bool {
@@ -474,30 +739,32 @@ func (da *DynamicAuth) GetAuth(p *Project, skipVerify bool, httpClient *http.Cli
 		}
 	}
 
-	value, ok := scrapes[da.valueScrapeName]
+	valueEx := da.valueExtractor
+	value, ok := scrapes[valueEx.VarName]
 	if !ok {
-		return nil, fmt.Errorf("value scrape %q not found", da.valueScrapeName)
+		return nil, fmt.Errorf("value scrape %q not found", valueEx.VarName)
 	}
-	value, err = da.valueScrapeTransform(value)
+	value, err = valueEx.Transform(value)
 	if err != nil {
-		return nil, fmt.Errorf("failed to transform value %q: %w", da.valueScrapeName, err)
+		return nil, fmt.Errorf("failed to transform value %q: %w", valueEx.VarName, err)
 	}
 
 	ap := dynamicProof{
-		value:   value,
-		dest:    da.destLoc,
-		destKey: da.destKey,
+		value: value,
+		dest:  da.dest,
 	}
 
 	// okay, do we have an expiration?
-	if da.expiresScrapeName != "" {
-		expStr, ok := scrapes[da.expiresScrapeName]
+	if da.expiresExtractor.VarName != "" {
+		expiresEx := da.expiresExtractor
+
+		expStr, ok := scrapes[expiresEx.VarName]
 		if !ok {
-			return nil, fmt.Errorf("expiration scrape %q not found", da.expiresScrapeName)
+			return nil, fmt.Errorf("expiration scrape %q not found", expiresEx.VarName)
 		}
-		expTime, err := da.expiresScrapeTransform(expStr)
+		expTime, err := expiresEx.Transform(expStr)
 		if err != nil {
-			return nil, fmt.Errorf("failed to transform expiration %q: %w", da.expiresScrapeName, err)
+			return nil, fmt.Errorf("failed to transform expiration %q: %w", expiresEx.VarName, err)
 		}
 		ap.expiresAt = expTime
 	}

@@ -14,7 +14,6 @@ type AuthProofType string
 
 const (
 	AuthProofHTTPBasic AuthProofType = "http-basic"
-	AuthProofOAuth2    AuthProofType = "oauth2"
 	AuthProofCustom    AuthProofType = "custom"
 )
 
@@ -62,66 +61,6 @@ func NewHTTPBasicCredentials(username, password string) AuthProof {
 	return HTTPBasicCredentials{
 		username: username,
 		password: password,
-	}
-}
-
-type Oauth2Token struct {
-	accessToken  string
-	tokenType    string // TODO: should support "bearer" and "mac".
-	refreshToken string
-	expiresAt    time.Time // might not be given, TODO: config to get this somewhere else like default, etc.
-	Scope        []string
-}
-
-func (t Oauth2Token) Apply(req *http.Request) error {
-	if t.tokenType == "bearer" {
-		req.Header.Set("Authorization", "Bearer "+t.accessToken)
-	} else if t.tokenType == "mac" {
-		// TODO: support this
-		return errors.New("MAC access token type not supported")
-	} else {
-		return errors.New("Unknown token type: " + t.tokenType)
-	}
-	return nil
-}
-
-func (t Oauth2Token) Valid() bool {
-	if t.expiresAt.IsZero() {
-		return true
-	}
-
-	return time.Now().Before(t.expiresAt)
-}
-
-func (t Oauth2Token) Export() map[string]any {
-	m := map[string]any{
-		"access_token": t.accessToken,
-		"token_type":   t.tokenType,
-		"expires_at":   t.expiresAt.Format(time.RFC3339),
-	}
-
-	if t.refreshToken != "" {
-		m["refresh_token"] = t.refreshToken
-	}
-
-	if len(t.Scope) > 0 {
-		m["scope"] = t.Scope
-	}
-
-	return m
-}
-
-func (t Oauth2Token) Type() AuthProofType {
-	return AuthProofOAuth2
-}
-
-func NewOAuth2Token(accessToken, tokenType string, expiresAt time.Time, refreshToken string, scope []string) AuthProof {
-	return Oauth2Token{
-		accessToken:  accessToken,
-		tokenType:    tokenType,
-		expiresAt:    expiresAt,
-		refreshToken: refreshToken,
-		Scope:        scope,
 	}
 }
 
@@ -260,81 +199,10 @@ func ImportHTTPBasicCreds(exported map[string]any) (AuthProof, error) {
 	}, nil
 }
 
-func ImportOAuth2Token(exported map[string]any) (AuthProof, error) {
-	var accessToken string
-	var refreshToken string
-	var tokenType string
-	var expTime time.Time
-	var scope []string
-
-	// ensure expected properties are present.
-	if rawAccess, ok := exported["access_token"]; ok {
-		if accessToken, ok = rawAccess.(string); !ok {
-			return nil, errors.New("access_token must be a string")
-		}
-	} else {
-		return nil, errors.New("missing access_token")
-	}
-
-	if rawType, ok := exported["token_type"]; ok {
-		if tokenType, ok = rawType.(string); !ok {
-			return nil, errors.New("token_type must be a string")
-		}
-	} else {
-		return nil, errors.New("missing token_type")
-	}
-
-	if rawExp, ok := exported["expires_at"]; ok {
-		var expStr string
-		if expStr, ok = rawExp.(string); !ok {
-			return nil, errors.New("expires_at must be a string containing an RFC-3339 date")
-		}
-		var err error
-		if expTime, err = time.Parse(time.RFC3339, expStr); err != nil {
-			return nil, fmt.Errorf("expires_at: %w", err)
-		}
-	} else {
-		return nil, errors.New("missing expires_at")
-	}
-
-	if rawRefresh, ok := exported["refresh_token"]; ok {
-		if refreshToken, ok = rawRefresh.(string); !ok {
-			return nil, errors.New("refresh_token must be a string")
-		}
-	}
-
-	if rawScope, ok := exported["scope"]; ok {
-		if scope, ok = rawScope.([]string); !ok {
-
-			// fallback to 'any'
-			if scopeAny, ok := rawScope.([]any); ok {
-				scope = make([]string, len(scopeAny))
-				for i := range scopeAny {
-					if scope[i], ok = scopeAny[i].(string); !ok {
-						return nil, errors.New("scope must be a list of strings")
-					}
-				}
-			} else {
-				return nil, errors.New("scope must be a list of strings")
-			}
-		}
-	}
-
-	return Oauth2Token{
-		accessToken:  accessToken,
-		tokenType:    tokenType,
-		expiresAt:    expTime,
-		refreshToken: refreshToken,
-		Scope:        scope,
-	}, nil
-}
-
 func ImportAuthProof(t AuthProofType, exported map[string]any) (AuthProof, error) {
 	switch t {
 	case AuthProofHTTPBasic:
 		return ImportHTTPBasicCreds(exported)
-	case AuthProofOAuth2:
-		return ImportOAuth2Token(exported)
 	case AuthProofCustom:
 		return ImportDynamicProof(exported)
 	default:
@@ -342,39 +210,11 @@ func ImportAuthProof(t AuthProofType, exported map[string]any) (AuthProof, error
 	}
 }
 
-type Auth interface {
-	GetAuth() (AuthProof, error) // runs an auth flow if dynamic, or returns the static proof if static
-	Static() bool
-
-	// IsSuccessfulAuth is a way for the caller to ask the Auth if it succeeded.
-	// Caller will always call IsSuccessfulAuth, so this also gives the Auth a
-	// chance to invalidate its proof if it detects that it is no longer valid.
-	IsSuccessfulAuth(resp *http.Response) bool
-}
-
 type AuthType string
 
-type HTTPBasicAuth struct {
-	proof HTTPBasicCredentials
-}
-
-func (ba HTTPBasicAuth) Static() bool {
-	return true
-}
-
-func (sa HTTPBasicAuth) GetAuth() (AuthProof, error) {
-	return sa.proof, nil
-}
-
-func (sa HTTPBasicAuth) IsSuccessfulAuth(resp *http.Response) bool {
-	return resp.StatusCode != http.StatusUnauthorized
-}
-
-func NewHTTPBasicAuth(creds HTTPBasicCredentials) HTTPBasicAuth {
-	return HTTPBasicAuth{
-		proof: creds,
-	}
-}
+const (
+	AuthTypeHTTPBasic AuthType = "basic"
+)
 
 type Transformer func(string) (string, error)
 type TimeTransformer func(string) (time.Time, error)
@@ -464,9 +304,9 @@ func NewJWTExpirationTransformer() TimeTransformer {
 // TODO: CLI transformer.
 
 type ProofDestination struct {
-	Location ProofLocation
-	Key      string
-	Format   ProofFormatType
+	Location ProofLocation   `json:"location"`
+	Key      string          `json:"key"`
+	Format   ProofFormatType `json:"format,omitempty"`
 }
 
 func (pd ProofDestination) Export() map[string]any {
@@ -541,9 +381,163 @@ type ScrapeTimeExtractor struct {
 	Transform TimeTransformer
 }
 
-type DynamicAuth struct {
-	proof AuthProof // TODO: fill concrete type later
+type Auth struct {
+	proof AuthProof
 
+	fetcher *AuthFetcher
+}
+
+func (a *Auth) GetAuth(p *Project, skipVerify bool, httpClient *http.Client, oc OutputControl) (AuthProof, error) {
+	if a.Static() {
+		return a.proof, nil
+	}
+
+	if a.proof == nil || !a.proof.Valid() {
+		if a.fetcher == nil {
+			return nil, errors.New("no static credentials or fetcher configured")
+		}
+
+		proof, err := a.fetcher.Fetch(p, skipVerify, httpClient, oc)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch auth proof: %w", err)
+		}
+
+		a.proof = proof
+	}
+
+	return a.proof, nil
+}
+
+func (a *Auth) IsSuccessfulAuth(resp *http.Response) bool {
+	success := resp.StatusCode != http.StatusUnauthorized
+
+	// invalidate proof immediately if auth failed
+	if !success {
+		a.proof = nil
+	}
+
+	return success
+}
+
+func (a *Auth) Static() bool {
+	return a.fetcher == nil
+}
+
+func (a *Auth) Export() map[string]any {
+	m := map[string]any{}
+	if a.proof != nil {
+		m["proof"] = a.proof.Export()
+	}
+	if a.fetcher != nil {
+
+		reqType := "flow"
+		reqName := a.fetcher.getAuthFlow
+		if a.fetcher.getAuthTemplate != "" {
+			reqType = "template"
+			reqName = a.fetcher.getAuthTemplate
+		}
+
+		m["fetcher"] = map[string]any{
+			"request": map[string]any{
+				"type": reqType,
+				"name": reqName,
+			},
+		}
+	}
+
+	return m
+}
+
+type RequestRef struct {
+	Name   string
+	IsFlow bool
+}
+
+func NewHTTPBasicAuth(creds HTTPBasicCredentials) Auth {
+	return Auth{
+		proof: creds,
+	}
+}
+
+// NewLoginCookieAuth returns an Auth that is configured to pull a cookie
+// containing the session ID from the response of the auth flow/template and use
+// it in authorized requests. The cookieName is the name of the cookie to pull.
+// Give flow or femplate, but not both. If expiration detection is set, this
+// Auth will always attempt to detect expiration info from the initial
+// set-cookie, but if it is not present, it will fallback to error response on
+// the auth'd request's response to detect expiration.
+func NewLoginCookieAuth(retrieval RequestRef, cookieName string, detectExpiration bool) (Auth, error) {
+	var flow, femplate string
+
+	if retrieval.IsFlow {
+		flow = retrieval.Name
+	} else {
+		femplate = retrieval.Name
+	}
+
+	fetcher, err := NewLoginCookieFetcher(flow, femplate, cookieName, detectExpiration)
+	if err != nil {
+		return Auth{}, err
+	}
+
+	return Auth{
+		fetcher: fetcher,
+	}, nil
+}
+
+// NewTokenAuth returns am Auth that is configured to pull a simple token
+// using another flow/template. Expiration is optional and is
+// extracted via the expiresScraper, if present. If not present, expiration will
+// be detected only by auth failure. Give flow or femplate, but not both. Only a
+// single token value may be extracted. If expiresTimeLayout is set, it will be
+// used for parsing expires time, and if set to an empty string, it will default
+// to RFC3339.
+func NewTokenAuth(retrieval RequestRef, tokenScraper Scraper, dest ProofDestination, expiresScraper Scraper, expiresTimeLayout string) (Auth, error) {
+	var flow, femplate string
+
+	if retrieval.IsFlow {
+		flow = retrieval.Name
+	} else {
+		femplate = retrieval.Name
+	}
+
+	fetcher, err := NewTokenFetcher(flow, femplate, tokenScraper, dest, expiresScraper, expiresTimeLayout)
+	if err != nil {
+		return Auth{}, err
+	}
+
+	return Auth{
+		fetcher: fetcher,
+	}, nil
+}
+
+// NewJWTAuth returns an Auth that is configured to pull a JWT token from
+// the body of the response of the auth flow/template and place it in an
+// Authorization header with the Bearer scheme. The scraper must point to a
+// valid JWT token in the response body.
+func NewJWTAuth(retrieval RequestRef, scraper BodyScraper) (Auth, error) {
+	var flow, femplate string
+
+	if retrieval.IsFlow {
+		flow = retrieval.Name
+	} else {
+		femplate = retrieval.Name
+	}
+
+	fetcher, err := NewJWTFetcher(flow, femplate, scraper)
+	if err != nil {
+		return Auth{}, err
+	}
+
+	return Auth{
+		fetcher: fetcher,
+	}, nil
+}
+
+// AuthFetcher is used to get a new AuthProof in an Auth. This is used for
+// any Auth mechanism that requires a proof that may change, such as a token or
+// a session ID.
+type AuthFetcher struct {
 	getAuthFlow     string // either execFlow or execTemplate must be set
 	getAuthTemplate string
 
@@ -555,23 +549,23 @@ type DynamicAuth struct {
 	dest ProofDestination
 }
 
-// NewJWTAuth returns a DynamicAuth that is configured to pull a JWT token from
+// NewJWTFetcher returns an AuthFetcher that is configured to pull a JWT token from
 // the body of the response of the auth flow/template and place it in an
 // Authorization header with the Bearer scheme. The scraper must point to a
 // valid JWT token in the response body. Give flow or femplate, but not
 // both.
-func NewJWTAuth(flow, femplate string, scraper BodyScraper) (*DynamicAuth, error) {
+func NewJWTFetcher(flow, femplate string, scraper BodyScraper) (*AuthFetcher, error) {
 	if flow != "" && femplate != "" {
-		return &DynamicAuth{}, errors.New("flow and template cannot both be set")
+		return &AuthFetcher{}, errors.New("flow and template cannot both be set")
 	}
 
 	if flow == "" && femplate == "" {
-		return &DynamicAuth{}, errors.New("either flow or template must be set")
+		return &AuthFetcher{}, errors.New("either flow or template must be set")
 	}
 
 	// TODO: validate flow, template actually exist in caller.
 
-	return &DynamicAuth{
+	return &AuthFetcher{
 		getAuthFlow:     flow,
 		getAuthTemplate: femplate,
 		caps:            []Scraper{scraper},
@@ -591,25 +585,25 @@ func NewJWTAuth(flow, femplate string, scraper BodyScraper) (*DynamicAuth, error
 	}, nil
 }
 
-// NewTokenAuth returns a DynamicAuth that is configured to pull a simple token
+// NewTokenFetcher returns an AuthFetcher that is configured to pull a simple token
 // using another flow/template. Expiration is optional and is
 // extracted via the expiresScraper, if present. If not present, expiration will
 // be detected only by auth failure. Give flow or femplate, but not both. Only a
 // single token value may be extracted. If expiresTimeLayout is set, it will be
 // used for parsing expires time, and if set to an empty string, it will default
 // to RFC3339.
-func NewTokenAuth(flow, femplate string, tokenScraper Scraper, dest ProofDestination, expiresScraper Scraper, expiresTimeLayout string) (*DynamicAuth, error) {
+func NewTokenFetcher(flow, femplate string, tokenScraper Scraper, dest ProofDestination, expiresScraper Scraper, expiresTimeLayout string) (*AuthFetcher, error) {
 	if flow != "" && femplate != "" {
-		return &DynamicAuth{}, errors.New("flow and template cannot both be set")
+		return &AuthFetcher{}, errors.New("flow and template cannot both be set")
 	}
 
 	if flow == "" && femplate == "" {
-		return &DynamicAuth{}, errors.New("either flow or template must be set")
+		return &AuthFetcher{}, errors.New("either flow or template must be set")
 	}
 
 	// TODO: validate flow, template actually exist in caller.
 
-	da := &DynamicAuth{
+	da := &AuthFetcher{
 		getAuthFlow:     flow,
 		getAuthTemplate: femplate,
 		caps:            []Scraper{tokenScraper},
@@ -631,14 +625,14 @@ func NewTokenAuth(flow, femplate string, tokenScraper Scraper, dest ProofDestina
 	return da, nil
 }
 
-// NewLoginCookieAuth returns a DynamicAuth that is configured to pull a cookie
+// NewLoginCookieFetcher returns an AuthFetcher that is configured to pull a cookie
 // containing the session ID from the response of the auth flow/template and use
 // it in authorized requests. The cookieName is the name of the cookie to pull.
 // Give flow or femplate, but not both. If expiration detection is set, this
 // Auth will always attempt to detect expiration info from the initial
 // set-cookie, but if it is not present, it will fallback to error response on
 // the auth'd request's response to detect expiration.
-func NewLoginCookieAuth(flow, femplate string, cookieName string, detectExpiration bool) (*DynamicAuth, error) {
+func NewLoginCookieFetcher(flow, femplate string, cookieName string, detectExpiration bool) (*AuthFetcher, error) {
 	if flow != "" && femplate != "" {
 		return nil, errors.New("flow and template cannot both be set")
 	}
@@ -651,7 +645,7 @@ func NewLoginCookieAuth(flow, femplate string, cookieName string, detectExpirati
 		cookieVarName = "session-cookie"
 	)
 
-	da := &DynamicAuth{
+	da := &AuthFetcher{
 		getAuthFlow:     flow,
 		getAuthTemplate: femplate,
 		caps: []Scraper{
@@ -683,26 +677,7 @@ func NewLoginCookieAuth(flow, femplate string, cookieName string, detectExpirati
 	return da, nil
 }
 
-func (da *DynamicAuth) IsSuccessfulAuth(resp *http.Response) bool {
-	success := resp.StatusCode != http.StatusUnauthorized
-
-	// invalidate proof immediately if auth failed
-	if !success {
-		da.proof = nil
-	}
-
-	return success
-}
-
-func (da *DynamicAuth) Static() bool {
-	return false
-}
-
-func (da *DynamicAuth) GetAuth(p *Project, skipVerify bool, httpClient *http.Client, oc OutputControl) (AuthProof, error) {
-	if da.proof.Valid() {
-		return da.proof, nil
-	}
-
+func (da *AuthFetcher) Fetch(p *Project, skipVerify bool, httpClient *http.Client, oc OutputControl) (AuthProof, error) {
 	var lastResult SendResult
 	var err error
 	if da.getAuthFlow != "" {
@@ -769,182 +744,9 @@ func (da *DynamicAuth) GetAuth(p *Project, skipVerify bool, httpClient *http.Cli
 		ap.expiresAt = expTime
 	}
 
-	da.proof = ap
-
 	return ap, nil
 
 	// TODO: fallback needs to be implemented at some level to decide that a
 	// previously valid proof is not valid and could be re-obtained, but that's
 	// probably going to need to be at caller-level.
 }
-
-// BASIC ALGO FLOW -
-//
-// 1. Does my proof need renewal?
-//    * That is, is the proof missing? OR is it present but expired?
-
-// req data model, flow-based:
-// - static: false (or omitted)
-// - flow name
-// - retrieval target (header, cookie, body path-spec, body offset)
-// - transform retreival to value
-// - transform retreival to expiration
-// - transform retrieval to target-key. optional.
-// - placement target (header, cookie, query param)
-
-// req data model, static-based:
-// - static true
-// - type: "http basic" or such or "custom"
-// - credentials: gives the credentials, custom obj.
-// - if custom, need placement target.
-
-/*
-"auth": {
-	"static": true,
-	"type": "http-basic",
-	"credentials": {
-		"username": "foo",
-		"password": "bar"
-	},
-}
-
-OR
-
-"auth": {
-	"static": true,
-	"type": "custom",
-	"credentials": {
-		"key": "value"
-	},
-	"target": {
-		"location": "header",
-		// key not needed and is ignored as it is from creds in this case
-	}
-}
-
-OR
-
-"auth": {
-	"static": false,
-	"type": "api-key",
-	"expiration": {
-		"resource-status": [
-			401,
-		]
-		AND/OR:
-		"from": {
-			// from syntax
-			"format": "ISO8601",
-		}
-		AND/OR:
-		"duration": "1h",
-		// implicitly - don't have it.
-	},
-	"retrieval": {
-		"template": "the-thing",
-		OR:
-		"flow": "the-thing",
-		OR:
-		"template params": {
-
-		},
-		-------
-		"from": {
-			"var": "name", // if var is auto-captured
-			OR:
-			"header": "name",
-			OR:
-			"cookie": "name",
-			OR:
-			"body": {
-				// offset, path-spec
-			}
-		}
-	}
-	"target": {
-		"location": "header"/"cookie"/"query",
-	}
-}
-
-OR
-
-// oauth2 w 4 different grant types
-
-// * auth code - client 'tells' owner to go to auth server and get an auth code, then owner goes back to client with it,
-// THEN, client takes the auth code, and...
-
-// * implicit - client gets the access token right away by being authorized by owner. Somehow. THEN...
-
-// * Resource owner password credentials - client uses the owner's username and password directly to get the access token. THEN...
-
-// * Client credentials - separate credentials just for the client are used to get the access token. THEN...
-
-
-// ALL (?) flows require use of a client_id.
-// SOME flows will use a client authentication method (like client_secret, or a client certificate).
-
-
-// NOTE:
-// from RFC-6749: "Additional authentication credentials, which are beyond
-   the scope of this specification, may be required in order for the
-   client to use a[n access] token."
-
-// NOTE:
-// methods of usage of access token are defined in RFC-6750.
-
-
-// If refresh token exists, it will be given when an access token is given as well.
-// If refresh token exists, then when access token is detected as expired, it is
-// used for getting a new access token and the grant flow is not repeated (unless the refresh token is ALSO expired).
-
-"auth": {
-	"static": false,
-// 	"type": "oauth2",
-
-// */
-
-// type marshaledAuthConfig struct {
-// 	Static      bool
-// 	Type        string
-// 	Credentials map[string]any
-// 	Target      AuthLocation
-
-// 	// TODO: flow-based things
-
-// }
-
-// type AuthLocation string
-
-// const (
-// 	AuthLocationHeader AuthLocation = "header"
-// 	AuthLocationCookie AuthLocation = "cookie"
-// 	AuthLocationQuery  AuthLocation = "query"
-// )
-
-// func unmarshalAuthConfig(data map[string]any) (Auth, error) {
-// 	if data == nil {
-// 		return nil
-// 	}
-
-// 	// check for well-known field names
-// 	var static bool
-// 	var typeStr string
-
-// 	for k, v := range data {
-// 		switch strings.ToLower(k) {
-// 		case "static":
-// 			boolV, ok := v.(bool)
-// 			if !ok {
-// 				return nil, fmt.Errorf("static: must be a boolean")
-// 			}
-// 			static = boolV
-// 		case "type":
-// 			strV, ok := v.(string)
-// 			if !ok {
-// 				return nil, fmt.Errorf("type: must be a string")
-// 			}
-
-// 			typeStr = strV
-// 		}
-// 	}
-// }

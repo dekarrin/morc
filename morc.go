@@ -359,7 +359,22 @@ func (bs BodyScraper) Spec() string {
 }
 
 func (bs BodyScraper) Scrape(resp *http.Response, preReadBody []byte) (string, error) {
-	data := preReadBody
+	var data []byte
+
+	if preReadBody == nil {
+		var err error
+		data, err = io.ReadAll(resp.Body)
+		if err != nil {
+			return "", fmt.Errorf("read response body: %w", err)
+		}
+		resp.Body.Close()
+
+		bufData := make([]byte, len(data))
+		copy(bufData, data)
+		resp.Body = io.NopCloser(bytes.NewBuffer(bufData))
+	} else {
+		data = preReadBody
+	}
 
 	if len(bs.Steps) < 1 {
 		// binary offset only, just do a bounds check

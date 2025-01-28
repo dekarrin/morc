@@ -4,6 +4,11 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
+)
+
+const (
+	CookieScraperExpiresDelimiter = ":EXP="
 )
 
 type SpecType int
@@ -27,9 +32,12 @@ type Scraper interface {
 	VarName() string
 }
 
+// Values returned will be either the exact value or "VALUE:EXP=EXPIRATION" if
+// WithExpires is true.
 type CookieScraper struct {
-	Name       string
-	CookieName string
+	Name        string
+	CookieName  string
+	WithExpires bool
 }
 
 func (cs CookieScraper) EqualSpec(other Scraper) bool {
@@ -46,7 +54,7 @@ func (cs CookieScraper) EqualSpec(other Scraper) bool {
 		return false
 	}
 
-	return cs.CookieName == ocs.CookieName
+	return cs.CookieName == ocs.CookieName && cs.WithExpires == ocs.WithExpires
 }
 
 func (cs CookieScraper) Type() SpecType {
@@ -58,7 +66,12 @@ func (cs CookieScraper) VarName() string {
 }
 
 func (cs CookieScraper) Spec() string {
-	return fmt.Sprintf("cookie %s", cs.CookieName)
+	withExpStr := ""
+	if cs.WithExpires {
+		withExpStr = " (with expiration)"
+	}
+
+	return fmt.Sprintf("cookie %s%s", cs.CookieName, withExpStr)
 }
 
 func (cs CookieScraper) String() string {
@@ -82,7 +95,13 @@ func (cs CookieScraper) Scrape(resp *http.Response, preReadBody []byte) (string,
 		return "", fmt.Errorf("cookie %s is not present in response", cs.CookieName)
 	}
 
-	return selectedCookie.Value, nil
+	val := selectedCookie.Value
+
+	if cs.WithExpires {
+		val += fmt.Sprintf(CookieScraperExpiresDelimiter+"%s", selectedCookie.Expires.Format(time.RFC3339))
+	}
+
+	return val, nil
 }
 
 // HeaderScraper supports scraping from headers and trailers.

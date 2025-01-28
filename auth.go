@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -12,6 +13,7 @@ type AuthProofType string
 const (
 	AuthProofHTTPBasic AuthProofType = "http-basic"
 	AuthProofOAuth2    AuthProofType = "oauth2"
+	AuthProofCustom    AuthProofType = "custom"
 )
 
 type AuthProof interface {
@@ -231,6 +233,11 @@ func ImportAuthProof(t AuthProofType, exported map[string]any) (AuthProof, error
 type Auth interface {
 	GetAuth() (AuthProof, error) // runs an auth flow if dynamic, or returns the static proof if static
 	Static() bool
+
+	// IsSuccessfulAuth is a way for the caller to ask the Auth if it succeeded.
+	// Caller will always call IsSuccessfulAuth, so this also gives the Auth a
+	// chance to invalidate its proof if it detects that it is no longer valid.
+	IsSuccessfulAuth(resp *http.Response) bool
 }
 
 type HTTPBasicAuth struct {
@@ -243,6 +250,10 @@ func (ba HTTPBasicAuth) Static() bool {
 
 func (sa HTTPBasicAuth) GetAuth() (AuthProof, error) {
 	return sa.proof, nil
+}
+
+func (sa HTTPBasicAuth) IsSuccessfulAuth(resp *http.Response) bool {
+	return resp.StatusCode != http.StatusUnauthorized
 }
 
 func NewHTTPBasicAuth(creds HTTPBasicCredentials) HTTPBasicAuth {
@@ -276,18 +287,153 @@ func (oa2 OAuth2AuthCodeGrantAuth) GetAuth() (AuthProof, error) {
 // ALGO FLOW for password to token (NON OAuth2)-
 //
 
+type proofDest string
+
+const (
+	proofDestHeader proofDest = "header"
+	proofDestCookie proofDest = "cookie"
+)
+
+type dynamicProof struct {
+	expiresAt time.Time
+	value     string
+
+	dest    proofDest
+	destKey string
+}
+
+func (dp dynamicProof) Apply(req *http.Request) error {
+	if dp.dest == proofDestHeader {
+		req.Header.Set(dp.destKey, dp.value)
+	} else if dp.dest == proofDestCookie {
+		req.AddCookie(&http.Cookie{
+			Name:  dp.destKey,
+			Value: dp.value,
+		})
+	} else {
+		return errors.New("unknown destination")
+	}
+
+	return nil
+}
+
+func (dp dynamicProof) Valid() bool {
+	if dp.expiresAt.IsZero() {
+		return true
+	}
+
+	return time.Now().Before(dp.expiresAt)
+}
+
+func (dp dynamicProof) Export() map[string]any {
+	return map[string]any{
+		"expires_at": dp.expiresAt.Format(time.RFC3339),
+		"value":      dp.value,
+		"dest": map[string]any{
+			"type": string(dp.dest),
+			"key":  dp.destKey,
+		},
+	}
+}
+
+// Type returns the type of AuthProof that this is. It is used for selecting
+// the correct constructor to recreate an AuthProof from an Exported string.
+func (dp dynamicProof) Type() AuthProofType {
+	return AuthProofCustom
+}
+
+type Transformer func(string) (string, error)
+type TimeTransformer func(string) (time.Time, error)
+
+func NewIdentityStringTransformer() Transformer {
+	return func(s string) (string, error) {
+		return s, nil
+	}
+}
+
+func NewParsedTimeTransformer(layout string) TimeTransformer {
+	if layout == "" {
+		layout = time.RFC3339
+	}
+
+	return func(s string) (time.Time, error) {
+		return time.Parse(layout, s)
+	}
+}
+
+func NewPairedCookieValueTransformer() Transformer {
+	return func(s string) (string, error) {
+		// for pulling value from string extracted by a CookieScraper that
+		// returns both an expiration and a value. Attempts to detect if no
+		// expiration was found, but might result in imperfect results if value
+		// happens to contain the exact string used to delimit expiration. If no
+		// expiration is detected, this will have the same result as the
+		// identity transform.
+
+		idx := strings.LastIndex(s, CookieScraperExpiresDelimiter)
+		if idx > -1 {
+			return s[:idx], nil
+		}
+		return s, nil
+	}
+}
+
+func NewPairedCookieExpiresTransformer() TimeTransformer {
+	return func(s string) (time.Time, error) {
+		// for pulling expiration from string extracted by a CookieScraper that
+		// returns both an expiration and a value. Attempts to detect if no
+		// expiration was found; if one is not present or the value is empty,
+		// the zero time is returned.
+
+		idx := strings.LastIndex(s, CookieScraperExpiresDelimiter)
+		if idx > -1 {
+			expStr := s[idx+len(CookieScraperExpiresDelimiter):]
+			if expStr == "" {
+				return time.Time{}, nil
+			}
+
+			return time.Parse(time.RFC3339, expStr)
+		}
+		return time.Time{}, nil
+	}
+}
+
+// TODO: CLI transformer.
+
 type DynamicAuth struct {
 	proof AuthProof // TODO: fill concrete type later
 
 	getAuthFlow     string // either execFlow or execTemplate must be set
 	getAuthTemplate string
+
+	caps []Scraper
+
+	valueScrapeName      string
+	valueScrapeTransform Transformer
+
+	expiresScrapeName      string
+	expiresScrapeTransform TimeTransformer
+
+	destLoc proofDest
+	destKey string
 }
 
-func (da DynamicAuth) Static() bool {
+func (da *DynamicAuth) IsSuccessfulAuth(resp *http.Response) bool {
+	success := resp.StatusCode != http.StatusUnauthorized
+
+	// invalidate proof immediately if auth failed
+	if !success {
+		da.proof = nil
+	}
+
+	return success
+}
+
+func (da *DynamicAuth) Static() bool {
 	return false
 }
 
-func (da DynamicAuth) GetAuth(p *Project, skipVerify bool, httpClient *http.Client, oc OutputControl) (AuthProof, error) {
+func (da *DynamicAuth) GetAuth(p *Project, skipVerify bool, httpClient *http.Client, oc OutputControl) (AuthProof, error) {
 	if da.proof.Valid() {
 		return da.proof, nil
 	}
@@ -313,10 +459,56 @@ func (da DynamicAuth) GetAuth(p *Project, skipVerify bool, httpClient *http.Clie
 		}
 	}
 
+	// make sure the response is not an error one
+	if lastResult.Response.StatusCode >= 400 {
+		return nil, fmt.Errorf("auth request failed with status %d", lastResult.Response.StatusCode)
+	}
+
+	// pull out the values
+	scrapes := map[string]string{}
+	for _, scraper := range da.caps {
+		var err error
+		scrapes[scraper.VarName()], err = scraper.Scrape(lastResult.Response, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scrape %q: %w", scraper.VarName(), err)
+		}
+	}
+
+	value, ok := scrapes[da.valueScrapeName]
+	if !ok {
+		return nil, fmt.Errorf("value scrape %q not found", da.valueScrapeName)
+	}
+	value, err = da.valueScrapeTransform(value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to transform value %q: %w", da.valueScrapeName, err)
+	}
+
+	ap := dynamicProof{
+		value:   value,
+		dest:    da.destLoc,
+		destKey: da.destKey,
+	}
+
+	// okay, do we have an expiration?
+	if da.expiresScrapeName != "" {
+		expStr, ok := scrapes[da.expiresScrapeName]
+		if !ok {
+			return nil, fmt.Errorf("expiration scrape %q not found", da.expiresScrapeName)
+		}
+		expTime, err := da.expiresScrapeTransform(expStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to transform expiration %q: %w", da.expiresScrapeName, err)
+		}
+		ap.expiresAt = expTime
+	}
+
+	da.proof = ap
+
+	return ap, nil
+
 	// TODO: fallback needs to be implemented at some level to decide that a
 	// previously valid proof is not valid and could be re-obtained, but that's
 	// probably going to need to be at caller-level.
-	return nil, fmt.Errorf("not implemented")
 }
 
 // BASIC ALGO FLOW -

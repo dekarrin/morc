@@ -33,53 +33,6 @@ type TraversalStep struct {
 	Index int
 }
 
-func (t TraversalStep) Export() map[string]interface{} {
-	if t.Key != "" {
-		return map[string]interface{}{
-			"key": t.Key,
-		}
-	}
-	return map[string]interface{}{
-		"index": t.Index,
-	}
-}
-
-func ImportTraversalStep(m map[string]interface{}) (TraversalStep, error) {
-	// need to be compatible w old encodings, so run compat.
-	compatMap := map[string]interface{}{}
-	for k, v := range m {
-		if strings.EqualFold(k, "index") {
-			compatMap["index"] = v
-		}
-		if strings.EqualFold(k, "key") {
-			compatMap["key"] = v
-		}
-	}
-	m = compatMap
-
-	var key string
-	var index int
-
-	if rawKey, ok := m["key"]; ok {
-		if key, ok = rawKey.(string); !ok {
-			return TraversalStep{}, fmt.Errorf("key: must be a string but was %T", rawKey)
-		}
-	}
-
-	if rawIndex, ok := m["index"]; ok {
-		if indexFloat, ok := rawIndex.(float64); ok {
-			index = int(indexFloat)
-		} else if index, ok = rawIndex.(int); !ok {
-			return TraversalStep{}, fmt.Errorf("index: must be an int or float64 but was %T", rawIndex)
-		}
-	}
-
-	return TraversalStep{
-		Key:   key,
-		Index: index,
-	}, nil
-}
-
 func (t TraversalStep) String() string {
 	if t.Key != "" {
 		return "." + t.Key
@@ -99,13 +52,14 @@ func (t TraversalStep) Traverse(data interface{}) (interface{}, error) {
 	}
 }
 
-func ParseVarScraperSpec(name, spec string) (BodyScraper, error) {
+func ParseVarScraperSpec(name, spec string) (Scraper, error) {
+	// TODO: support for anything besides body-based scrapers
 	// okay, are we looking at a byte offset or a JSON traversal?
 	if strings.HasPrefix(spec, ":") {
 		// it is a byte offset of the form ":START,END"
 		offsets := strings.SplitN(spec[1:], ",", 2)
 		if len(offsets) != 2 {
-			return BodyScraper{}, fmt.Errorf("%q is not in :START,END format", spec)
+			return Scraper{}, fmt.Errorf("%q is not in :START,END format", spec)
 		}
 
 		var start, end int
@@ -114,28 +68,29 @@ func ParseVarScraperSpec(name, spec string) (BodyScraper, error) {
 		if len(offsets[0]) > 0 {
 			start, err = strconv.Atoi(offsets[0])
 			if err != nil {
-				return BodyScraper{}, fmt.Errorf("%q: start offset: %w", spec, err)
+				return Scraper{}, fmt.Errorf("%q: start offset: %w", spec, err)
 			}
 
 			if start < 0 {
-				return BodyScraper{}, fmt.Errorf("%q: start offset cannot be negative", spec)
+				return Scraper{}, fmt.Errorf("%q: start offset cannot be negative", spec)
 			}
 		}
 
 		if len(offsets[1]) > 0 {
 			end, err = strconv.Atoi(offsets[1])
 			if err != nil {
-				return BodyScraper{}, fmt.Errorf("%q: end offset: %w", spec, err)
+				return Scraper{}, fmt.Errorf("%q: end offset: %w", spec, err)
 			}
 		}
 
 		// only matters if end is greater than 0; 0 means "to the end", -1 means 1 from the end, etc.
 		if end <= start && end > 0 {
-			return BodyScraper{}, fmt.Errorf("end offset %d is less than or equal to start offset %d", end, start)
+			return Scraper{}, fmt.Errorf("end offset %d is less than or equal to start offset %d", end, start)
 		}
 
-		return BodyScraper{
+		return Scraper{
 			Name:        name,
+			Type:        SpecBodyOffset,
 			OffsetStart: start,
 			OffsetEnd:   end,
 		}, nil
@@ -183,7 +138,7 @@ func ParseVarScraperSpec(name, spec string) (BodyScraper, error) {
 				} else if ch == '[' {
 					curMode = inIndex
 				} else {
-					return BodyScraper{}, fmt.Errorf("invalid character %q at position %d; should be either '.' to specify a key or '[' to specify an index", ch, i)
+					return Scraper{}, fmt.Errorf("invalid character %q at position %d; should be either '.' to specify a key or '[' to specify an index", ch, i)
 				}
 			case inKey:
 				if ch == '.' || ch == '[' {
@@ -191,7 +146,7 @@ func ParseVarScraperSpec(name, spec string) (BodyScraper, error) {
 					// parsing at this index
 					symStr := curSymbol.String()
 					if symStr == "" {
-						return BodyScraper{}, fmt.Errorf("missing key at position %d", i)
+						return Scraper{}, fmt.Errorf("missing key at position %d", i)
 					}
 					currentStep.Key = symStr
 					steps = append(steps, currentStep)
@@ -203,11 +158,11 @@ func ParseVarScraperSpec(name, spec string) (BodyScraper, error) {
 					// escape character; consume next character
 					i++
 					if i >= len(specR) {
-						return BodyScraper{}, fmt.Errorf("escape character at end of string")
+						return Scraper{}, fmt.Errorf("escape character at end of string")
 					}
 					curSymbol.WriteRune(specR[i])
 				} else if unicode.IsSpace(ch) {
-					return BodyScraper{}, fmt.Errorf("unescaped whitespace character in key at position %d; quote key name or escape whitespace with '\\'", i)
+					return Scraper{}, fmt.Errorf("unescaped whitespace character in key at position %d; quote key name or escape whitespace with '\\'", i)
 				} else {
 					curSymbol.WriteRune(ch)
 				}
@@ -216,7 +171,7 @@ func ParseVarScraperSpec(name, spec string) (BodyScraper, error) {
 					// end of quoted key
 					symStr := curSymbol.String()
 					if symStr == "" {
-						return BodyScraper{}, fmt.Errorf("missing key at position %d", i)
+						return Scraper{}, fmt.Errorf("missing key at position %d", i)
 					}
 					currentStep.Key = symStr
 					steps = append(steps, currentStep)
@@ -227,7 +182,7 @@ func ParseVarScraperSpec(name, spec string) (BodyScraper, error) {
 					// escape character; consume next character
 					i++
 					if i >= len(specR) {
-						return BodyScraper{}, fmt.Errorf("escape character at end of string")
+						return Scraper{}, fmt.Errorf("escape character at end of string")
 					}
 					curSymbol.WriteRune(specR[i])
 				} else {
@@ -238,11 +193,11 @@ func ParseVarScraperSpec(name, spec string) (BodyScraper, error) {
 					// end of index
 					symStr := curSymbol.String()
 					if symStr == "" {
-						return BodyScraper{}, fmt.Errorf("missing index at position %d", i)
+						return Scraper{}, fmt.Errorf("missing index at position %d", i)
 					}
 					index, err := strconv.Atoi(symStr)
 					if err != nil {
-						return BodyScraper{}, fmt.Errorf("invalid index %q: %w", symStr, err)
+						return Scraper{}, fmt.Errorf("invalid index %q: %w", symStr, err)
 					}
 					currentStep.Index = index
 					steps = append(steps, currentStep)
@@ -254,7 +209,7 @@ func ParseVarScraperSpec(name, spec string) (BodyScraper, error) {
 				}
 			default:
 				// should never happen
-				return BodyScraper{}, fmt.Errorf("invalid mode %d", curMode)
+				return Scraper{}, fmt.Errorf("invalid mode %d", curMode)
 			}
 		}
 
@@ -263,17 +218,18 @@ func ParseVarScraperSpec(name, spec string) (BodyScraper, error) {
 		if curMode == inKey {
 			symStr := curSymbol.String()
 			if symStr == "" {
-				return BodyScraper{}, fmt.Errorf("missing key at end of string")
+				return Scraper{}, fmt.Errorf("missing key at end of string")
 			}
 			currentStep.Key = symStr
 			steps = append(steps, currentStep)
 		} else if curMode == inQuotedKey {
-			return BodyScraper{}, fmt.Errorf("unterminated quoted key at end of string")
+			return Scraper{}, fmt.Errorf("unterminated quoted key at end of string")
 		} else if curMode == inIndex {
-			return BodyScraper{}, fmt.Errorf("unterminated index at end of string")
+			return Scraper{}, fmt.Errorf("unterminated index at end of string")
 		}
 
-		return BodyScraper{
+		return Scraper{
+			Type:  SpecBodyJSON,
 			Name:  name,
 			Steps: steps,
 		}, nil
@@ -282,11 +238,12 @@ func ParseVarScraperSpec(name, spec string) (BodyScraper, error) {
 	// else, check shorthand names for captures
 	switch strings.ToLower(spec) {
 	case "raw":
-		return BodyScraper{
+		return Scraper{
+			Type: SpecBodyOffset,
 			Name: name,
 		}, nil
 	default:
-		return BodyScraper{}, fmt.Errorf("invalid var scraper spec %q", spec)
+		return Scraper{}, fmt.Errorf("invalid var scraper spec %q", spec)
 	}
 }
 
@@ -304,7 +261,7 @@ func ParseVarName(name string) (string, error) {
 	return name, nil
 }
 
-func ParseVarScraper(s string) (BodyScraper, error) {
+func ParseVarScraper(s string) (Scraper, error) {
 	// Parse var scraper specification strings of the form "NAME::START,END" for
 	// byte offsets and "NAME:key1.key2[index1]...keyN" for JSON traversal with array
 	// indexes and object keys in a syntax similar to jq.
@@ -312,12 +269,12 @@ func ParseVarScraper(s string) (BodyScraper, error) {
 	// first, split name from spec:
 	parts := strings.SplitN(s, ":", 2)
 	if len(parts) != 2 {
-		return BodyScraper{}, fmt.Errorf("not in NAME:SPEC format")
+		return Scraper{}, fmt.Errorf("not in NAME:SPEC format")
 	}
 
 	name, err := ParseVarName(parts[0])
 	if err != nil {
-		return BodyScraper{}, err
+		return Scraper{}, err
 	}
 	spec := parts[1]
 
@@ -449,10 +406,10 @@ func (r *RESTClient) SendRequest(req *http.Request) (*http.Response, map[string]
 	for _, scraper := range r.Scrapers {
 		value, err := scraper.Scrape(resp, respBody)
 		if err != nil {
-			return resp, nil, fmt.Errorf("scrape %s: %w", scraper.VarName(), err)
+			return resp, nil, fmt.Errorf("scrape %s: %w", scraper.Name, err)
 		}
-		capturedVars[scraper.VarName()] = value
-		r.Vars[scraper.VarName()] = value
+		capturedVars[scraper.Name] = value
+		r.Vars[scraper.Name] = value
 	}
 
 	// clear var overrides

@@ -280,7 +280,7 @@ func invokeCapsNew(io cmdio.IO, projFile, reqName, varName string, attrs capAttr
 
 	// otherwise, we have a valid capture, so add it to the request.
 	if req.Captures == nil {
-		req.Captures = make(map[string]morc.Scraper)
+		req.Captures = make(map[string]morc.InterfaceScraper)
 		p.Templates[reqName] = req
 	}
 	req.Captures[varUpper] = cap

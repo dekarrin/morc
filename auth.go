@@ -216,16 +216,107 @@ const (
 	AuthTypeHTTPBasic AuthType = "basic"
 )
 
-type Transformer func(string) (string, error)
-type TimeTransformer func(string) (time.Time, error)
+type TransformerFuncName string
 
-func NewIdentityStringTransformer() Transformer {
+const (
+	TransformerFuncIdentity               TransformerFuncName = "identity"
+	TransformerFuncPairedCookieValue      TransformerFuncName = "paired-cookie-value"
+	TransformerFuncPairedCookieExpiration TransformerFuncName = "paired-cookie-expiration"
+	TransformerFuncJWTExpiration          TransformerFuncName = "jwt-expiration"
+	TransformerFuncParsedTime             TransformerFuncName = "parsed-time"
+)
+
+type TransformerFunc func(string) (string, error)
+type TimeTransformerFunc func(string) (time.Time, error)
+
+type Transformer struct {
+	FuncName TransformerFuncName
+	Params   map[string]any
+
+	fn TransformerFunc
+}
+
+func (t *Transformer) Apply(s string) (string, error) {
+	if t.fn == nil {
+		var err error
+		t.fn, err = NewTransformerFuncFromParams(t.FuncName, t.Params)
+		if err != nil {
+			return "", fmt.Errorf("init func: %w", err)
+		}
+	}
+
+	return t.fn(s)
+}
+
+type TimeTransformer struct {
+	FuncName TransformerFuncName
+	Params   map[string]any
+
+	fn TimeTransformerFunc
+}
+
+func (t *TimeTransformer) Apply(s string) (time.Time, error) {
+	if t.fn == nil {
+		var err error
+		t.fn, err = NewTimeTransformerFuncFromParams(t.FuncName, t.Params)
+		if err != nil {
+			return time.Time{}, fmt.Errorf("init func: %w", err)
+		}
+	}
+	return t.fn(s)
+}
+
+func NewTransformerFuncFromParams(name TransformerFuncName, params map[string]any) (TransformerFunc, error) {
+	switch name {
+	case TransformerFuncIdentity:
+		return NewIdentityStringTransformer(), nil
+	case TransformerFuncPairedCookieValue:
+		return NewPairedCookieValueTransformer(), nil
+	case TransformerFuncPairedCookieExpiration:
+		return nil, fmt.Errorf("%v is a time-transformer", name)
+	case TransformerFuncJWTExpiration:
+		return nil, fmt.Errorf("%v is a time-transformer", name)
+	case TransformerFuncParsedTime:
+		return nil, fmt.Errorf("%v is a time-transformer", name)
+	default:
+		return nil, fmt.Errorf("unknown transformer %q", name)
+	}
+}
+
+func NewTimeTransformerFuncFromParams(name TransformerFuncName, params map[string]any) (TimeTransformerFunc, error) {
+	switch name {
+
+	case TransformerFuncIdentity:
+		return nil, fmt.Errorf("%v is a string-transformer", name)
+	case TransformerFuncPairedCookieValue:
+		return nil, fmt.Errorf("%v is a string-transformer", name)
+	case TransformerFuncPairedCookieExpiration:
+		return NewPairedCookieExpiresTransformer(), nil
+	case TransformerFuncJWTExpiration:
+		return NewJWTExpirationTransformer(), nil
+	case TransformerFuncParsedTime:
+		var layout string
+
+		if rawLayout, ok := params["layout"]; ok {
+			if layout, ok = rawLayout.(string); !ok {
+				return nil, errors.New("layout must be a string")
+			}
+		} else {
+			return nil, errors.New("layout missing from params")
+		}
+		return NewParsedTimeTransformer(layout), nil
+	default:
+		return nil, fmt.Errorf("unknown transformer %q", name)
+	}
+}
+
+func NewIdentityStringTransformer() TransformerFunc {
 	return func(s string) (string, error) {
 		return s, nil
 	}
 }
 
-func NewParsedTimeTransformer(layout string) TimeTransformer {
+func NewParsedTimeTransformer(layout string) TimeTransformerFunc {
 	if layout == "" {
 		layout = time.RFC3339
 	}
@@ -235,7 +326,7 @@ func NewParsedTimeTransformer(layout string) TimeTransformer {
 	}
 }
 
-func NewPairedCookieValueTransformer() Transformer {
+func NewPairedCookieValueTransformer() TransformerFunc {
 	return func(s string) (string, error) {
 		// for pulling value from string extracted by a CookieScraper that
 		// returns both an expiration and a value. Attempts to detect if no
@@ -252,7 +343,7 @@ func NewPairedCookieValueTransformer() Transformer {
 	}
 }
 
-func NewPairedCookieExpiresTransformer() TimeTransformer {
+func NewPairedCookieExpiresTransformer() TimeTransformerFunc {
 	return func(s string) (time.Time, error) {
 		// for pulling expiration from string extracted by a CookieScraper that
 		// returns both an expiration and a value. Attempts to detect if no
@@ -272,16 +363,16 @@ func NewPairedCookieExpiresTransformer() TimeTransformer {
 	}
 }
 
-func NewJWTExpirationTransformer() TimeTransformer {
+func NewJWTExpirationTransformer() TimeTransformerFunc {
 	return func(s string) (time.Time, error) {
 		parts := strings.Split(s, ".")
 		if len(parts) != 3 {
-			return time.Time{}, fmt.Errorf("Not in xxxxx.yyyyy.zzzzz JWT format: %s", s)
+			return time.Time{}, fmt.Errorf("not in xxxxx.yyyyy.zzzzz JWT format: %s", s)
 		}
 		encodedClaims := parts[1]
 		claimsStr, err := base64.RawURLEncoding.DecodeString(encodedClaims)
 		if err != nil {
-			return time.Time{}, fmt.Errorf("Failed to decode JWT claims: %w", err)
+			return time.Time{}, fmt.Errorf("failed to decode JWT claims: %w", err)
 		}
 
 		type justExp struct {
@@ -290,7 +381,7 @@ func NewJWTExpirationTransformer() TimeTransformer {
 
 		var claims justExp
 		if err := json.Unmarshal(claimsStr, &claims); err != nil {
-			return time.Time{}, fmt.Errorf("Failed to parse JWT claims: %w", err)
+			return time.Time{}, fmt.Errorf("failed to parse JWT claims: %w", err)
 		}
 
 		if claims.Exp == 0 {
@@ -570,12 +661,16 @@ func NewJWTFetcher(flow, femplate string, scraper Scraper) (*AuthFetcher, error)
 		getAuthTemplate: femplate,
 		caps:            []Scraper{scraper},
 		valueExtractor: ScrapeExtractor{
-			VarName:   scraper.Name,
-			Transform: NewIdentityStringTransformer(),
+			VarName: scraper.Name,
+			Transform: Transformer{
+				FuncName: TransformerFuncIdentity,
+			},
 		},
 		expiresExtractor: ScrapeTimeExtractor{
-			VarName:   scraper.Name,
-			Transform: NewJWTExpirationTransformer(),
+			VarName: scraper.Name,
+			Transform: TimeTransformer{
+				FuncName: TransformerFuncJWTExpiration,
+			},
 		},
 		dest: ProofDestination{
 			Location: ProofLocationHeader,
@@ -608,16 +703,21 @@ func NewTokenFetcher(flow, femplate string, tokenScraper Scraper, dest ProofDest
 		getAuthTemplate: femplate,
 		caps:            []Scraper{tokenScraper},
 		valueExtractor: ScrapeExtractor{
-			VarName:   tokenScraper.Name,
-			Transform: NewIdentityStringTransformer(),
+			VarName: tokenScraper.Name,
+			Transform: Transformer{
+				FuncName: TransformerFuncIdentity,
+			},
 		},
 		dest: dest,
 	}
 
 	if expiresScraper != nil {
 		da.expiresExtractor = ScrapeTimeExtractor{
-			VarName:   expiresScraper.Name,
-			Transform: NewParsedTimeTransformer(expiresTimeLayout),
+			VarName: expiresScraper.Name,
+			Transform: TimeTransformer{
+				FuncName: TransformerFuncParsedTime,
+				Params:   map[string]any{"layout": expiresTimeLayout},
+			},
 		}
 		da.caps = append(da.caps, *expiresScraper)
 	}
@@ -649,7 +749,7 @@ func NewLoginCookieFetcher(flow, femplate string, cookieName string, detectExpir
 		getAuthFlow:     flow,
 		getAuthTemplate: femplate,
 		caps: []Scraper{
-			Scraper{
+			{
 				Type:             SpecCookie,
 				Name:             cookieVarName,
 				CookieName:       cookieName,
@@ -657,8 +757,10 @@ func NewLoginCookieFetcher(flow, femplate string, cookieName string, detectExpir
 			},
 		},
 		valueExtractor: ScrapeExtractor{
-			VarName:   cookieVarName,
-			Transform: NewIdentityStringTransformer(),
+			VarName: cookieVarName,
+			Transform: Transformer{
+				FuncName: TransformerFuncIdentity,
+			},
 		},
 		dest: ProofDestination{
 			Location: ProofDestinationCookie,
@@ -669,10 +771,14 @@ func NewLoginCookieFetcher(flow, femplate string, cookieName string, detectExpir
 
 	if detectExpiration {
 		da.expiresExtractor = ScrapeTimeExtractor{
-			VarName:   cookieVarName,
-			Transform: NewPairedCookieExpiresTransformer(),
+			VarName: cookieVarName,
+			Transform: TimeTransformer{
+				FuncName: TransformerFuncPairedCookieExpiration,
+			},
 		}
-		da.valueExtractor.Transform = NewPairedCookieValueTransformer()
+		da.valueExtractor.Transform = Transformer{
+			FuncName: TransformerFuncPairedCookieValue,
+		}
 	}
 
 	return da, nil
@@ -720,7 +826,7 @@ func (da *AuthFetcher) Fetch(p *Project, skipVerify bool, httpClient *http.Clien
 	if !ok {
 		return nil, fmt.Errorf("value scrape %q not found", valueEx.VarName)
 	}
-	value, err = valueEx.Transform(value)
+	value, err = valueEx.Transform.Apply(value)
 	if err != nil {
 		return nil, fmt.Errorf("failed to transform value %q: %w", valueEx.VarName, err)
 	}
@@ -738,7 +844,7 @@ func (da *AuthFetcher) Fetch(p *Project, skipVerify bool, httpClient *http.Clien
 		if !ok {
 			return nil, fmt.Errorf("expiration scrape %q not found", expiresEx.VarName)
 		}
-		expTime, err := expiresEx.Transform(expStr)
+		expTime, err := expiresEx.Transform.Apply(expStr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to transform expiration %q: %w", expiresEx.VarName, err)
 		}

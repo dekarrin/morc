@@ -25,18 +25,6 @@ const (
 	SpecTrailer    SpecType = "trailer"
 )
 
-// TODO: make everything that takes a BodyScraper actually take a InterfaceScraper. This
-// will be fairly non-trivial, make sure all types are accounted for.
-type InterfaceScraper interface {
-	String() string
-	Spec() string
-	Scrape(resp *http.Response, preReadBody []byte) (string, error)
-	Type() SpecType
-	EqualSpec(other InterfaceScraper) bool
-	VarName() string
-	Export() map[string]interface{}
-}
-
 type Scraper struct {
 	Type SpecType
 	Name string

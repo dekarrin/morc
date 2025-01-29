@@ -438,7 +438,7 @@ func testRequest_withAllPropertiesSet() morc.RequestTemplate {
 		},
 		Body:     []byte("{\n    \"username\": \"grimAuxiliatrix\"\n}"),
 		AuthFlow: "auth1",
-		Captures: map[string]morc.BodyScraper{
+		Captures: map[string]morc.Scraper{
 			"var1": {
 				Name:        "var1",
 				OffsetStart: 1,

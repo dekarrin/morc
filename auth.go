@@ -492,7 +492,7 @@ func NewLoginCookieAuth(retrieval RequestRef, cookieName string, detectExpiratio
 // single token value may be extracted. If expiresTimeLayout is set, it will be
 // used for parsing expires time, and if set to an empty string, it will default
 // to RFC3339.
-func NewTokenAuth(retrieval RequestRef, tokenScraper InterfaceScraper, dest ProofDestination, expiresScraper InterfaceScraper, expiresTimeLayout string) (Auth, error) {
+func NewTokenAuth(retrieval RequestRef, tokenScraper Scraper, dest ProofDestination, expiresScraper *Scraper, expiresTimeLayout string) (Auth, error) {
 	var flow, femplate string
 
 	if retrieval.IsFlow {
@@ -514,8 +514,8 @@ func NewTokenAuth(retrieval RequestRef, tokenScraper InterfaceScraper, dest Proo
 // NewJWTAuth returns an Auth that is configured to pull a JWT token from
 // the body of the response of the auth flow/template and place it in an
 // Authorization header with the Bearer scheme. The scraper must point to a
-// valid JWT token in the response body.
-func NewJWTAuth(retrieval RequestRef, scraper BodyScraper) (Auth, error) {
+// valid JWT token in the response.
+func NewJWTAuth(retrieval RequestRef, scraper Scraper) (Auth, error) {
 	var flow, femplate string
 
 	if retrieval.IsFlow {
@@ -541,7 +541,7 @@ type AuthFetcher struct {
 	getAuthFlow     string // either execFlow or execTemplate must be set
 	getAuthTemplate string
 
-	caps []InterfaceScraper
+	caps []Scraper
 
 	valueExtractor   ScrapeExtractor
 	expiresExtractor ScrapeTimeExtractor
@@ -554,7 +554,7 @@ type AuthFetcher struct {
 // Authorization header with the Bearer scheme. The scraper must point to a
 // valid JWT token in the response body. Give flow or femplate, but not
 // both.
-func NewJWTFetcher(flow, femplate string, scraper BodyScraper) (*AuthFetcher, error) {
+func NewJWTFetcher(flow, femplate string, scraper Scraper) (*AuthFetcher, error) {
 	if flow != "" && femplate != "" {
 		return &AuthFetcher{}, errors.New("flow and template cannot both be set")
 	}
@@ -568,13 +568,13 @@ func NewJWTFetcher(flow, femplate string, scraper BodyScraper) (*AuthFetcher, er
 	return &AuthFetcher{
 		getAuthFlow:     flow,
 		getAuthTemplate: femplate,
-		caps:            []InterfaceScraper{scraper},
+		caps:            []Scraper{scraper},
 		valueExtractor: ScrapeExtractor{
-			VarName:   scraper.VarName(),
+			VarName:   scraper.Name,
 			Transform: NewIdentityStringTransformer(),
 		},
 		expiresExtractor: ScrapeTimeExtractor{
-			VarName:   scraper.VarName(),
+			VarName:   scraper.Name,
 			Transform: NewJWTExpirationTransformer(),
 		},
 		dest: ProofDestination{
@@ -592,7 +592,7 @@ func NewJWTFetcher(flow, femplate string, scraper BodyScraper) (*AuthFetcher, er
 // single token value may be extracted. If expiresTimeLayout is set, it will be
 // used for parsing expires time, and if set to an empty string, it will default
 // to RFC3339.
-func NewTokenFetcher(flow, femplate string, tokenScraper InterfaceScraper, dest ProofDestination, expiresScraper InterfaceScraper, expiresTimeLayout string) (*AuthFetcher, error) {
+func NewTokenFetcher(flow, femplate string, tokenScraper Scraper, dest ProofDestination, expiresScraper *Scraper, expiresTimeLayout string) (*AuthFetcher, error) {
 	if flow != "" && femplate != "" {
 		return &AuthFetcher{}, errors.New("flow and template cannot both be set")
 	}
@@ -606,9 +606,9 @@ func NewTokenFetcher(flow, femplate string, tokenScraper InterfaceScraper, dest 
 	da := &AuthFetcher{
 		getAuthFlow:     flow,
 		getAuthTemplate: femplate,
-		caps:            []InterfaceScraper{tokenScraper},
+		caps:            []Scraper{tokenScraper},
 		valueExtractor: ScrapeExtractor{
-			VarName:   tokenScraper.VarName(),
+			VarName:   tokenScraper.Name,
 			Transform: NewIdentityStringTransformer(),
 		},
 		dest: dest,
@@ -616,10 +616,10 @@ func NewTokenFetcher(flow, femplate string, tokenScraper InterfaceScraper, dest 
 
 	if expiresScraper != nil {
 		da.expiresExtractor = ScrapeTimeExtractor{
-			VarName:   expiresScraper.VarName(),
+			VarName:   expiresScraper.Name,
 			Transform: NewParsedTimeTransformer(expiresTimeLayout),
 		}
-		da.caps = append(da.caps, expiresScraper)
+		da.caps = append(da.caps, *expiresScraper)
 	}
 
 	return da, nil
@@ -648,11 +648,12 @@ func NewLoginCookieFetcher(flow, femplate string, cookieName string, detectExpir
 	da := &AuthFetcher{
 		getAuthFlow:     flow,
 		getAuthTemplate: femplate,
-		caps: []InterfaceScraper{
-			CookieScraper{
-				Name:        cookieVarName,
-				CookieName:  cookieName,
-				WithExpires: detectExpiration,
+		caps: []Scraper{
+			Scraper{
+				Type:             SpecCookie,
+				Name:             cookieVarName,
+				CookieName:       cookieName,
+				CookieExpiration: detectExpiration,
 			},
 		},
 		valueExtractor: ScrapeExtractor{
@@ -708,9 +709,9 @@ func (da *AuthFetcher) Fetch(p *Project, skipVerify bool, httpClient *http.Clien
 	scrapes := map[string]string{}
 	for _, scraper := range da.caps {
 		var err error
-		scrapes[scraper.VarName()], err = scraper.Scrape(lastResult.Response, nil)
+		scrapes[scraper.Name], err = scraper.Scrape(lastResult.Response, nil)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scrape %q: %w", scraper.VarName(), err)
+			return nil, fmt.Errorf("failed to scrape %q: %w", scraper.Name, err)
 		}
 	}
 

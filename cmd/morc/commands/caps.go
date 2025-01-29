@@ -190,7 +190,7 @@ func invokeCapsEdit(io cmdio.IO, projFile, reqName, varName string, attrs capAtt
 	// if we have a spec change, apply that next
 	if attrs.spec.set {
 		if !cap.EqualSpec(attrs.spec.v) {
-			existingName := cap.VarName()
+			existingName := cap.Name
 			cap = attrs.spec.v
 			cap.Name = existingName
 			modifiedVals[capKeySpec] = attrs.spec.v.Spec()
@@ -200,7 +200,7 @@ func invokeCapsEdit(io cmdio.IO, projFile, reqName, varName string, attrs capAtt
 	}
 
 	// update the request
-	req.Captures[strings.ToUpper(cap.VarName())] = cap
+	req.Captures[strings.ToUpper(cap.Name)] = cap
 	p.Templates[reqName] = req
 
 	// save the project file
@@ -236,7 +236,7 @@ func invokeCapsGet(io cmdio.IO, projFile, reqName, capName string, getItem capKe
 
 	switch getItem {
 	case capKeyVar:
-		io.Printf("%s\n", cap.VarName())
+		io.Printf("%s\n", cap.Name)
 	case capKeySpec:
 		io.Printf("%s\n", cap.Spec())
 	default:
@@ -280,7 +280,7 @@ func invokeCapsNew(io cmdio.IO, projFile, reqName, varName string, attrs capAttr
 
 	// otherwise, we have a valid capture, so add it to the request.
 	if req.Captures == nil {
-		req.Captures = make(map[string]morc.InterfaceScraper)
+		req.Captures = make(map[string]morc.Scraper)
 		p.Templates[reqName] = req
 	}
 	req.Captures[varUpper] = cap
@@ -292,9 +292,9 @@ func invokeCapsNew(io cmdio.IO, projFile, reqName, varName string, attrs capAttr
 	}
 
 	var scrapeSource string
-	if cap.Type() == morc.SpecBodyJSON {
+	if cap.Type == morc.SpecBodyJSON {
 		scrapeSource = "path " + cap.Spec()
-	} else if cap.Type() == morc.SpecBodyOffset {
+	} else if cap.Type == morc.SpecBodyOffset {
 		scrapeSource = cap.Spec()
 	}
 
@@ -373,7 +373,7 @@ type capsArgs struct {
 
 type capAttrValues struct {
 	capVar optional[string]
-	spec   optional[morc.BodyScraper]
+	spec   optional[morc.Scraper]
 }
 
 func parseCapsArgs(cmd *cobra.Command, posArgs []string, args *capsArgs) error {
@@ -518,7 +518,7 @@ func parseCapsSetFlags(cmd *cobra.Command, attrs *capAttrValues) error {
 			return fmt.Errorf("--spec/-s: %w", err)
 		}
 
-		attrs.spec = optional[morc.BodyScraper]{set: true, v: spec}
+		attrs.spec = optional[morc.Scraper]{set: true, v: spec}
 	}
 
 	if cmd.Flags().Lookup("var").Changed {

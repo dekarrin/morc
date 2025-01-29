@@ -4,7 +4,6 @@ package morc
 import (
 	"bytes"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -32,6 +31,53 @@ const (
 type TraversalStep struct {
 	Key   string // if set, index is ignored
 	Index int
+}
+
+func (t TraversalStep) Export() map[string]interface{} {
+	if t.Key != "" {
+		return map[string]interface{}{
+			"key": t.Key,
+		}
+	}
+	return map[string]interface{}{
+		"index": t.Index,
+	}
+}
+
+func ImportTraversalStep(m map[string]interface{}) (TraversalStep, error) {
+	// need to be compatible w old encodings, so run compat.
+	compatMap := map[string]interface{}{}
+	for k, v := range m {
+		if strings.EqualFold(k, "index") {
+			compatMap["index"] = v
+		}
+		if strings.EqualFold(k, "key") {
+			compatMap["key"] = v
+		}
+	}
+	m = compatMap
+
+	var key string
+	var index int
+
+	if rawKey, ok := m["key"]; ok {
+		if key, ok = rawKey.(string); !ok {
+			return TraversalStep{}, fmt.Errorf("key: must be a string but was %T", rawKey)
+		}
+	}
+
+	if rawIndex, ok := m["index"]; ok {
+		if indexFloat, ok := rawIndex.(float64); ok {
+			index = int(indexFloat)
+		} else if index, ok = rawIndex.(int); !ok {
+			return TraversalStep{}, fmt.Errorf("index: must be an int or float64 but was %T", rawIndex)
+		}
+	}
+
+	return TraversalStep{
+		Key:   key,
+		Index: index,
+	}, nil
 }
 
 func (t TraversalStep) String() string {
@@ -276,180 +322,6 @@ func ParseVarScraper(s string) (BodyScraper, error) {
 	spec := parts[1]
 
 	return ParseVarScraperSpec(name, spec)
-}
-
-type BodyScraper struct {
-	Name        string
-	OffsetStart int
-	OffsetEnd   int
-	Steps       []TraversalStep // if non-nil, OffsetStart and OffsetEnd are ignored
-}
-
-func (bs BodyScraper) VarName() string {
-	return bs.Name
-}
-
-func (bs BodyScraper) String() string {
-	s := fmt.Sprintf("%s from ", strings.ToUpper(bs.Name))
-	s += bs.Spec()
-	return s
-}
-
-func (bs BodyScraper) Type() SpecType {
-	if len(bs.Steps) > 0 {
-		return SpecBodyJSON
-	}
-	return SpecBodyOffset
-}
-
-func (bs BodyScraper) EqualSpec(other Scraper) bool {
-	if other == nil {
-		return false
-	}
-
-	var otherBodyScraper BodyScraper
-	var ok bool
-
-	if otherBodyScraper, ok = other.(BodyScraper); !ok {
-		return false
-	}
-
-	if otherBodyScraper.Type() != bs.Type() {
-		return false
-	}
-
-	if bs.Type() == SpecBodyJSON {
-		for i := range bs.Steps {
-			if bs.Steps[i] != otherBodyScraper.Steps[i] {
-				return false
-			}
-		}
-	} else if bs.Type() == SpecBodyOffset {
-		if bs.OffsetStart != otherBodyScraper.OffsetStart || bs.OffsetEnd != otherBodyScraper.OffsetEnd {
-			return false
-		}
-	}
-
-	// not comprable
-	return false
-}
-
-func (bs BodyScraper) Spec() string {
-	s := ""
-	if len(bs.Steps) > 0 {
-		for _, step := range bs.Steps {
-			s += step.String()
-		}
-	} else {
-		if bs.OffsetStart == 0 && bs.OffsetEnd == 0 {
-			s += "entire response"
-		} else {
-			s += fmt.Sprintf("offset %d,", bs.OffsetStart)
-
-			if bs.OffsetEnd == 0 {
-				s += "<END>"
-			} else if bs.OffsetEnd < 0 {
-				s += fmt.Sprintf("<END%d>", bs.OffsetEnd)
-			} else {
-				s += fmt.Sprintf("%d", bs.OffsetEnd)
-			}
-		}
-	}
-	return s
-}
-
-func (bs BodyScraper) Scrape(resp *http.Response, preReadBody []byte) (string, error) {
-	var data []byte
-
-	if preReadBody == nil {
-		var err error
-		data, err = io.ReadAll(resp.Body)
-		if err != nil {
-			return "", fmt.Errorf("read response body: %w", err)
-		}
-		resp.Body.Close()
-
-		bufData := make([]byte, len(data))
-		copy(bufData, data)
-		resp.Body = io.NopCloser(bytes.NewBuffer(bufData))
-	} else {
-		data = preReadBody
-	}
-
-	if len(bs.Steps) < 1 {
-		// binary offset only, just do a bounds check
-		if bs.OffsetEnd > 0 && bs.OffsetEnd > len(data) {
-			return "", fmt.Errorf("end offset is %d but data length is only %d", bs.OffsetEnd, len(data))
-		}
-
-		// if end is 0, return the rest of the data
-		if bs.OffsetEnd == 0 {
-			return string(data[bs.OffsetStart:]), nil
-		} else if bs.OffsetEnd < 0 {
-			// bounds check
-			actualEnd := len(data) + bs.OffsetEnd
-			if actualEnd < bs.OffsetStart {
-				return "", fmt.Errorf("effective end offset of %d (%d) is less than start offset %d", bs.OffsetEnd, actualEnd, bs.OffsetStart)
-			}
-			return string(data[bs.OffsetStart:actualEnd]), nil
-		} else {
-			return string(data[bs.OffsetStart:bs.OffsetEnd]), nil
-		}
-	}
-
-	// otherwise, perform the traversal. hopefully we got either a JSON map or a
-	// JSON list or this is going to fail
-	var jsonData interface{}
-
-	// ...just look ahead and check if the first non-whitespace char is a '{' or '['
-	var firstChar rune
-	for _, b := range data {
-		if unicode.IsSpace(rune(b)) {
-			continue
-		}
-		firstChar = rune(b)
-		break
-	}
-
-	// if first char is a '{', assume it's a map
-	if firstChar == '{' {
-		var jsonMap map[string]interface{}
-		err := json.Unmarshal(data, &jsonMap)
-		if err != nil {
-			return "", fmt.Errorf("unmarshal JSON map: %w", err)
-		}
-		jsonData = jsonMap
-	} else if firstChar == '[' {
-		var jsonList []interface{}
-		err := json.Unmarshal(data, &jsonList)
-		if err != nil {
-			return "", fmt.Errorf("unmarshal JSON list: %w", err)
-		}
-		jsonData = jsonList
-	} else {
-		return "", fmt.Errorf("data does not appear to be a JSON array or object")
-	}
-
-	// now that we have the parsed data, apply traversal steps
-	var err error
-	for idx, step := range bs.Steps {
-		jsonData, err = step.Traverse(jsonData)
-		if err != nil {
-			errSequence := ""
-			for _, oldStep := range bs.Steps[:idx+1] {
-				errSequence += oldStep.String()
-			}
-			return "", fmt.Errorf("traversal error at %s: %w", errSequence, err)
-		}
-	}
-
-	// assuming successful traversal, jsonData should be the value we want.
-	switch typedData := jsonData.(type) {
-	case string:
-		return typedData, nil
-	default:
-		return fmt.Sprintf("%v", jsonData), nil
-	}
 }
 
 // Do not use default RESTClient, call NewRESTClient instead.

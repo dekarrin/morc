@@ -28,6 +28,12 @@ const (
 	varNamePattern = `[-a-zA-Z0-9_]+`
 )
 
+// RequestSequence holds the name of either a RequestTemplate or a Flow.
+type RequestSequence struct {
+	Name   string
+	IsFlow bool
+}
+
 type TraversalStep struct {
 	Key   string // if set, index is ignored
 	Index int

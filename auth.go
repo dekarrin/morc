@@ -502,46 +502,58 @@ func (a *Auth) GetAuth(p *Project, skipVerify bool, httpClient *http.Client, oc 
 func (a *Auth) IsSuccessfulAuth(resp *http.Response) bool {
 	success := resp.StatusCode != http.StatusUnauthorized
 
-	// invalidate proof immediately if auth failed
+	// invalidate proof immediately if auth failed and proof is dynamic
 	if !success {
-		a.proof = nil
+		if a.proof != nil && a.proof.Type() == AuthProofCustom {
+			a.proof = nil
+		}
 	}
 
 	return success
 }
 
-func (a *Auth) Static() bool {
+func (a Auth) Static() bool {
 	return a.fetcher == nil
 }
 
-func (a *Auth) Export() map[string]any {
-	m := map[string]any{}
-	if a.proof != nil {
-		m["proof"] = a.proof.Export()
-	}
-	if a.fetcher != nil {
-
-		reqType := "flow"
-		reqName := a.fetcher.getAuthFlow
-		if a.fetcher.getAuthTemplate != "" {
-			reqType = "template"
-			reqName = a.fetcher.getAuthTemplate
-		}
-
-		m["fetcher"] = map[string]any{
-			"request": map[string]any{
-				"type": reqType,
-				"name": reqName,
-			},
-		}
-	}
-
-	return m
+type marshaledAuth struct {
+	Proof     map[string]any
+	ProofType AuthProofType `json:",omitempty"`
+	Fetcher   *AuthFetcher  `json:",omitempty"`
 }
 
-type RequestRef struct {
-	Name   string
-	IsFlow bool
+func (a Auth) MarshalJSON() ([]byte, error) {
+	ma := marshaledAuth{}
+	if a.proof != nil {
+		ma.Proof = a.proof.Export()
+		ma.ProofType = a.proof.Type()
+	}
+
+	if a.fetcher != nil {
+		ma.Fetcher = a.fetcher
+	}
+
+	return json.Marshal(ma)
+}
+
+func (a *Auth) UnmarshalJSON(b []byte) error {
+	var ma marshaledAuth
+	if err := json.Unmarshal(b, &ma); err != nil {
+		return err
+	}
+
+	if ma.Proof != nil {
+		t, err := ImportAuthProof(ma.ProofType, ma.Proof)
+		if err != nil {
+			return err
+		}
+		a.proof = t
+	}
+
+	if ma.Fetcher != nil {
+		a.fetcher = ma.Fetcher
+	}
+	return nil
 }
 
 func NewHTTPBasicAuth(creds HTTPBasicCredentials) Auth {
@@ -557,7 +569,7 @@ func NewHTTPBasicAuth(creds HTTPBasicCredentials) Auth {
 // Auth will always attempt to detect expiration info from the initial
 // set-cookie, but if it is not present, it will fallback to error response on
 // the auth'd request's response to detect expiration.
-func NewLoginCookieAuth(retrieval RequestRef, cookieName string, detectExpiration bool) (Auth, error) {
+func NewLoginCookieAuth(retrieval RequestSequence, cookieName string, detectExpiration bool) (Auth, error) {
 	var flow, femplate string
 
 	if retrieval.IsFlow {
@@ -583,7 +595,7 @@ func NewLoginCookieAuth(retrieval RequestRef, cookieName string, detectExpiratio
 // single token value may be extracted. If expiresTimeLayout is set, it will be
 // used for parsing expires time, and if set to an empty string, it will default
 // to RFC3339.
-func NewTokenAuth(retrieval RequestRef, tokenScraper Scraper, dest ProofDestination, expiresScraper *Scraper, expiresTimeLayout string) (Auth, error) {
+func NewTokenAuth(retrieval RequestSequence, tokenScraper Scraper, dest ProofDestination, expiresScraper *Scraper, expiresTimeLayout string) (Auth, error) {
 	var flow, femplate string
 
 	if retrieval.IsFlow {
@@ -606,7 +618,7 @@ func NewTokenAuth(retrieval RequestRef, tokenScraper Scraper, dest ProofDestinat
 // the body of the response of the auth flow/template and place it in an
 // Authorization header with the Bearer scheme. The scraper must point to a
 // valid JWT token in the response.
-func NewJWTAuth(retrieval RequestRef, scraper Scraper) (Auth, error) {
+func NewJWTAuth(retrieval RequestSequence, scraper Scraper) (Auth, error) {
 	var flow, femplate string
 
 	if retrieval.IsFlow {
@@ -629,15 +641,15 @@ func NewJWTAuth(retrieval RequestRef, scraper Scraper) (Auth, error) {
 // any Auth mechanism that requires a proof that may change, such as a token or
 // a session ID.
 type AuthFetcher struct {
-	getAuthFlow     string // either execFlow or execTemplate must be set
-	getAuthTemplate string
+	Flow     string // either execFlow or execTemplate must be set
+	Template string
 
-	caps []Scraper
+	Caps []Scraper
 
-	valueExtractor   ScrapeExtractor
-	expiresExtractor ScrapeTimeExtractor
+	Value   ScrapeExtractor
+	Expires ScrapeTimeExtractor
 
-	dest ProofDestination
+	Dest ProofDestination
 }
 
 // NewJWTFetcher returns an AuthFetcher that is configured to pull a JWT token from
@@ -657,22 +669,22 @@ func NewJWTFetcher(flow, femplate string, scraper Scraper) (*AuthFetcher, error)
 	// TODO: validate flow, template actually exist in caller.
 
 	return &AuthFetcher{
-		getAuthFlow:     flow,
-		getAuthTemplate: femplate,
-		caps:            []Scraper{scraper},
-		valueExtractor: ScrapeExtractor{
+		Flow:     flow,
+		Template: femplate,
+		Caps:     []Scraper{scraper},
+		Value: ScrapeExtractor{
 			VarName: scraper.Name,
 			Transform: Transformer{
 				FuncName: TransformerFuncIdentity,
 			},
 		},
-		expiresExtractor: ScrapeTimeExtractor{
+		Expires: ScrapeTimeExtractor{
 			VarName: scraper.Name,
 			Transform: TimeTransformer{
 				FuncName: TransformerFuncJWTExpiration,
 			},
 		},
-		dest: ProofDestination{
+		Dest: ProofDestination{
 			Location: ProofLocationHeader,
 			Key:      "Authorization",
 			Format:   ProofFormatTypeBearer,
@@ -699,27 +711,27 @@ func NewTokenFetcher(flow, femplate string, tokenScraper Scraper, dest ProofDest
 	// TODO: validate flow, template actually exist in caller.
 
 	da := &AuthFetcher{
-		getAuthFlow:     flow,
-		getAuthTemplate: femplate,
-		caps:            []Scraper{tokenScraper},
-		valueExtractor: ScrapeExtractor{
+		Flow:     flow,
+		Template: femplate,
+		Caps:     []Scraper{tokenScraper},
+		Value: ScrapeExtractor{
 			VarName: tokenScraper.Name,
 			Transform: Transformer{
 				FuncName: TransformerFuncIdentity,
 			},
 		},
-		dest: dest,
+		Dest: dest,
 	}
 
 	if expiresScraper != nil {
-		da.expiresExtractor = ScrapeTimeExtractor{
+		da.Expires = ScrapeTimeExtractor{
 			VarName: expiresScraper.Name,
 			Transform: TimeTransformer{
 				FuncName: TransformerFuncParsedTime,
 				Params:   map[string]any{"layout": expiresTimeLayout},
 			},
 		}
-		da.caps = append(da.caps, *expiresScraper)
+		da.Caps = append(da.Caps, *expiresScraper)
 	}
 
 	return da, nil
@@ -746,9 +758,9 @@ func NewLoginCookieFetcher(flow, femplate string, cookieName string, detectExpir
 	)
 
 	da := &AuthFetcher{
-		getAuthFlow:     flow,
-		getAuthTemplate: femplate,
-		caps: []Scraper{
+		Flow:     flow,
+		Template: femplate,
+		Caps: []Scraper{
 			{
 				Type:             SpecCookie,
 				Name:             cookieVarName,
@@ -756,13 +768,13 @@ func NewLoginCookieFetcher(flow, femplate string, cookieName string, detectExpir
 				CookieExpiration: detectExpiration,
 			},
 		},
-		valueExtractor: ScrapeExtractor{
+		Value: ScrapeExtractor{
 			VarName: cookieVarName,
 			Transform: Transformer{
 				FuncName: TransformerFuncIdentity,
 			},
 		},
-		dest: ProofDestination{
+		Dest: ProofDestination{
 			Location: ProofDestinationCookie,
 			Key:      cookieName,
 			Format:   ProofFormatTypeNone,
@@ -770,13 +782,13 @@ func NewLoginCookieFetcher(flow, femplate string, cookieName string, detectExpir
 	}
 
 	if detectExpiration {
-		da.expiresExtractor = ScrapeTimeExtractor{
+		da.Expires = ScrapeTimeExtractor{
 			VarName: cookieVarName,
 			Transform: TimeTransformer{
 				FuncName: TransformerFuncPairedCookieExpiration,
 			},
 		}
-		da.valueExtractor.Transform = Transformer{
+		da.Value.Transform = Transformer{
 			FuncName: TransformerFuncPairedCookieValue,
 		}
 	}
@@ -787,22 +799,22 @@ func NewLoginCookieFetcher(flow, femplate string, cookieName string, detectExpir
 func (da *AuthFetcher) Fetch(p *Project, skipVerify bool, httpClient *http.Client, oc OutputControl) (AuthProof, error) {
 	var lastResult SendResult
 	var err error
-	if da.getAuthFlow != "" {
+	if da.Flow != "" {
 		// TODO: pre-examine flow to ensure it doesn't itself end up calling
 		// itself recursively.
 
-		res, err := p.Exec(da.getAuthFlow, nil, skipVerify, "", httpClient, oc)
+		res, err := p.Exec(da.Flow, nil, skipVerify, "", httpClient, oc)
 		if err != nil {
-			return nil, fmt.Errorf("auth flow %q failed: %w", da.getAuthFlow, err)
+			return nil, fmt.Errorf("auth flow %q failed: %w", da.Flow, err)
 		}
 		if len(res) == 0 {
-			return nil, fmt.Errorf("auth flow %q did not return any results", da.getAuthFlow)
+			return nil, fmt.Errorf("auth flow %q did not return any results", da.Flow)
 		}
 		lastResult = res[0]
-	} else if da.getAuthTemplate != "" {
-		lastResult, err = p.Send(da.getAuthTemplate, nil, skipVerify, "", httpClient, oc)
+	} else if da.Template != "" {
+		lastResult, err = p.Send(da.Template, nil, skipVerify, "", httpClient, oc)
 		if err != nil {
-			return nil, fmt.Errorf("auth request template %q failed: %w", da.getAuthTemplate, err)
+			return nil, fmt.Errorf("auth request template %q failed: %w", da.Template, err)
 		}
 	}
 
@@ -813,7 +825,7 @@ func (da *AuthFetcher) Fetch(p *Project, skipVerify bool, httpClient *http.Clien
 
 	// pull out the values
 	scrapes := map[string]string{}
-	for _, scraper := range da.caps {
+	for _, scraper := range da.Caps {
 		var err error
 		scrapes[scraper.Name], err = scraper.Scrape(lastResult.Response, nil)
 		if err != nil {
@@ -821,7 +833,7 @@ func (da *AuthFetcher) Fetch(p *Project, skipVerify bool, httpClient *http.Clien
 		}
 	}
 
-	valueEx := da.valueExtractor
+	valueEx := da.Value
 	value, ok := scrapes[valueEx.VarName]
 	if !ok {
 		return nil, fmt.Errorf("value scrape %q not found", valueEx.VarName)
@@ -833,12 +845,12 @@ func (da *AuthFetcher) Fetch(p *Project, skipVerify bool, httpClient *http.Clien
 
 	ap := dynamicProof{
 		value: value,
-		dest:  da.dest,
+		dest:  da.Dest,
 	}
 
 	// okay, do we have an expiration?
-	if da.expiresExtractor.VarName != "" {
-		expiresEx := da.expiresExtractor
+	if da.Expires.VarName != "" {
+		expiresEx := da.Expires
 
 		expStr, ok := scrapes[expiresEx.VarName]
 		if !ok {

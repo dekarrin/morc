@@ -330,7 +330,7 @@ type RESTClient struct {
 	VarOverrides map[string]string // Cleared after every call to SendRequest.
 	VarPrefix    string
 
-	Scrapers []BodyScraper
+	Scrapers []Scraper
 
 	// cookie jar that records all SetCookies calls; this is a pointer to the
 	// same jar that is passed to HTTP
@@ -367,7 +367,7 @@ func NewRESTClient(cookieLifetime time.Duration, httpClient *http.Client) *RESTC
 		http:      httpClient,
 		Vars:      make(map[string]string),
 		VarPrefix: "$",
-		Scrapers:  make([]BodyScraper, 0),
+		Scrapers:  make([]Scraper, 0),
 		jar:       cookies,
 	}
 }
@@ -449,10 +449,10 @@ func (r *RESTClient) SendRequest(req *http.Request) (*http.Response, map[string]
 	for _, scraper := range r.Scrapers {
 		value, err := scraper.Scrape(resp, respBody)
 		if err != nil {
-			return resp, nil, fmt.Errorf("scrape %s: %w", scraper.Name, err)
+			return resp, nil, fmt.Errorf("scrape %s: %w", scraper.VarName(), err)
 		}
-		capturedVars[scraper.Name] = value
-		r.Vars[scraper.Name] = value
+		capturedVars[scraper.VarName()] = value
+		r.Vars[scraper.VarName()] = value
 	}
 
 	// clear var overrides
@@ -816,7 +816,7 @@ type SendOptions struct {
 	// Captures is a list of variable scrapers that will be used to extract
 	// values from the response body. The captured values *will* be kept in any
 	// saved state (should state save be requested).
-	Captures []BodyScraper
+	Captures []Scraper
 
 	// LoadStateFile is the path to a state file that should be loaded before
 	// sending the request. If this is set, the state file will be loaded and

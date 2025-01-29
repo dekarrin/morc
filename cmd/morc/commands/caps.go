@@ -190,7 +190,7 @@ func invokeCapsEdit(io cmdio.IO, projFile, reqName, varName string, attrs capAtt
 	// if we have a spec change, apply that next
 	if attrs.spec.set {
 		if !cap.EqualSpec(attrs.spec.v) {
-			existingName := cap.Name
+			existingName := cap.VarName()
 			cap = attrs.spec.v
 			cap.Name = existingName
 			modifiedVals[capKeySpec] = attrs.spec.v.Spec()
@@ -200,7 +200,7 @@ func invokeCapsEdit(io cmdio.IO, projFile, reqName, varName string, attrs capAtt
 	}
 
 	// update the request
-	req.Captures[strings.ToUpper(cap.Name)] = cap
+	req.Captures[strings.ToUpper(cap.VarName())] = cap
 	p.Templates[reqName] = req
 
 	// save the project file
@@ -236,7 +236,7 @@ func invokeCapsGet(io cmdio.IO, projFile, reqName, capName string, getItem capKe
 
 	switch getItem {
 	case capKeyVar:
-		io.Printf("%s\n", cap.Name)
+		io.Printf("%s\n", cap.VarName())
 	case capKeySpec:
 		io.Printf("%s\n", cap.Spec())
 	default:
@@ -280,7 +280,7 @@ func invokeCapsNew(io cmdio.IO, projFile, reqName, varName string, attrs capAttr
 
 	// otherwise, we have a valid capture, so add it to the request.
 	if req.Captures == nil {
-		req.Captures = make(map[string]morc.BodyScraper)
+		req.Captures = make(map[string]morc.Scraper)
 		p.Templates[reqName] = req
 	}
 	req.Captures[varUpper] = cap

@@ -504,20 +504,14 @@ func LoadProject(projR, seshR, histR io.Reader) (Project, error) {
 		Config:    m.Config,
 	}
 
-	// force req, cap, flow names to upper-case.
+	// force req, flow names to upper-case.
 	// Vars automatically handles case insensitivity so does not need this.
+	// Caps is handled automatically in custom marshaling code.
 	// TODO: make flows, templates, caps access pass through accessors and
 	// therefore be able to handle case insensitivity even when used via
 	// programmatic interface.
 	for reqName, req := range p.Templates {
 		req.Name = strings.ToLower(req.Name)
-
-		for capName, cap := range req.Captures {
-			cap.Name = strings.ToUpper(cap.Name)
-
-			delete(req.Captures, capName)
-			req.Captures[strings.ToUpper(capName)] = cap
-		}
 
 		delete(p.Templates, reqName)
 		p.Templates[strings.ToLower(reqName)] = req
@@ -569,20 +563,14 @@ func LoadProjectFromDisk(projFilename string, all bool) (Project, error) {
 		Config:    m.Config,
 	}
 
-	// force req, cap, flow names to upper-case.
+	// force req, flow names to upper-case.
 	// Vars automatically handles case insensitivity so does not need this.
+	// Caps is handled automatically in custom marshaling code.
 	// TODO: make flows, templates, caps access pass through accessors and
 	// therefore be able to handle case insensitivity even when used via
 	// programmatic interface.
 	for reqName, req := range p.Templates {
 		req.Name = strings.ToLower(req.Name)
-
-		for capName, cap := range req.Captures {
-			cap.Name = strings.ToUpper(cap.Name)
-
-			delete(req.Captures, capName)
-			req.Captures[strings.ToUpper(capName)] = cap
-		}
 
 		delete(p.Templates, reqName)
 		p.Templates[strings.ToLower(reqName)] = req
@@ -783,12 +771,49 @@ func (s *Session) UnmarshalJSON(data []byte) error {
 
 type RequestTemplate struct {
 	Name     string
-	Captures map[string]BodyScraper
+	Captures map[string]Scraper
 	Body     []byte
 	URL      string
 	Method   string
 	Headers  http.Header
 	AuthFlow string
+}
+
+type marshaledRequestTemplate struct {
+	Name     string
+	Captures map[string]map[string]interface{}
+	Body     []byte
+	URL      string
+	Method   string
+	Headers  http.Header
+	AuthFlow string
+}
+
+func (rt *RequestTemplate) UnmarshalJSON(data []byte) error {
+	var m marshaledRequestTemplate
+	if err := json.Unmarshal(data, &m); err != nil {
+		return err
+	}
+
+	rt.Name = m.Name
+	rt.Body = m.Body
+	rt.URL = m.URL
+	rt.Method = m.Method
+	rt.AuthFlow = m.AuthFlow
+
+	if rt.Captures == nil {
+		rt.Captures = make(map[string]Scraper)
+	}
+
+	for _, cap := range m.Captures {
+		scraper, err := ImportScraper(cap)
+		if err != nil {
+			return fmt.Errorf("unmarshal capture: %w", err)
+		}
+		rt.Captures[strings.ToUpper(scraper.VarName())] = scraper
+	}
+
+	return nil
 }
 
 func (r RequestTemplate) Sendable() bool {

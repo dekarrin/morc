@@ -96,6 +96,7 @@ func ImportBodyScraper(m map[string]interface{}) (BodyScraper, error) {
 		if bs.Name, ok = rawName.(string); !ok {
 			return bs, fmt.Errorf("name: must be a string, but was %T", rawName)
 		}
+		bs.Name = strings.ToUpper(bs.Name)
 	} else {
 		return bs, fmt.Errorf("missing name")
 	}
@@ -364,6 +365,7 @@ func ImportCookieScraper(m map[string]interface{}) (CookieScraper, error) {
 		if cs.Name, ok = rawName.(string); !ok {
 			return cs, fmt.Errorf("name: must be a string, but was %T", rawName)
 		}
+		cs.Name = strings.ToUpper(cs.Name)
 	} else {
 		return cs, fmt.Errorf("missing name")
 	}
@@ -478,6 +480,7 @@ func ImportHeaderScraper(m map[string]interface{}) (HeaderScraper, error) {
 		if hs.Name, ok = rawName.(string); !ok {
 			return hs, fmt.Errorf("name: must be a string, but was %T", rawName)
 		}
+		hs.Name = strings.ToUpper(hs.Name)
 	} else {
 		return hs, fmt.Errorf("missing name")
 	}

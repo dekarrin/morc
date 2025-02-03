@@ -423,109 +423,161 @@ func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 		return SendResult{}, fmt.Errorf("request template %s has no URL set", tmpl.Name)
 	}
 
-	// if this template has auth configured on it, do that first
-	var authProof AuthProof
+	var auth *Auth
 	if tmpl.Auth != "" {
-		auth, ok := p.Auths[strings.ToLower(tmpl.Auth)]
+		authItem, ok := p.Auths[strings.ToLower(tmpl.Auth)]
 		if !ok {
 			return SendResult{}, fmt.Errorf("request template %s references non-existent auth %s", tmpl.Name, tmpl.Auth)
+		}
+		auth = &authItem
+	}
+
+	// retry failed auth ONLY if we did not just get it.
+	var result SendResult
+
+	var retry bool = true
+	for retry {
+		retry = false
+
+		// if this template has auth configured on it, do that first
+		var authProof AuthProof
+		var authRequested bool
+		if auth != nil {
+			var err error
+
+			authProof, authRequested, err = p.ExecAuth(auth, skipVerify, httpClient, oc)
+			if err != nil {
+				return SendResult{}, err
+			}
+
+			// persist any auth changes
+			p.Auths[strings.ToLower(tmpl.Auth)] = *auth
+		}
+
+		sendOpts := SendOptions{
+			Vars:               vars,
+			Body:               tmpl.Body,
+			Headers:            tmpl.Headers,
+			Output:             oc,
+			CookieLifetime:     p.Config.CookieLifetime,
+			InsecureSkipVerify: skipVerify,
+			Client:             httpClient,
+			Auth:               authProof,
+		}
+
+		capVarNames := []string{}
+		for k := range tmpl.Captures {
+			capVarNames = append(capVarNames, k)
+		}
+		sort.Strings(capVarNames)
+		for _, k := range capVarNames {
+			sendOpts.Captures = append(sendOpts.Captures, tmpl.Captures[k])
+		}
+
+		if len(p.Session.Cookies) > 0 {
+			sendOpts.Cookies = p.Session.Cookies
 		}
 
 		var err error
 
-		authProof, err = p.ExecAuth(&auth, skipVerify, httpClient, oc)
+		result, err = Send(tmpl.Method, tmpl.URL, varSymbol, sendOpts)
 		if err != nil {
-			return SendResult{}, err
+			return result, err
 		}
 
-		// persist any auth changes
-		p.Auths[strings.ToLower(tmpl.Auth)] = auth
-	}
-
-	sendOpts := SendOptions{
-		Vars:               vars,
-		Body:               tmpl.Body,
-		Headers:            tmpl.Headers,
-		Output:             oc,
-		CookieLifetime:     p.Config.CookieLifetime,
-		InsecureSkipVerify: skipVerify,
-		Client:             httpClient,
-		Auth:               authProof,
-	}
-
-	capVarNames := []string{}
-	for k := range tmpl.Captures {
-		capVarNames = append(capVarNames, k)
-	}
-	sort.Strings(capVarNames)
-	for _, k := range capVarNames {
-		sendOpts.Captures = append(sendOpts.Captures, tmpl.Captures[k])
-	}
-
-	if len(p.Session.Cookies) > 0 {
-		sendOpts.Cookies = p.Session.Cookies
-	}
-
-	result, err := Send(tmpl.Method, tmpl.URL, varSymbol, sendOpts)
-	if err != nil {
-		return result, err
-	}
-
-	// TODO: check auth result here.
-
-	// persist var captures
-	if len(result.Captures) > 0 {
-		for k, v := range result.Captures {
-			p.Vars.Set(k, v)
-		}
-	}
-
-	// persist history
-	if p.Config.RecordHistory {
-		entry := HistoryEntry{
-			Template: tmpl.Name,
-			ReqTime:  result.SendTime,
-			RespTime: result.RecvTime,
-			Request:  result.Request,
-			Response: result.Response,
-			Captures: result.Captures,
+		// persist var captures
+		if len(result.Captures) > 0 {
+			for k, v := range result.Captures {
+				p.Vars.Set(k, v)
+			}
 		}
 
-		p.History = append(p.History, entry)
-	}
+		// persist history
+		if p.Config.RecordHistory {
+			entry := HistoryEntry{
+				Template: tmpl.Name,
+				ReqTime:  result.SendTime,
+				RespTime: result.RecvTime,
+				Request:  result.Request,
+				Response: result.Response,
+				Captures: result.Captures,
+			}
 
-	// persist cookies
-	if p.Config.RecordSession && len(result.Cookies) > 0 {
-		p.Session.Cookies = result.Cookies
+			p.History = append(p.History, entry)
+		}
+
+		// persist cookies
+		if p.Config.RecordSession && len(result.Cookies) > 0 {
+			p.Session.Cookies = result.Cookies
+		}
+
+		// auth check here.
+		if auth != nil {
+			if !auth.IsSuccessfulAuthUse(result.Response) {
+				// auth failed
+
+				// TODO: error check Fprint output
+
+				// get our output writer, if specified, or default to stdout
+				var w io.Writer = os.Stdout
+				if oc.Writer != nil {
+					w = oc.Writer
+				}
+				if !oc.SuppressAuthFailures {
+					fmt.Fprintf(w, "Auth %s failed for request %s\n", auth.Name, tmpl.Name)
+				}
+
+				// auth is retriable only if it could possibly be refreshed.
+				if !auth.Static() {
+					if !authRequested {
+						retry = true
+						if !oc.SuppressAuthFailures {
+							fmt.Fprintf(w, "Retrying with newly-retrieved auth...\n")
+						}
+					} else if !oc.SuppressAuthFailures {
+						fmt.Fprintf(w, "Newly-retrieved auth failed; not retrying\n")
+					}
+				} else if !oc.SuppressAuthFailures {
+					fmt.Fprintf(w, "Auth is static and cannot be refreshed; not retrying\n")
+				}
+			}
+		}
 	}
 
 	return result, nil
 }
 
-func (p *Project) ExecAuth(auth *Auth, skipVerify bool, httpClient *http.Client, oc OutputControl) (AuthProof, error) {
+// ExecAuth retreives an auth proof with the given auth using the given options.
+// It returns the proof, whether requests were sent to retrieve it (as opposed
+// to simply using an already held and still-valid auth proof), and any error
+// that ocurred retrieving the auth.
+func (p *Project) ExecAuth(auth *Auth, skipVerify bool, httpClient *http.Client, oc OutputControl) (ap AuthProof, requested bool, err error) {
+	requested = false
+
 	if auth.Static() {
-		return auth.Proof, nil
+		return auth.Proof, requested, nil
 	}
 
 	if auth.Proof == nil || !auth.Proof.Valid() {
 		if auth.Fetcher == nil {
-			return nil, errors.New("no static credentials or fetcher configured")
+			return nil, requested, errors.New("no static credentials or fetcher configured")
 		}
 
 		reqs, err := p.Fetch(auth.Fetcher.Seq, nil, skipVerify, "", httpClient, oc)
 		if err != nil {
-			return nil, fmt.Errorf("fetch auth: %w", err)
+			return nil, requested, fmt.Errorf("fetch auth: %w", err)
 		}
+		requested = true
 
 		proof, err := auth.Fetcher.ScrapeFromResult(reqs[0])
 		if err != nil {
-			return nil, fmt.Errorf("read auth: %w", err)
+			return nil, requested, fmt.Errorf("read auth: %w", err)
 		}
 
 		auth.Proof = proof
 	}
 
-	return auth.Proof, nil
+	return auth.Proof, requested, nil
 }
 
 func dumpToFile(path string, dumpFunc func(io.Writer) error) error {

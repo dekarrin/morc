@@ -765,6 +765,18 @@ type OutputControl struct {
 	// Writer is the writer to which output should be written. If not set,
 	// output will be written to os.Stdout.
 	Writer io.Writer
+
+	// SuppressAuthFailures suppresses output of messages indicating failure to
+	// use an auth proof and reasons why.
+	// TODO: actual CLI arg for this.
+	SuppressAuthFailures bool
+
+	// SuppressAuthRequests suppresses all output from requests for retrieving
+	// auth information. If false, output for auth requests will be shown,
+	// subject to the values of other fields in this struct.
+	// TODO: actually make this do things.
+	// TODO: CLI arg for this.
+	SuppressAuthRequests bool
 }
 
 // SendOptions is used to encapsulate non-critical options for sending a request

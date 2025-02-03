@@ -478,7 +478,10 @@ type Auth struct {
 	Fetcher *AuthFetcher
 }
 
-func (a *Auth) IsSuccessfulAuth(resp *http.Response) bool {
+// IsSuccessfulAuthUse returns whether the given response from an authenticated
+// request is considered successful. This is generally always the case unless the
+// returned status is 401 Unauthorized.
+func (a *Auth) IsSuccessfulAuthUse(resp *http.Response) bool {
 	success := resp.StatusCode != http.StatusUnauthorized
 
 	// invalidate proof immediately if auth failed and proof is dynamic

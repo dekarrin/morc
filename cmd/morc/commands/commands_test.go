@@ -436,8 +436,8 @@ func testRequest_withAllPropertiesSet() morc.RequestTemplate {
 			"Content-Type": {"application/json"},
 			"User-Agent":   {"morc/0.0.0", "test/0.0.0"},
 		},
-		Body:     []byte("{\n    \"username\": \"grimAuxiliatrix\"\n}"),
-		AuthFlow: "auth1",
+		Body: []byte("{\n    \"username\": \"grimAuxiliatrix\"\n}"),
+		Auth: "auth1",
 		Captures: map[string]morc.Scraper{
 			"var1": {
 				Name:        "var1",

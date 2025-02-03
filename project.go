@@ -808,7 +808,7 @@ type RequestTemplate struct {
 	URL      string
 	Method   string
 	Headers  http.Header
-	AuthFlow string
+	Auth     string
 }
 
 func (r RequestTemplate) Sendable() bool {

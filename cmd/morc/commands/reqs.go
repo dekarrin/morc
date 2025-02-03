@@ -439,12 +439,12 @@ func invokeReqsShow(io cmdio.IO, projFile, reqName string) error {
 	}
 	io.Printf("\n")
 
-	if req.AuthFlow == "" {
+	if req.Auth == "" {
 		io.Printf("AUTH FLOW:")
 		io.PrintLoudf(" (none)")
 		io.Printf("\n")
 	} else {
-		io.Printf("AUTH FLOW: %s\n", req.AuthFlow)
+		io.Printf("AUTH FLOW: %s\n", req.Auth)
 	}
 
 	return nil
@@ -545,10 +545,10 @@ func invokeReqsGet(io cmdio.IO, projFile, reqName string, item reqKey) error {
 			}
 		}
 	case reqKeyAuthFlow:
-		if req.AuthFlow == "" {
+		if req.Auth == "" {
 			io.PrintLoudf("(none)\n")
 		} else {
-			io.Printf("%s\n", req.AuthFlow)
+			io.Printf("%s\n", req.Auth)
 		}
 	case reqKeyCaptures:
 		if len(req.Captures) == 0 {

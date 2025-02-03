@@ -385,6 +385,32 @@ func (p *Project) Send(reqName string, varOverrides map[string]string, skipVerif
 	return p.SendTemplate(tmpl, p.Vars.MergedSet(varOverrides), skipVerify, prefix, httpClient, oc)
 }
 
+// Fetch performs either a flow or a template send and returns the slice of
+// results for each. If a template is specified, the returned slice will have
+// only one element. If a flow is specified, it is an error if the flow does not
+// return at least one SendResult.
+func (p *Project) Fetch(r RequestSequence, varOverrides map[string]string, skipVerify bool, varPrefixOverride string, httpClient *http.Client, oc OutputControl) ([]SendResult, error) {
+	var results []SendResult
+	if r.IsFlow {
+		res, err := p.Exec(r.Name, varOverrides, skipVerify, varPrefixOverride, httpClient, oc)
+		if err != nil {
+			return nil, fmt.Errorf("flow %q failed: %w", r.Name, err)
+		}
+		if len(res) == 0 {
+			return nil, fmt.Errorf("flow %q did not return any results", r.Name)
+		}
+		results = res
+	} else {
+		res, err := p.Send(r.Name, varOverrides, skipVerify, varPrefixOverride, httpClient, oc)
+		if err != nil {
+			return nil, fmt.Errorf("request template %q failed: %w", r.Name, err)
+		}
+		results = []SendResult{res}
+	}
+
+	return results, nil
+}
+
 // SendTemplate sends the request template and mutates the project accordingly. If
 // client is set, that is used as the client for the request and generally this
 // is only done during testing.
@@ -398,7 +424,23 @@ func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 	}
 
 	// if this template has auth configured on it, do that first
-	var authProof Auth
+	var authProof AuthProof
+	if tmpl.Auth != "" {
+		auth, ok := p.Auths[strings.ToLower(tmpl.Auth)]
+		if !ok {
+			return SendResult{}, fmt.Errorf("request template %s references non-existent auth %s", tmpl.Name, tmpl.Auth)
+		}
+
+		var err error
+
+		authProof, err = p.ExecAuth(&auth, skipVerify, httpClient, oc)
+		if err != nil {
+			return SendResult{}, err
+		}
+
+		// persist any auth changes
+		p.Auths[strings.ToLower(tmpl.Auth)] = auth
+	}
 
 	sendOpts := SendOptions{
 		Vars:               vars,
@@ -408,6 +450,7 @@ func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 		CookieLifetime:     p.Config.CookieLifetime,
 		InsecureSkipVerify: skipVerify,
 		Client:             httpClient,
+		Auth:               authProof,
 	}
 
 	capVarNames := []string{}
@@ -427,6 +470,8 @@ func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 	if err != nil {
 		return result, err
 	}
+
+	// TODO: check auth result here.
 
 	// persist var captures
 	if len(result.Captures) > 0 {
@@ -455,6 +500,32 @@ func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 	}
 
 	return result, nil
+}
+
+func (p *Project) ExecAuth(auth *Auth, skipVerify bool, httpClient *http.Client, oc OutputControl) (AuthProof, error) {
+	if auth.Static() {
+		return auth.Proof, nil
+	}
+
+	if auth.Proof == nil || !auth.Proof.Valid() {
+		if auth.Fetcher == nil {
+			return nil, errors.New("no static credentials or fetcher configured")
+		}
+
+		reqs, err := p.Fetch(auth.Fetcher.Seq, nil, skipVerify, "", httpClient, oc)
+		if err != nil {
+			return nil, fmt.Errorf("fetch auth: %w", err)
+		}
+
+		proof, err := auth.Fetcher.ScrapeFromResult(reqs[0])
+		if err != nil {
+			return nil, fmt.Errorf("read auth: %w", err)
+		}
+
+		auth.Proof = proof
+	}
+
+	return auth.Proof, nil
 }
 
 func dumpToFile(path string, dumpFunc func(io.Writer) error) error {
@@ -511,13 +582,15 @@ func LoadProject(projR, seshR, histR io.Reader) (Project, error) {
 		Auths:     m.Auths,
 	}
 
-	// force req, cap, flow, auth names to upper-case.
+	// force req, cap, flow, auth names to same case (lower for all but var
+	// names).
 	// Vars automatically handles case insensitivity so does not need this.
 	// TODO: make flows, templates, caps access pass through accessors and
 	// therefore be able to handle case insensitivity even when used via
 	// programmatic interface.
 	for reqName, req := range p.Templates {
 		req.Name = strings.ToLower(req.Name)
+		req.Auth = strings.ToLower(req.Auth)
 
 		for capName, cap := range req.Captures {
 			cap.Name = strings.ToUpper(cap.Name)
@@ -583,13 +656,15 @@ func LoadProjectFromDisk(projFilename string, all bool) (Project, error) {
 		Auths:     m.Auths,
 	}
 
-	// force req, cap, flow, auth names to upper-case.
+	// force req, cap, flow, auth names to correct case (lower for all but var
+	// names).
 	// Vars automatically handles case insensitivity so does not need this.
 	// TODO: make flows, templates, caps access pass through accessors and
 	// therefore be able to handle case insensitivity even when used via
 	// programmatic interface.
 	for reqName, req := range p.Templates {
 		req.Name = strings.ToLower(req.Name)
+		req.Auth = strings.ToLower(req.Auth)
 
 		for capName, cap := range req.Captures {
 			cap.Name = strings.ToUpper(cap.Name)

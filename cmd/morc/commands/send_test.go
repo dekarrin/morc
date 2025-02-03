@@ -180,7 +180,7 @@ func Test_Send(t *testing.T) {
 						Method: "GET",
 						URL:    "/",
 						Captures: map[string]morc.Scraper{
-							"TEST": {Name: "TEST", OffsetStart: 18, OffsetEnd: 24},
+							"TEST": {Name: "TEST", Type: morc.SpecBodyOffset, OffsetStart: 18, OffsetEnd: 24},
 						},
 					},
 				},
@@ -192,7 +192,7 @@ func Test_Send(t *testing.T) {
 						Method: "GET",
 						URL:    "/",
 						Captures: map[string]morc.Scraper{
-							"TEST": {Name: "TEST", OffsetStart: 18, OffsetEnd: 24},
+							"TEST": {Name: "TEST", Type: morc.SpecBodyOffset, OffsetStart: 18, OffsetEnd: 24},
 						},
 					},
 				},
@@ -218,7 +218,7 @@ func Test_Send(t *testing.T) {
 						Method: "GET",
 						URL:    "/",
 						Captures: map[string]morc.Scraper{
-							"TEST": {Name: "TEST", Steps: []morc.TraversalStep{
+							"TEST": {Name: "TEST", Type: morc.SpecBodyJSON, Steps: []morc.TraversalStep{
 								{Key: "name"},
 								{Key: "last"},
 							}},
@@ -233,7 +233,7 @@ func Test_Send(t *testing.T) {
 						Method: "GET",
 						URL:    "/",
 						Captures: map[string]morc.Scraper{
-							"TEST": {Name: "TEST", Steps: []morc.TraversalStep{
+							"TEST": {Name: "TEST", Type: morc.SpecBodyJSON, Steps: []morc.TraversalStep{
 								{Key: "name"},
 								{Key: "last"},
 							}},
@@ -262,7 +262,7 @@ func Test_Send(t *testing.T) {
 						Method: "GET",
 						URL:    "/",
 						Captures: map[string]morc.Scraper{
-							"TEST": {Name: "TEST"},
+							"TEST": {Name: "TEST", Type: morc.SpecBodyOffset},
 						},
 					},
 				},
@@ -274,7 +274,7 @@ func Test_Send(t *testing.T) {
 						Method: "GET",
 						URL:    "/",
 						Captures: map[string]morc.Scraper{
-							"TEST": {Name: "TEST"},
+							"TEST": {Name: "TEST", Type: morc.SpecBodyOffset},
 						},
 					},
 				},
@@ -299,7 +299,7 @@ func Test_Send(t *testing.T) {
 						Method: "GET",
 						URL:    "/",
 						Captures: map[string]morc.Scraper{
-							"TEST": {Name: "TEST", OffsetEnd: -2},
+							"TEST": {Name: "TEST", Type: morc.SpecBodyOffset, OffsetEnd: -2},
 						},
 					},
 				},
@@ -311,7 +311,7 @@ func Test_Send(t *testing.T) {
 						Method: "GET",
 						URL:    "/",
 						Captures: map[string]morc.Scraper{
-							"TEST": {Name: "TEST", OffsetEnd: -2},
+							"TEST": {Name: "TEST", Type: morc.SpecBodyOffset, OffsetEnd: -2},
 						},
 					},
 				},
@@ -454,7 +454,7 @@ Content-Length: 0
 						Method: "GET",
 						URL:    "/",
 						Captures: map[string]morc.Scraper{
-							"TEST": {Name: "TEST", OffsetStart: 18, OffsetEnd: 24},
+							"TEST": {Name: "TEST", Type: morc.SpecBodyOffset, OffsetStart: 18, OffsetEnd: 24},
 						},
 					},
 				},
@@ -466,7 +466,7 @@ Content-Length: 0
 						Method: "GET",
 						URL:    "/",
 						Captures: map[string]morc.Scraper{
-							"TEST": {Name: "TEST", OffsetStart: 18, OffsetEnd: 24},
+							"TEST": {Name: "TEST", Type: morc.SpecBodyOffset, OffsetStart: 18, OffsetEnd: 24},
 						},
 					},
 				},

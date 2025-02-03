@@ -445,7 +445,21 @@ func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 		if auth != nil {
 			var err error
 
-			authProof, authRequested, err = p.ExecAuth(auth, skipVerify, httpClient, oc)
+			authOC := oc
+			if oc.SuppressAuthRequests {
+				authOC = OutputControl{
+					Request:              false,
+					Captures:             false,
+					Headers:              false,
+					SuppressResponseBody: true,
+					Format:               oc.Format,
+					Writer:               oc.Writer,
+					SuppressAuthFailures: oc.SuppressAuthFailures,
+					SuppressAuthRequests: true,
+				}
+			}
+
+			authProof, authRequested, err = p.ExecAuth(auth, skipVerify, httpClient, authOC)
 			if err != nil {
 				return SendResult{}, err
 			}

@@ -50,6 +50,7 @@ func Test_Caps_List(t *testing.T) {
 				Captures: map[string]morc.Scraper{
 					"troll": {
 						Name: "troll",
+						Type: morc.SpecBodyJSON,
 						Steps: []morc.TraversalStep{
 							{Key: "data"},
 							{Key: "people"},
@@ -70,6 +71,7 @@ func Test_Caps_List(t *testing.T) {
 				Captures: map[string]morc.Scraper{
 					"troll": {
 						Name: "troll",
+						Type: morc.SpecBodyOffset,
 					},
 				},
 			}),
@@ -83,6 +85,7 @@ func Test_Caps_List(t *testing.T) {
 				Captures: map[string]morc.Scraper{
 					"troll": {
 						Name:      "troll",
+						Type:      morc.SpecBodyOffset,
 						OffsetEnd: -1,
 					},
 				},
@@ -97,6 +100,7 @@ func Test_Caps_List(t *testing.T) {
 				Captures: map[string]morc.Scraper{
 					"troll": {
 						Name:        "troll",
+						Type:        morc.SpecBodyOffset,
 						OffsetStart: 12,
 					},
 				},
@@ -111,6 +115,7 @@ func Test_Caps_List(t *testing.T) {
 				Captures: map[string]morc.Scraper{
 					"troll": {
 						Name: "troll",
+						Type: morc.SpecBodyJSON,
 						Steps: []morc.TraversalStep{
 							{Key: "data"},
 							{Key: "people"},
@@ -131,6 +136,7 @@ func Test_Caps_List(t *testing.T) {
 				Captures: map[string]morc.Scraper{
 					"troll": {
 						Name: "troll",
+						Type: morc.SpecBodyJSON,
 						Steps: []morc.TraversalStep{
 							{Key: "data"},
 							{Key: "people"},
@@ -141,11 +147,13 @@ func Test_Caps_List(t *testing.T) {
 					},
 					"villain": {
 						Name:        "villain",
+						Type:        morc.SpecBodyOffset,
 						OffsetStart: 28,
 						OffsetEnd:   36,
 					},
 					"lakhs": {
 						Name: "lakhs",
+						Type: morc.SpecBodyJSON,
 						Steps: []morc.TraversalStep{
 							{Key: "data"},
 							{Key: "people"},
@@ -168,6 +176,7 @@ func Test_Caps_List(t *testing.T) {
 				Captures: map[string]morc.Scraper{
 					"troll": {
 						Name: "troll",
+						Type: morc.SpecBodyJSON,
 						Steps: []morc.TraversalStep{
 							{Key: "data"},
 							{Key: "people"},
@@ -178,10 +187,12 @@ func Test_Caps_List(t *testing.T) {
 					},
 					"villain": {
 						Name:        "villain",
+						Type:        morc.SpecBodyOffset,
 						OffsetStart: 28,
 						OffsetEnd:   36,
 					},
 					"lakhs": {
+						Type: morc.SpecBodyJSON,
 						Name: "lakhs",
 						Steps: []morc.TraversalStep{
 							{Key: "data"},
@@ -267,6 +278,7 @@ func Test_Caps_New(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"troll": {
 							Name: "troll",
+							Type: morc.SpecBodyJSON,
 							Steps: []morc.TraversalStep{
 								{Key: "data"},
 								{Key: "people"},
@@ -289,6 +301,7 @@ func Test_Caps_New(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"troll": {
 							Name: "troll",
+							Type: morc.SpecBodyJSON,
 							Steps: []morc.TraversalStep{
 								{Key: "data"},
 								{Key: "people"},
@@ -361,6 +374,7 @@ func Test_Caps_New(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name: "TROLL",
+							Type: morc.SpecBodyJSON,
 							Steps: []morc.TraversalStep{
 								{Key: "data"},
 								{Key: "people"},
@@ -389,6 +403,7 @@ func Test_Caps_New(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name: "TROLL",
+							Type: morc.SpecBodyJSON,
 							Steps: []morc.TraversalStep{
 								{Key: "data"},
 								{Key: "people"},
@@ -417,6 +432,7 @@ func Test_Caps_New(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name:        "TROLL",
+							Type:        morc.SpecBodyOffset,
 							OffsetStart: 28,
 							OffsetEnd:   0,
 						},
@@ -440,6 +456,7 @@ func Test_Caps_New(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name:        "TROLL",
+							Type:        morc.SpecBodyOffset,
 							OffsetStart: 0,
 							OffsetEnd:   -32,
 						},
@@ -463,6 +480,7 @@ func Test_Caps_New(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name:        "TROLL",
+							Type:        morc.SpecBodyOffset,
 							OffsetStart: 0,
 							OffsetEnd:   32,
 						},
@@ -486,6 +504,7 @@ func Test_Caps_New(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name: "TROLL",
+							Type: morc.SpecBodyOffset,
 						},
 					},
 				},
@@ -507,6 +526,7 @@ func Test_Caps_New(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name: "TROLL",
+							Type: morc.SpecBodyOffset,
 						},
 					},
 				},
@@ -528,6 +548,7 @@ func Test_Caps_New(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name:        "TROLL",
+							Type:        morc.SpecBodyOffset,
 							OffsetStart: 28,
 							OffsetEnd:   32,
 						},
@@ -551,6 +572,7 @@ func Test_Caps_New(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name:        "TROLL",
+							Type:        morc.SpecBodyOffset,
 							OffsetStart: 28,
 							OffsetEnd:   32,
 						},
@@ -665,6 +687,7 @@ func Test_Caps_Delete(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name:        "TROLL",
+							Type:        morc.SpecBodyOffset,
 							OffsetStart: 28,
 							OffsetEnd:   32,
 						},
@@ -688,6 +711,7 @@ func Test_Caps_Delete(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name:        "TROLL",
+							Type:        morc.SpecBodyOffset,
 							OffsetStart: 28,
 							OffsetEnd:   32,
 						},
@@ -807,6 +831,7 @@ func Test_Caps_Edit(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name: "TROLL",
+							Type: morc.SpecBodyJSON,
 							Steps: []morc.TraversalStep{
 								{Key: "data"},
 								{Key: "people"},
@@ -824,6 +849,7 @@ func Test_Caps_Edit(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name:        "TROLL",
+							Type:        morc.SpecBodyOffset,
 							OffsetStart: 28,
 							OffsetEnd:   32,
 						},
@@ -841,6 +867,7 @@ func Test_Caps_Edit(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name: "TROLL",
+							Type: morc.SpecBodyJSON,
 							Steps: []morc.TraversalStep{
 								{Key: "data"},
 								{Key: "people"},
@@ -858,6 +885,7 @@ func Test_Caps_Edit(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name:        "TROLL",
+							Type:        morc.SpecBodyOffset,
 							OffsetStart: 28,
 							OffsetEnd:   32,
 						},
@@ -875,6 +903,7 @@ func Test_Caps_Edit(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name: "TROLL",
+							Type: morc.SpecBodyJSON,
 							Steps: []morc.TraversalStep{
 								{Key: "data"},
 								{Key: "people"},
@@ -892,6 +921,7 @@ func Test_Caps_Edit(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL_NAME": {
 							Name: "TROLL_NAME",
+							Type: morc.SpecBodyJSON,
 							Steps: []morc.TraversalStep{
 								{Key: "data"},
 								{Key: "people"},
@@ -914,6 +944,7 @@ func Test_Caps_Edit(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name: "TROLL",
+							Type: morc.SpecBodyJSON,
 							Steps: []morc.TraversalStep{
 								{Key: "data"},
 								{Key: "people"},
@@ -931,6 +962,7 @@ func Test_Caps_Edit(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL_NAME": {
 							Name: "TROLL_NAME",
+							Type: morc.SpecBodyJSON,
 							Steps: []morc.TraversalStep{
 								{Key: "data"},
 								{Key: "people"},
@@ -953,6 +985,7 @@ func Test_Caps_Edit(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name: "TROLL",
+							Type: morc.SpecBodyJSON,
 							Steps: []morc.TraversalStep{
 								{Key: "data"},
 								{Key: "people"},
@@ -970,6 +1003,7 @@ func Test_Caps_Edit(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL_NAME": {
 							Name:        "TROLL_NAME",
+							Type:        morc.SpecBodyOffset,
 							OffsetStart: 28,
 							OffsetEnd:   32,
 						},
@@ -987,6 +1021,7 @@ func Test_Caps_Edit(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name: "TROLL",
+							Type: morc.SpecBodyJSON,
 							Steps: []morc.TraversalStep{
 								{Key: "data"},
 								{Key: "people"},
@@ -1004,6 +1039,7 @@ func Test_Caps_Edit(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL_NAME": {
 							Name:        "TROLL_NAME",
+							Type:        morc.SpecBodyOffset,
 							OffsetStart: 28,
 							OffsetEnd:   32,
 						},
@@ -1112,6 +1148,7 @@ func Test_Caps_Show(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name: "TROLL",
+							Type: morc.SpecBodyJSON,
 							Steps: []morc.TraversalStep{
 								{Key: "data"},
 								{Key: "people"},
@@ -1134,6 +1171,7 @@ func Test_Caps_Show(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name: "TROLL",
+							Type: morc.SpecBodyJSON,
 							Steps: []morc.TraversalStep{
 								{Key: "data"},
 								{Key: "people"},
@@ -1156,6 +1194,7 @@ func Test_Caps_Show(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name:        "TROLL",
+							Type:        morc.SpecBodyOffset,
 							OffsetStart: 28,
 							OffsetEnd:   32,
 						},
@@ -1173,6 +1212,7 @@ func Test_Caps_Show(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name:        "TROLL",
+							Type:        morc.SpecBodyOffset,
 							OffsetStart: 28,
 							OffsetEnd:   32,
 						},
@@ -1281,6 +1321,7 @@ func Test_Caps_Get(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name:        "TROLL",
+							Type:        morc.SpecBodyOffset,
 							OffsetStart: 28,
 							OffsetEnd:   32,
 						},
@@ -1298,6 +1339,7 @@ func Test_Caps_Get(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name:        "TROLL",
+							Type:        morc.SpecBodyOffset,
 							OffsetStart: 28,
 							OffsetEnd:   32,
 						},
@@ -1315,6 +1357,7 @@ func Test_Caps_Get(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"troll": {
 							Name: "troll",
+							Type: morc.SpecBodyJSON,
 							Steps: []morc.TraversalStep{
 								{Key: "data"},
 								{Key: "people"},
@@ -1337,6 +1380,7 @@ func Test_Caps_Get(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"troll": {
 							Name: "troll",
+							Type: morc.SpecBodyJSON,
 							Steps: []morc.TraversalStep{
 								{Key: "data"},
 								{Key: "people"},
@@ -1359,6 +1403,7 @@ func Test_Caps_Get(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name:        "TROLL",
+							Type:        morc.SpecBodyOffset,
 							OffsetStart: 28,
 							OffsetEnd:   32,
 						},
@@ -1376,6 +1421,7 @@ func Test_Caps_Get(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name: "TROLL",
+							Type: morc.SpecBodyOffset,
 						},
 					},
 				},
@@ -1391,6 +1437,7 @@ func Test_Caps_Get(t *testing.T) {
 					Captures: map[string]morc.Scraper{
 						"TROLL": {
 							Name:        "TROLL",
+							Type:        morc.SpecBodyOffset,
 							OffsetStart: 28,
 							OffsetEnd:   32,
 						},

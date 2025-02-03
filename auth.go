@@ -473,6 +473,8 @@ type ScrapeTimeExtractor struct {
 }
 
 type Auth struct {
+	Name string
+
 	proof AuthProof
 
 	fetcher *AuthFetcher
@@ -517,13 +519,16 @@ func (a Auth) Static() bool {
 }
 
 type marshaledAuth struct {
+	Name      string
 	Proof     map[string]any
 	ProofType AuthProofType `json:",omitempty"`
 	Fetcher   *AuthFetcher  `json:",omitempty"`
 }
 
 func (a Auth) MarshalJSON() ([]byte, error) {
-	ma := marshaledAuth{}
+	ma := marshaledAuth{
+		Name: a.Name,
+	}
 	if a.proof != nil {
 		ma.Proof = a.proof.Export()
 		ma.ProofType = a.proof.Type()
@@ -542,6 +547,8 @@ func (a *Auth) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
+	a.Name = ma.Name
+
 	if ma.Proof != nil {
 		t, err := ImportAuthProof(ma.ProofType, ma.Proof)
 		if err != nil {
@@ -556,8 +563,9 @@ func (a *Auth) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func NewHTTPBasicAuth(creds HTTPBasicCredentials) Auth {
+func NewHTTPBasicAuth(name string, creds HTTPBasicCredentials) Auth {
 	return Auth{
+		Name:  name,
 		proof: creds,
 	}
 }
@@ -569,7 +577,7 @@ func NewHTTPBasicAuth(creds HTTPBasicCredentials) Auth {
 // Auth will always attempt to detect expiration info from the initial
 // set-cookie, but if it is not present, it will fallback to error response on
 // the auth'd request's response to detect expiration.
-func NewLoginCookieAuth(retrieval RequestSequence, cookieName string, detectExpiration bool) (Auth, error) {
+func NewLoginCookieAuth(name string, retrieval RequestSequence, cookieName string, detectExpiration bool) (Auth, error) {
 	var flow, femplate string
 
 	if retrieval.IsFlow {
@@ -584,6 +592,7 @@ func NewLoginCookieAuth(retrieval RequestSequence, cookieName string, detectExpi
 	}
 
 	return Auth{
+		Name:    name,
 		fetcher: fetcher,
 	}, nil
 }
@@ -595,7 +604,7 @@ func NewLoginCookieAuth(retrieval RequestSequence, cookieName string, detectExpi
 // single token value may be extracted. If expiresTimeLayout is set, it will be
 // used for parsing expires time, and if set to an empty string, it will default
 // to RFC3339.
-func NewTokenAuth(retrieval RequestSequence, tokenScraper Scraper, dest ProofDestination, expiresScraper *Scraper, expiresTimeLayout string) (Auth, error) {
+func NewTokenAuth(name string, retrieval RequestSequence, tokenScraper Scraper, dest ProofDestination, expiresScraper *Scraper, expiresTimeLayout string) (Auth, error) {
 	var flow, femplate string
 
 	if retrieval.IsFlow {
@@ -610,6 +619,7 @@ func NewTokenAuth(retrieval RequestSequence, tokenScraper Scraper, dest ProofDes
 	}
 
 	return Auth{
+		Name:    name,
 		fetcher: fetcher,
 	}, nil
 }
@@ -618,7 +628,7 @@ func NewTokenAuth(retrieval RequestSequence, tokenScraper Scraper, dest ProofDes
 // the body of the response of the auth flow/template and place it in an
 // Authorization header with the Bearer scheme. The scraper must point to a
 // valid JWT token in the response.
-func NewJWTAuth(retrieval RequestSequence, scraper Scraper) (Auth, error) {
+func NewJWTAuth(name string, retrieval RequestSequence, scraper Scraper) (Auth, error) {
 	var flow, femplate string
 
 	if retrieval.IsFlow {
@@ -633,6 +643,7 @@ func NewJWTAuth(retrieval RequestSequence, scraper Scraper) (Auth, error) {
 	}
 
 	return Auth{
+		Name:    name,
 		fetcher: fetcher,
 	}, nil
 }

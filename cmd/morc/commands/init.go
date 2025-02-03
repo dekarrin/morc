@@ -52,6 +52,7 @@ func invokeInit(io cmdio.IO, projName string) error {
 		Name:      projName,
 		Templates: map[string]morc.RequestTemplate{},
 		Flows:     map[string]morc.Flow{},
+		Auths:     map[string]morc.Auth{},
 		Vars:      morc.NewVarStore(),
 		History:   []morc.HistoryEntry{},
 		Session:   morc.Session{},

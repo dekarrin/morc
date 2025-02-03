@@ -833,6 +833,10 @@ type SendOptions struct {
 	// should generally NOT be used in production code. THIS IS INSECURE AND
 	// SHOULD BE USED WITH CAUTION.
 	InsecureSkipVerify bool
+
+	// Auth is the proof of authentication to send along with the request. If
+	// set, it will be applied to the request just before it is sent.
+	Auth AuthProof
 }
 
 type SendResult struct {
@@ -927,6 +931,11 @@ func Send(method, URL, varSymbol string, opts SendOptions) (SendResult, error) {
 			return SendResult{}, fmt.Errorf("read request body: %w", err)
 		}
 		req.Body = io.NopCloser(bytes.NewBuffer(reqBodyBytes))
+	}
+
+	// apply auth if we have it
+	if opts.Auth != nil {
+		opts.Auth.Apply(req)
 	}
 
 	sendTime := time.Now()

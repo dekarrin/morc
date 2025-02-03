@@ -105,6 +105,7 @@ type Project struct {
 	History   []HistoryEntry
 	Session   Session
 	Config    Settings
+	Auths     map[string]Auth
 }
 
 func (p Project) WithConfig(cfg Settings) Project {
@@ -131,6 +132,7 @@ func (p Project) Dump(w io.Writer) error {
 		Flows:     p.Flows,
 		Vars:      p.Vars,
 		Config:    p.Config,
+		Auths:     p.Auths,
 	}
 
 	projDataBytes, err := json.MarshalIndent(m, "", "  ")
@@ -188,6 +190,7 @@ type marshaledProject struct {
 	Flows     map[string]Flow            `json:"flows"`
 	Vars      VarStore                   `json:"vars"`
 	Config    Settings                   `json:"config"`
+	Auths     map[string]Auth            `json:"auths"`
 }
 
 func (p Project) FlowsWithTemplate(template string) []string {
@@ -394,6 +397,9 @@ func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 		return SendResult{}, fmt.Errorf("request template %s has no URL set", tmpl.Name)
 	}
 
+	// if this template has auth configured on it, do that first
+	var authProof Auth
+
 	sendOpts := SendOptions{
 		Vars:               vars,
 		Body:               tmpl.Body,
@@ -502,9 +508,10 @@ func LoadProject(projR, seshR, histR io.Reader) (Project, error) {
 		Flows:     m.Flows,
 		Vars:      m.Vars,
 		Config:    m.Config,
+		Auths:     m.Auths,
 	}
 
-	// force req, cap, flow names to upper-case.
+	// force req, cap, flow, auth names to upper-case.
 	// Vars automatically handles case insensitivity so does not need this.
 	// TODO: make flows, templates, caps access pass through accessors and
 	// therefore be able to handle case insensitivity even when used via
@@ -527,6 +534,12 @@ func LoadProject(projR, seshR, histR io.Reader) (Project, error) {
 
 		delete(p.Flows, flowName)
 		p.Flows[strings.ToLower(flowName)] = flow
+	}
+	for authName, auth := range p.Auths {
+		auth.Name = strings.ToLower(auth.Name)
+
+		delete(p.Auths, authName)
+		p.Auths[strings.ToLower(authName)] = auth
 	}
 
 	if seshR != nil {
@@ -567,9 +580,10 @@ func LoadProjectFromDisk(projFilename string, all bool) (Project, error) {
 		Flows:     m.Flows,
 		Vars:      m.Vars,
 		Config:    m.Config,
+		Auths:     m.Auths,
 	}
 
-	// force req, cap, flow names to upper-case.
+	// force req, cap, flow, auth names to upper-case.
 	// Vars automatically handles case insensitivity so does not need this.
 	// TODO: make flows, templates, caps access pass through accessors and
 	// therefore be able to handle case insensitivity even when used via
@@ -592,6 +606,12 @@ func LoadProjectFromDisk(projFilename string, all bool) (Project, error) {
 
 		delete(p.Flows, flowName)
 		p.Flows[strings.ToLower(flowName)] = flow
+	}
+	for authName, auth := range p.Auths {
+		auth.Name = strings.ToLower(auth.Name)
+
+		delete(p.Auths, authName)
+		p.Auths[strings.ToLower(authName)] = auth
 	}
 
 	// set current project file path to the one we just read from

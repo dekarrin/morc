@@ -272,6 +272,7 @@ func invokeProjNew(io cmdio.IO, projFile string, attrs projAttrValues) error {
 		Name:      attrs.name.v,
 		Templates: map[string]morc.RequestTemplate{},
 		Flows:     map[string]morc.Flow{},
+		Auths:     map[string]morc.Auth{},
 		Vars:      morc.NewVarStore(),
 		History:   []morc.HistoryEntry{},
 		Session:   morc.Session{},

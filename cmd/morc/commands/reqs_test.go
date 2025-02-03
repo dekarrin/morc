@@ -690,7 +690,7 @@ func Test_Reqs_Show(t *testing.T) {
 			args: []string{"reqs", "req1"},
 			p: morc.Project{
 				Templates: map[string]morc.RequestTemplate{
-					"req1": {Name: "req1", Captures: map[string]morc.Scraper{"test": {Name: "test", OffsetStart: 3, OffsetEnd: 5}}},
+					"req1": {Name: "req1", Captures: map[string]morc.Scraper{"test": {Name: "test", Type: morc.SpecBodyOffset, OffsetStart: 3, OffsetEnd: 5}}},
 				},
 			},
 			expectStdoutOutput: "" +

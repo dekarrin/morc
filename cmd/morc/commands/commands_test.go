@@ -441,11 +441,13 @@ func testRequest_withAllPropertiesSet() morc.RequestTemplate {
 		Captures: map[string]morc.Scraper{
 			"var1": {
 				Name:        "var1",
+				Type:        morc.SpecBodyOffset,
 				OffsetStart: 1,
 				OffsetEnd:   3,
 			},
 			"var2": {
 				Name: "var2",
+				Type: morc.SpecBodyJSON,
 				Steps: []morc.TraversalStep{
 					{Key: "key1"},
 				},

@@ -28,10 +28,28 @@ const (
 	varNamePattern = `[-a-zA-Z0-9_]+`
 )
 
-// RequestSequence holds the name of either a RequestTemplate or a Flow.
+// RequestSequence holds the name of either a RequestTemplate or a Flow. Parsing
+// defaults to a flow if the string starts with neither "F:" nor "R:".
 type RequestSequence struct {
 	Name   string
 	IsFlow bool
+}
+
+func (rs RequestSequence) String() string {
+	if rs.IsFlow {
+		return "F:" + rs.Name
+	}
+	return "R:" + rs.Name
+}
+
+func ParseRequestSequence(s string) (RequestSequence, error) {
+	if strings.HasPrefix(strings.ToUpper(s), "F:") {
+		return RequestSequence{Name: s[2:], IsFlow: true}, nil
+	} else if strings.HasPrefix(strings.ToUpper(s), "R:") {
+		return RequestSequence{Name: s[2:], IsFlow: false}, nil
+	} else {
+		return RequestSequence{Name: s, IsFlow: true}, nil
+	}
 }
 
 type TraversalStep struct {

@@ -422,6 +422,18 @@ type cliFlags struct {
 	// URL is the URL to send the request to.
 	URL string
 
+	// Type is the type of the resource.
+	Type string
+
+	// Username is a username for authentication using HTTP Basic Auth.
+	Username string
+
+	// Password is a password for authentication using HTTP Basic Auth.
+	Password string
+
+	// Cookie is the name of the cookie to use for session-based authentication.
+	Cookie string
+
 	// HistoryFile is the path to a history file. It may contain the special
 	// string "::PROJ_DIR::"; if so, it will be interpreted as the current
 	// directory of the project file at runtime.
@@ -481,6 +493,14 @@ type cliFlags struct {
 	// output.
 	Format string
 
+	// Retrieval is the name of either a request template or flow used to
+	// retrieve a resource such as an auth proof.
+	Retrieval string
+
+	// TokenScraper is a scraper spec that specifies how to extract a token from
+	// the last response in a retrieval sequence.
+	TokenScraper string
+
 	// BRequest is a request output control switch flag that indicates that the
 	// request should be printed in addition to any other output.
 	BRequest bool
@@ -498,6 +518,11 @@ type cliFlags struct {
 	// BNoBody is a request output control switch flag that indicates that the
 	// body of the response should not be printed.
 	BNoBody bool
+
+	// BNoExpiration is a switch flag that indicates that a session-based
+	// authentication should not attempt to track cookie expiration and should
+	// use it until it fails.
+	BNoExpiration bool
 
 	// BNoDates is a historical request output control switch flag that
 	// indicates that dates of historical events should not be printed when they

@@ -67,9 +67,24 @@ func NewHTTPBasicCredentials(username, password string) AuthProof {
 type ProofLocation string
 
 const (
-	ProofLocationHeader    ProofLocation = "header"
-	ProofDestinationCookie ProofLocation = "cookie"
+	ProofLocationHeader ProofLocation = "header"
+	ProofLocationCookie ProofLocation = "cookie"
 )
+
+func (pl ProofLocation) String() string {
+	return string(pl)
+}
+
+func ParseProofLocation(s string) (ProofLocation, error) {
+	switch strings.ToLower(s) {
+	case "header":
+		return ProofLocationHeader, nil
+	case "cookie":
+		return ProofLocationCookie, nil
+	default:
+		return "", fmt.Errorf("unknown proof location %q", s)
+	}
+}
 
 type ProofFormatType string
 
@@ -77,6 +92,21 @@ const (
 	ProofFormatTypeNone   ProofFormatType = ""
 	ProofFormatTypeBearer ProofFormatType = "bearer"
 )
+
+func (pf ProofFormatType) String() string {
+	return string(pf)
+}
+
+func ParseProofFormatType(s string) (ProofFormatType, error) {
+	switch strings.ToLower(s) {
+	case "":
+		return ProofFormatTypeNone, nil
+	case "bearer":
+		return ProofFormatTypeBearer, nil
+	default:
+		return "", fmt.Errorf("unknown proof format %q", s)
+	}
+}
 
 type dynamicProof struct {
 	value     string
@@ -92,7 +122,7 @@ func (dp dynamicProof) Apply(req *http.Request) error {
 
 	if dp.dest.Location == ProofLocationHeader {
 		req.Header.Set(dp.dest.Key, value)
-	} else if dp.dest.Location == ProofDestinationCookie {
+	} else if dp.dest.Location == ProofLocationCookie {
 		req.AddCookie(&http.Cookie{
 			Name:  dp.dest.Key,
 			Value: value,
@@ -213,7 +243,11 @@ func ImportAuthProof(t AuthProofType, exported map[string]any) (AuthProof, error
 type AuthType string
 
 const (
+	AuthTypeNone      AuthType = ""
 	AuthTypeHTTPBasic AuthType = "basic"
+	AuthTypeSession   AuthType = "session"
+	AuthTypeToken     AuthType = "token"
+	AuthTypeJWT       AuthType = "jwt"
 )
 
 type TransformerFuncName string
@@ -400,6 +434,16 @@ type ProofDestination struct {
 	Format   ProofFormatType `json:"format,omitempty"`
 }
 
+func (pd ProofDestination) String() string {
+	s := fmt.Sprintf("%s %q", pd.Location, pd.Key)
+
+	if pd.Format != ProofFormatTypeNone {
+		s += fmt.Sprintf(" (%s)", pd.Format)
+	}
+
+	return s
+}
+
 func (pd ProofDestination) Export() map[string]any {
 	m := map[string]any{
 		"location": string(pd.Location),
@@ -425,7 +469,7 @@ func ImportProofDest(exported map[string]any) (ProofDestination, error) {
 			return ProofDestination{}, errors.New("location: must be a string")
 		}
 
-		if loc != ProofLocationHeader && loc != ProofDestinationCookie {
+		if loc != ProofLocationHeader && loc != ProofLocationCookie {
 			return ProofDestination{}, errors.New("location: must be 'header' or 'cookie'")
 		}
 	} else {
@@ -473,7 +517,13 @@ type ScrapeTimeExtractor struct {
 }
 
 type Auth struct {
-	Name    string
+	Name string
+
+	// Type is the type of authentication method that this Auth uses. It mostly
+	// is used to refer to the method of creation and for a CLI interface;
+	// actual library usage of Type is fairly minimal and an Auth can be created
+	// and used without the AuthType explicitly set.
+	Type    AuthType
 	Proof   AuthProof
 	Fetcher *AuthFetcher
 }
@@ -500,6 +550,7 @@ func (a Auth) Static() bool {
 
 type marshaledAuth struct {
 	Name      string
+	Type      AuthType
 	Proof     map[string]any
 	ProofType AuthProofType `json:",omitempty"`
 	Fetcher   *AuthFetcher  `json:",omitempty"`
@@ -508,6 +559,7 @@ type marshaledAuth struct {
 func (a Auth) MarshalJSON() ([]byte, error) {
 	ma := marshaledAuth{
 		Name: a.Name,
+		Type: a.Type,
 	}
 	if a.Proof != nil {
 		ma.Proof = a.Proof.Export()
@@ -528,6 +580,7 @@ func (a *Auth) UnmarshalJSON(b []byte) error {
 	}
 
 	a.Name = ma.Name
+	a.Type = ma.Type
 
 	if ma.Proof != nil {
 		t, err := ImportAuthProof(ma.ProofType, ma.Proof)
@@ -543,28 +596,31 @@ func (a *Auth) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// NewHTTPBasicAuth is a command that needs defining.
 func NewHTTPBasicAuth(name string, creds HTTPBasicCredentials) Auth {
 	return Auth{
 		Name:  name,
+		Type:  AuthTypeHTTPBasic,
 		Proof: creds,
 	}
 }
 
-// NewLoginCookieAuth returns an Auth that is configured to pull a cookie
+// NewSessionAuth returns an Auth that is configured to pull a cookie
 // containing the session ID from the response of the auth flow/template and use
 // it in authorized requests. The cookieName is the name of the cookie to pull.
 // Give flow or femplate, but not both. If expiration detection is set, this
 // Auth will always attempt to detect expiration info from the initial
 // set-cookie, but if it is not present, it will fallback to error response on
 // the auth'd request's response to detect expiration.
-func NewLoginCookieAuth(name string, retrieval RequestSequence, cookieName string, detectExpiration bool) (Auth, error) {
-	fetcher, err := NewLoginCookieFetcher(retrieval, cookieName, detectExpiration)
+func NewSessionAuth(name string, retrieval RequestSequence, cookieName string, detectExpiration bool) (Auth, error) {
+	fetcher, err := NewSessionCookieFetcher(retrieval, cookieName, detectExpiration)
 	if err != nil {
 		return Auth{}, err
 	}
 
 	return Auth{
 		Name:    name,
+		Type:    AuthTypeSession,
 		Fetcher: fetcher,
 	}, nil
 }
@@ -584,6 +640,7 @@ func NewTokenAuth(name string, retrieval RequestSequence, tokenScraper Scraper, 
 
 	return Auth{
 		Name:    name,
+		Type:    AuthTypeToken,
 		Fetcher: fetcher,
 	}, nil
 }
@@ -600,6 +657,7 @@ func NewJWTAuth(name string, retrieval RequestSequence, scraper Scraper) (Auth, 
 
 	return Auth{
 		Name:    name,
+		Type:    AuthTypeJWT,
 		Fetcher: fetcher,
 	}, nil
 }
@@ -693,14 +751,14 @@ func NewTokenFetcher(seq RequestSequence, tokenScraper Scraper, dest ProofDestin
 	return da, nil
 }
 
-// NewLoginCookieFetcher returns an AuthFetcher that is configured to pull a cookie
+// NewSessionCookieFetcher returns an AuthFetcher that is configured to pull a cookie
 // containing the session ID from the response of the auth flow/template and use
 // it in authorized requests. The cookieName is the name of the cookie to pull.
 // Give flow or femplate, but not both. If expiration detection is set, this
 // Auth will always attempt to detect expiration info from the initial
 // set-cookie, but if it is not present, it will fallback to error response on
 // the auth'd request's response to detect expiration.
-func NewLoginCookieFetcher(seq RequestSequence, cookieName string, detectExpiration bool) (*AuthFetcher, error) {
+func NewSessionCookieFetcher(seq RequestSequence, cookieName string, detectExpiration bool) (*AuthFetcher, error) {
 	if seq.Name == "" {
 		return &AuthFetcher{}, errors.New("flow/template name must be set")
 	}
@@ -726,7 +784,7 @@ func NewLoginCookieFetcher(seq RequestSequence, cookieName string, detectExpirat
 			},
 		},
 		Dest: ProofDestination{
-			Location: ProofDestinationCookie,
+			Location: ProofLocationCookie,
 			Key:      cookieName,
 			Format:   ProofFormatTypeNone,
 		},

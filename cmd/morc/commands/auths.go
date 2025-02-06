@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dekarrin/morc"
+	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/spf13/cobra"
 )
 
@@ -32,7 +33,20 @@ var authsCmd = &cobra.Command{
 	Long:    "", // TODO: fill help.
 	Args:    cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, posArgs []string) error {
-		return nil
+		var args authsArgs
+		if err := parseAuthsArgs(cmd, posArgs, &args); err != nil {
+			return err
+		}
+
+		// done checking args, don't show usage on error
+		cmd.SilenceUsage = true
+		io := cmdio.From(cmd)
+		io.Quiet = flags.BQuiet
+
+		switch args.action {
+		default:
+			panic(fmt.Sprintf("unhandled auths action %q", args.action))
+		}
 	},
 }
 
@@ -68,7 +82,7 @@ func init() {
 	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "clear")
 
 	// don't specify attribute args if not creating or setting.
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "name")
+	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "clear", "name")
 	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "type")
 	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "username")
 	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "password")
@@ -119,6 +133,67 @@ type authAttrValues struct {
 
 	expirationSpec   optional[morc.Scraper]
 	expirationLayout optional[string]
+}
+
+func parseAuthsArgs(cmd *cobra.Command, posArgs []string, args *authsArgs) error {
+	args.projFile = projPathFromFlagsOrFile(cmd)
+	if args.projFile == "" {
+		return fmt.Errorf("project file cannot be set to empty string")
+	}
+
+	var err error
+
+	args.action, err = parseAuthsActionFromFlags(cmd, posArgs)
+	if err != nil {
+		return err
+	}
+
+	// do action-specific arg and flag parsing
+	switch args.action {
+	case authsActionList:
+		// nothing else to do
+	case authsActionShow:
+		// use arg 1 as the auth name
+		args.auth = posArgs[0]
+	case authsActionClear:
+		// special case of auth name set from a CLI flag rather than pos arg.
+		args.auth = flags.Clear
+	case authsActionDelete:
+		// special case of auth name set from a CLI flag rather than pos arg.
+		args.auth = flags.Delete
+
+		args.force = flags.BForce
+	case authsActionGet:
+		// use arg 1 as the auth name
+		args.auth = posArgs[0]
+
+		args.getItem, err = parseAuthAttrKey(flags.Get)
+		if err != nil {
+			return err
+		}
+	case authsActionNew:
+		// above action parsing already checked that invalid set opts will not
+		// be present so we can just call parseAuthsSetFlags and then use
+		// --new argument to set the new auth method name.
+		if err := parseAuthsSetFlags(cmd, &args.sets); err != nil {
+			return err
+		}
+
+		// set auth name from the flag
+		args.auth = flags.New
+		args.sets.name = optional[string]{set: true, v: flags.New}
+	case authsActionEdit:
+		// use arg 1 as the auth name
+		args.auth = posArgs[0]
+
+		if err := parseAuthsSetFlags(cmd, &args.sets); err != nil {
+			return err
+		}
+	default:
+		panic(fmt.Sprintf("unhandled auths action %q", args.action))
+	}
+
+	return nil
 }
 
 func parseAuthsActionFromFlags(cmd *cobra.Command, posArgs []string) (authsAction, error) {

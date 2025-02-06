@@ -515,6 +515,9 @@ type cliFlags struct {
 	// specifying where token auth proofs should be used.
 	Dest string
 
+	// Clear specifies that the given resource should be cleared.
+	Clear string
+
 	// BRequest is a request output control switch flag that indicates that the
 	// request should be printed in addition to any other output.
 	BRequest bool

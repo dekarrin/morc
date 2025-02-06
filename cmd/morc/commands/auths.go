@@ -25,7 +25,7 @@ var authsCmd = &cobra.Command{
 			"auths AUTH\n" +
 			"auths AUTH --get ATTR\n" +
 			"auths AUTH \n" + // TODO: actual auth parameters.
-			"auths AUTH --clear",
+			"auths --clear AUTH",
 	},
 	GroupID: "project",
 	Short:   "Show or modify authorization methods",
@@ -50,7 +50,7 @@ func init() {
 	authsCmd.PersistentFlags().StringVarP(&flags.Delete, "delete", "D", "", "Delete the auth method named `AUTH`.")
 	authsCmd.PersistentFlags().BoolVarP(&flags.BForce, "force", "f", false, "Force deletion of an auth method even if it is used in a request.")
 	authsCmd.PersistentFlags().StringVarP(&flags.Get, "get", "G", "", "Get the value of the given attribute `ATTR` from the auth method. ATTR must be one of: "+strings.Join(authAttrKeyNames(), ", "))
-	authsCmd.PersistentFlags().BoolVarP(&flags.BClear, "clear", "C", false, "Clear any currently saved auth proof. Only applicable to auth types that use dynamically-retrieved proofs, such a cookie or a token.")
+	authsCmd.PersistentFlags().StringVarP(&flags.Clear, "clear", "C", "", "Clear any currently saved auth proof. Only applicable to auth types that use dynamically-retrieved proofs, such a cookie or a token.")
 	authsCmd.PersistentFlags().StringVarP(&flags.Name, "name", "n", "", "Change the name of an auth method to `NAME`.")
 	authsCmd.PersistentFlags().StringVarP(&flags.Type, "type", "t", "", "Set the type of auth method to `TYPE`. TYPE must be one of 'basic', 'session', 'jwt', or 'token'; the choice determined what other options are available.")
 	authsCmd.PersistentFlags().StringVarP(&flags.Username, "username", "u", "", "Set the `USERNAME` for use with HTTP basic auth. Only valid when --type is 'basic'.")
@@ -58,7 +58,7 @@ func init() {
 	authsCmd.PersistentFlags().StringVarP(&flags.Retrieval, "retrieval", "r", "", "Set the flow or request template to use to retrieve proof of authentication. This is a string of the form F:NAME for a flow or R:NAME for a request template; if no prefix is given, it is assumed to be a flow name. Only valid when --type is 'session', 'jwt', or 'token'.")
 	authsCmd.PersistentFlags().StringVarP(&flags.Cookie, "cookie", "c", "", "Set the name of the cookie to get session information from to `NAME`. Only valid when --type is 'session'.")
 	authsCmd.PersistentFlags().BoolVarP(&flags.BNoExpiration, "no-exp", "", false, "Do not detect an expiration time for the auth proof, resulting in it being used until an invalid auth is detected. Only valid when --type is 'session' or 'token'.")
-	authsCmd.PersistentFlags().BoolVarP(&flags.BNoExpiration, "exp", "", false, "Enable detection of an expiration time for a session cookie based auth proof, resulting in a new one being automatically retrieved before the authenticated request if the currently held one has expired. Only valid when --type is 'session'.")
+	authsCmd.PersistentFlags().BoolVarP(&flags.BYesExpiration, "exp", "", false, "Enable detection of an expiration time for a session cookie based auth proof, resulting in a new one being automatically retrieved before the authenticated request if the currently held one has expired. Only valid when --type is 'session'.")
 	authsCmd.PersistentFlags().StringVarP(&flags.TokenScraper, "token-scraper", "T", "", "Set the scraper to use to extract the token from the last response of auth proof retrieval. Only valid when --type is 'jwt' or 'token'.")
 	authsCmd.PersistentFlags().StringVarP(&flags.Dest, "dest", "d", "", "Set where the token should be used in the authenticated request. `LOCATION` must be either 'header:NAME-OF-HEADER' or 'cookie:NAME-OF-COOKIE'. Only valid when --type is 'token'.")
 	authsCmd.PersistentFlags().StringVarP(&flags.Format, "format", "", "", "Set the format of the token proof in the authenticated to `FORMAT`. If not set, the token's exact value is used. If set to `bearer`, it's value will be preceded by the word 'Bearer'. Only valid when --type is 'token'.")
@@ -153,8 +153,11 @@ func parseAuthsActionFromFlags(cmd *cobra.Command, posArgs []string) (authsActio
 			return authsActionGet, fmt.Errorf("unknown positional argument %q", posArgs[1])
 		}
 		return authsActionGet, nil
-	} else if flags.BClear {
-		// TODO: need to give name of auth to clear.
+	} else if flags.Clear != "" {
+		if len(posArgs) > 0 {
+			return authsActionClear, fmt.Errorf("unknown positional argument %q", posArgs[0])
+		}
+		return authsActionClear, nil
 	} else if authsSetFlagIsPresent(cmd) {
 		if len(posArgs) < 1 {
 			return authsActionEdit, fmt.Errorf("missing name of AUTH to update")
@@ -163,6 +166,14 @@ func parseAuthsActionFromFlags(cmd *cobra.Command, posArgs []string) (authsActio
 			return authsActionEdit, fmt.Errorf("unknown positional argument %q", posArgs[1])
 		}
 		return authsActionEdit, nil
+	}
+
+	if len(posArgs) == 0 {
+		return authsActionList, nil
+	} else if len(posArgs) == 1 {
+		return authsActionShow, nil
+	} else {
+		return authsAction(0), fmt.Errorf("unknown positional argument %q", posArgs[1])
 	}
 }
 

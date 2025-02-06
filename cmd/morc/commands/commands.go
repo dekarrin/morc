@@ -490,7 +490,7 @@ type cliFlags struct {
 	StepReplaces []string
 
 	// Format is a request output control flag that gives the format of the
-	// output.
+	// output. It is also used for specifying the format of an auth method.
 	Format string
 
 	// Retrieval is the name of either a request template or flow used to
@@ -500,6 +500,20 @@ type cliFlags struct {
 	// TokenScraper is a scraper spec that specifies how to extract a token from
 	// the last response in a retrieval sequence.
 	TokenScraper string
+
+	// ExpirationScraper is a scraper spec that specifies how to extract an
+	// expiration from the last response in a retrieval sequence.
+	ExpirationScraper string
+
+	// ExpirationLayout is a scraper spec that specifies the format of the
+	// value retrieved by ExpirationScraper. If not set, it is assumed to be an
+	// RFC3339-formatted date. If given, it can either be the name of a
+	// particular layout or a Go layout string.
+	ExpirationLayout string
+
+	// Dest specifies the location to use something in. It's used for
+	// specifying where token auth proofs should be used.
+	Dest string
 
 	// BRequest is a request output control switch flag that indicates that the
 	// request should be printed in addition to any other output.

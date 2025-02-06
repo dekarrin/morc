@@ -86,18 +86,18 @@ func ParseProofLocation(s string) (ProofLocation, error) {
 	}
 }
 
-type ProofFormatType string
+type ProofFormat string
 
 const (
-	ProofFormatTypeNone   ProofFormatType = ""
-	ProofFormatTypeBearer ProofFormatType = "bearer"
+	ProofFormatTypeNone   ProofFormat = ""
+	ProofFormatTypeBearer ProofFormat = "bearer"
 )
 
-func (pf ProofFormatType) String() string {
+func (pf ProofFormat) String() string {
 	return string(pf)
 }
 
-func ParseProofFormatType(s string) (ProofFormatType, error) {
+func ParseProofFormatType(s string) (ProofFormat, error) {
 	switch strings.ToLower(s) {
 	case "":
 		return ProofFormatTypeNone, nil
@@ -429,9 +429,9 @@ func NewJWTExpirationTransformer() TimeTransformerFunc {
 // TODO: CLI transformer.
 
 type ProofDestination struct {
-	Location ProofLocation   `json:"location"`
-	Key      string          `json:"key"`
-	Format   ProofFormatType `json:"format,omitempty"`
+	Location ProofLocation `json:"location"`
+	Key      string        `json:"key"`
+	Format   ProofFormat   `json:"format,omitempty"`
 }
 
 func (pd ProofDestination) String() string {
@@ -460,7 +460,7 @@ func (pd ProofDestination) Export() map[string]any {
 func ImportProofDest(exported map[string]any) (ProofDestination, error) {
 	var loc ProofLocation
 	var key string
-	var destFormat ProofFormatType = ProofFormatTypeNone
+	var destFormat ProofFormat = ProofFormatTypeNone
 
 	if rawType, ok := exported["location"]; ok {
 		if destStr, ok := rawType.(string); ok {
@@ -489,7 +489,7 @@ func ImportProofDest(exported map[string]any) (ProofDestination, error) {
 		if destFormatStr, ok = rawFormat.(string); !ok {
 			return ProofDestination{}, errors.New("format: must be a string")
 		}
-		destFormat = ProofFormatType(destFormatStr)
+		destFormat = ProofFormat(destFormatStr)
 		if destFormat != ProofFormatTypeNone && destFormat != ProofFormatTypeBearer {
 			return ProofDestination{}, errors.New("format: must be set to empty string or 'bearer'")
 		}

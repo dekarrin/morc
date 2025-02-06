@@ -534,9 +534,14 @@ type cliFlags struct {
 	BNoBody bool
 
 	// BNoExpiration is a switch flag that indicates that a session-based
-	// authentication should not attempt to track cookie expiration and should
-	// use it until it fails.
+	// authentication should not attempt to track auth proof expiration and
+	// should use it until it fails.
 	BNoExpiration bool
+
+	// BYesExpiration is a switch flag that indicates that a session-based
+	// authentication should attempt to track cookie expiration and should
+	// automatically refresh it prior to authenticated request if it is invalid.
+	BYesExpiration bool
 
 	// BNoDates is a historical request output control switch flag that
 	// indicates that dates of historical events should not be printed when they

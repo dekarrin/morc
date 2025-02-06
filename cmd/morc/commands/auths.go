@@ -54,16 +54,18 @@ func init() {
 	authsCmd.PersistentFlags().StringVarP(&flags.Type, "type", "t", "", "Set the type of auth method to `TYPE`. TYPE must be one of 'basic', 'session', 'jwt', or 'token'; the choice determined what other options are available.")
 	authsCmd.PersistentFlags().StringVarP(&flags.Username, "username", "u", "", "Set the `USERNAME` for use with HTTP basic auth. Only valid when --type is 'basic'.")
 	authsCmd.PersistentFlags().StringVarP(&flags.Password, "password", "p", "", "Set the `PASSWORD` for use with HTTP basic auth. Only valid when --type is 'basic'.")
-	authsCmd.PersistentFlags().StringVarP(&flags.Cookie, "cookie", "c", "", "Set the name of the cookie to get session information from to `NAME`. Only valid when --type is 'session'.")
-	authsCmd.PersistentFlags().BoolVarP(&flags.BNoExpiration, "no-exp", "", false, "Do not detect an expiration time for the session cookie, resulting in it being used until an invalid auth is detected. Only valid when --type is 'session'.")
 	authsCmd.PersistentFlags().StringVarP(&flags.Retrieval, "retrieval", "r", "", "Set the flow or request template to use to retrieve proof of authentication. This is a string of the form F:NAME for a flow or R:NAME for a request template; if no prefix is given, it is assumed to be a flow name. Only valid when --type is 'session', 'jwt', or 'token'.")
+	authsCmd.PersistentFlags().StringVarP(&flags.Cookie, "cookie", "c", "", "Set the name of the cookie to get session information from to `NAME`. Only valid when --type is 'session'.")
+	authsCmd.PersistentFlags().BoolVarP(&flags.BNoExpiration, "no-exp", "", false, "Do not detect an expiration time for the auth proof, resulting in it being used until an invalid auth is detected. Only valid when --type is 'session' or 'token'.")
+	authsCmd.PersistentFlags().BoolVarP(&flags.BNoExpiration, "exp", "", false, "Enable detection of an expiration time for a session cookie based auth proof, resulting in a new one being automatically retrieved before the authenticated request if the currently held one has expired. Only valid when --type is 'session'.")
 	authsCmd.PersistentFlags().StringVarP(&flags.TokenScraper, "token-scraper", "", "", "Set the scraper to use to extract the token from the last response of auth proof retrieval. Only valid when --type is 'jwt' or 'token'.")
-	authsCmd.PersistentFlags().StringVarP(&flags.Dest, "use-in", "", "", "Set where the token should be used in the authenticated request. `LOCATION` must be either 'header:NAME-OF-HEADER' or 'cookie:NAME-OF-COOKIE'. Only valid when --type is 'token'.")
+	authsCmd.PersistentFlags().StringVarP(&flags.Dest, "dest", "", "", "Set where the token should be used in the authenticated request. `LOCATION` must be either 'header:NAME-OF-HEADER' or 'cookie:NAME-OF-COOKIE'. Only valid when --type is 'token'.")
 	authsCmd.PersistentFlags().StringVarP(&flags.Format, "format", "", "", "Set the format of the token proof in the authenticated to `FORMAT`. If not set, the token's exact value is used. If set to `bearer`, it's value will be preceded by the word 'Bearer'. Only valid when --type is 'token'.")
 	authsCmd.PersistentFlags().StringVarP(&flags.ExpirationScraper, "exp-scraper", "", "", "Set the scraper to use to extract the expiration time of the token from the last response of auth proof retrieval. Only valid when --type is 'token'.")
 	authsCmd.PersistentFlags().StringVarP(&flags.ExpirationLayout, "exp-layout", "", "RFC3339", "Set the layout of the expiration time of the token to `LAYOUT`. This can either be a custom string that is Go time layout format, or one of the following constants: 'RFC822', 'RFC822Z', 'RFC850', 'RFC1123', 'RFC1123Z', 'RFC3339', or 'RFC3339Nano'. Only valid when --type is 'token'.")
 
 	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "clear")
+	reqsCmd.MarkFlagsMutuallyExclusive("no-exp", "exp")
 
 	rootCmd.AddCommand(authsCmd)
 }
@@ -76,6 +78,89 @@ type authsArgs struct {
 	auth     string
 
 	sets authAttrValues
+}
+
+type authAttrValues struct {
+	name     optional[string]
+	authType optional[string]
+
+	username optional[string]
+	password optional[string]
+
+	retrieval           optional[morc.RequestSequence]
+	expirationDetection optional[bool]
+
+	cookie optional[string]
+
+	tokenSpec optional[morc.Scraper]
+	dest      optional[morc.ProofDestination]
+	format    optional[morc.ProofFormat]
+
+	expirationSpec   optional[morc.Scraper]
+	expirationLayout optional[string]
+}
+
+func parseAuthsSetFlags(cmd *cobra.Command, attrs *authAttrValues) error {
+	f := cmd.Flags()
+
+	if f.Changed("name") {
+		attrs.name = optional[string]{set: true, v: flags.Name}
+	}
+
+	if f.Changed("type") {
+		tLower := strings.ToLower(flags.Type)
+		if tLower != "basic" && tLower != "session" && tLower != "jwt" && tLower != "token" {
+			return fmt.Errorf("invalid auth type %q; must be one of 'basic', 'session', 'jwt', or 'token'", flags.Type)
+		}
+		attrs.authType = optional[string]{set: true, v: flags.Type}
+	}
+
+	if f.Changed("username") {
+		attrs.username = optional[string]{set: true, v: flags.Username}
+	}
+
+	if f.Changed("password") {
+		attrs.password = optional[string]{set: true, v: flags.Password}
+	}
+
+	if f.Changed("retrieval") {
+		seq, err := morc.ParseRequestSequence(flags.Retrieval)
+		if err != nil {
+			return fmt.Errorf("invalid retrieval sequence %q: %w", flags.Retrieval, err)
+		}
+		attrs.retrieval = optional[morc.RequestSequence]{set: true, v: seq}
+	}
+
+	if f.Changed("cookie") {
+		attrs.cookie = optional[string]{set: true, v: flags.Cookie}
+	}
+
+	if f.Changed("no-exp") {
+		attrs.expirationDetection = optional[bool]{set: true, v: false}
+	}
+
+	if f.Changed("exp") {
+		attrs.expirationDetection = optional[bool]{set: true, v: true}
+	}
+
+	return nil
+}
+
+func authsSetFlagIsPresent(cmd *cobra.Command) bool {
+	f := cmd.Flags()
+	return f.Changed("name") ||
+		f.Changed("type") ||
+		f.Changed("username") ||
+		f.Changed("password") ||
+		f.Changed("retrieval") ||
+		f.Changed("no-exp") ||
+		f.Changed("exp") ||
+		f.Changed("token-scraper") ||
+		f.Changed("exp-scraper") ||
+		f.Changed("exp-layout") ||
+		f.Changed("cookie") ||
+		f.Changed("dest") ||
+		f.Changed("format")
 }
 
 type authsAction int

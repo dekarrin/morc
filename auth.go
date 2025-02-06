@@ -97,7 +97,7 @@ func (pf ProofFormat) String() string {
 	return string(pf)
 }
 
-func ParseProofFormatType(s string) (ProofFormat, error) {
+func ParseProofFormat(s string) (ProofFormat, error) {
 	switch strings.ToLower(s) {
 	case "":
 		return ProofFormatTypeNone, nil
@@ -721,6 +721,14 @@ func NewJWTFetcher(seq RequestSequence, scraper Scraper) (*AuthFetcher, error) {
 func NewTokenFetcher(seq RequestSequence, tokenScraper Scraper, dest ProofDestination, expiresScraper *Scraper, expiresTimeLayout string) (*AuthFetcher, error) {
 	if seq.Name == "" {
 		return &AuthFetcher{}, errors.New("flow/template name must be set")
+	}
+
+	if tokenScraper.Name == "" {
+		return &AuthFetcher{}, errors.New("token scraper name cannot be empty")
+	}
+
+	if expiresScraper != nil && expiresScraper.Name == "" {
+		return &AuthFetcher{}, errors.New("expires scraper name cannot be empty")
 	}
 
 	// TODO: validate flow, template actually exist in caller.

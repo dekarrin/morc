@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/dekarrin/morc"
 	"github.com/spf13/cobra"
@@ -58,13 +59,33 @@ func init() {
 	authsCmd.PersistentFlags().StringVarP(&flags.Cookie, "cookie", "c", "", "Set the name of the cookie to get session information from to `NAME`. Only valid when --type is 'session'.")
 	authsCmd.PersistentFlags().BoolVarP(&flags.BNoExpiration, "no-exp", "", false, "Do not detect an expiration time for the auth proof, resulting in it being used until an invalid auth is detected. Only valid when --type is 'session' or 'token'.")
 	authsCmd.PersistentFlags().BoolVarP(&flags.BNoExpiration, "exp", "", false, "Enable detection of an expiration time for a session cookie based auth proof, resulting in a new one being automatically retrieved before the authenticated request if the currently held one has expired. Only valid when --type is 'session'.")
-	authsCmd.PersistentFlags().StringVarP(&flags.TokenScraper, "token-scraper", "", "", "Set the scraper to use to extract the token from the last response of auth proof retrieval. Only valid when --type is 'jwt' or 'token'.")
-	authsCmd.PersistentFlags().StringVarP(&flags.Dest, "dest", "", "", "Set where the token should be used in the authenticated request. `LOCATION` must be either 'header:NAME-OF-HEADER' or 'cookie:NAME-OF-COOKIE'. Only valid when --type is 'token'.")
+	authsCmd.PersistentFlags().StringVarP(&flags.TokenScraper, "token-scraper", "T", "", "Set the scraper to use to extract the token from the last response of auth proof retrieval. Only valid when --type is 'jwt' or 'token'.")
+	authsCmd.PersistentFlags().StringVarP(&flags.Dest, "dest", "d", "", "Set where the token should be used in the authenticated request. `LOCATION` must be either 'header:NAME-OF-HEADER' or 'cookie:NAME-OF-COOKIE'. Only valid when --type is 'token'.")
 	authsCmd.PersistentFlags().StringVarP(&flags.Format, "format", "", "", "Set the format of the token proof in the authenticated to `FORMAT`. If not set, the token's exact value is used. If set to `bearer`, it's value will be preceded by the word 'Bearer'. Only valid when --type is 'token'.")
-	authsCmd.PersistentFlags().StringVarP(&flags.ExpirationScraper, "exp-scraper", "", "", "Set the scraper to use to extract the expiration time of the token from the last response of auth proof retrieval. Only valid when --type is 'token'.")
-	authsCmd.PersistentFlags().StringVarP(&flags.ExpirationLayout, "exp-layout", "", "RFC3339", "Set the layout of the expiration time of the token to `LAYOUT`. This can either be a custom string that is Go time layout format, or one of the following constants: 'RFC822', 'RFC822Z', 'RFC850', 'RFC1123', 'RFC1123Z', 'RFC3339', or 'RFC3339Nano'. Only valid when --type is 'token'.")
+	authsCmd.PersistentFlags().StringVarP(&flags.ExpirationScraper, "exp-scraper", "X", "", "Set the scraper to use to extract the expiration time of the token from the last response of auth proof retrieval. Only valid when --type is 'token'.")
+	authsCmd.PersistentFlags().StringVarP(&flags.ExpirationLayout, "exp-layout", "L", "RFC3339", "Set the layout of the expiration time of the token to `LAYOUT`. This can either be a custom string that is Go time layout format, or one of the following constants: 'RFC822', 'RFC822Z', 'RFC850', 'RFC1123', 'RFC1123Z', 'RFC3339', or 'RFC3339Nano'. Only valid when --type is 'token'.")
 
 	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "clear")
+
+	// don't specify attribute args if not creating or setting.
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "name")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "type")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "username")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "password")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "retrieval")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "cookie")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "no-exp")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exp")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "token-scraper")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "dest")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "format")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exp-scraper")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exp-layout")
+
+	reqsCmd.MarkFlagsMutuallyExclusive("new", "get", "clear", "force")
+	reqsCmd.MarkFlagsMutuallyExclusive("no-exp", "exp-scraper")
+	reqsCmd.MarkFlagsMutuallyExclusive("no-exp", "exp-layout")
+
 	reqsCmd.MarkFlagsMutuallyExclusive("no-exp", "exp")
 
 	rootCmd.AddCommand(authsCmd)
@@ -100,6 +121,51 @@ type authAttrValues struct {
 	expirationLayout optional[string]
 }
 
+func parseAuthsActionFromFlags(cmd *cobra.Command, posArgs []string) (authsAction, error) {
+	// mutual exclusions enforced by cobra (and therefore we do not check them here):
+	// * --new, --delete, --get, and --clear
+	// * --delete with mod flags
+	// * --get with mod flags
+	// * --clear with mod flags
+	// * --force with --get, --clear, and --new
+	// * --no-exp with any flag that indicates expiration detection
+
+	// make sure user isn't invalidly using -f because cobra is not enforcing this
+	if flags.BForce && flags.Delete == "" {
+		return authsAction(0), fmt.Errorf("--force/-f can only be used with --delete/-D")
+	}
+
+	if flags.Delete != "" {
+		if len(posArgs) > 0 {
+			return authsActionDelete, fmt.Errorf("unknown positional argument %q", posArgs[0])
+		}
+		return authsActionDelete, nil
+	} else if flags.New != "" {
+		if len(posArgs) > 0 {
+			return authsActionNew, fmt.Errorf("unknown positional argument %q", posArgs[0])
+		}
+		return authsActionNew, nil
+	} else if flags.Get != "" {
+		if len(posArgs) < 1 {
+			return authsActionGet, fmt.Errorf("missing name of AUTH to get from")
+		}
+		if len(posArgs) > 1 {
+			return authsActionGet, fmt.Errorf("unknown positional argument %q", posArgs[1])
+		}
+		return authsActionGet, nil
+	} else if flags.BClear {
+		// TODO: need to give name of auth to clear.
+	} else if authsSetFlagIsPresent(cmd) {
+		if len(posArgs) < 1 {
+			return authsActionEdit, fmt.Errorf("missing name of AUTH to update")
+		}
+		if len(posArgs) > 1 {
+			return authsActionEdit, fmt.Errorf("unknown positional argument %q", posArgs[1])
+		}
+		return authsActionEdit, nil
+	}
+}
+
 func parseAuthsSetFlags(cmd *cobra.Command, attrs *authAttrValues) error {
 	f := cmd.Flags()
 
@@ -126,7 +192,7 @@ func parseAuthsSetFlags(cmd *cobra.Command, attrs *authAttrValues) error {
 	if f.Changed("retrieval") {
 		seq, err := morc.ParseRequestSequence(flags.Retrieval)
 		if err != nil {
-			return fmt.Errorf("invalid retrieval sequence %q: %w", flags.Retrieval, err)
+			return fmt.Errorf("--retrieval/-r: %w", err)
 		}
 		attrs.retrieval = optional[morc.RequestSequence]{set: true, v: seq}
 	}
@@ -141,6 +207,81 @@ func parseAuthsSetFlags(cmd *cobra.Command, attrs *authAttrValues) error {
 
 	if f.Changed("exp") {
 		attrs.expirationDetection = optional[bool]{set: true, v: true}
+	}
+
+	if f.Changed("token-scraper") {
+		scraper, err := morc.ParseVarScraperSpec("token", flags.TokenScraper)
+		if err != nil {
+			return fmt.Errorf("--token-scraper/-T: %w", err)
+		}
+		attrs.tokenSpec = optional[morc.Scraper]{set: true, v: scraper}
+	}
+
+	if f.Changed("dest") {
+		parts := strings.SplitN(flags.Dest, ":", 2)
+		if len(parts) != 2 {
+			return fmt.Errorf("--dest/-d: must be in the form 'header:NAME' or 'cookie:NAME'")
+		}
+		loc, err := morc.ParseProofLocation(parts[0])
+		if err != nil {
+			return fmt.Errorf("--dest/-d: %q: %w", parts[0], err)
+		}
+		key := parts[1]
+		if key == "" {
+			return fmt.Errorf("--dest/-d: key name must not be empty")
+		}
+
+		pd := morc.ProofDestination{
+			Location: loc,
+			Key:      key,
+		}
+
+		attrs.dest = optional[morc.ProofDestination]{set: true, v: pd}
+	}
+
+	if f.Changed("format") {
+		format, err := morc.ParseProofFormat(flags.Format)
+		if err != nil {
+			return fmt.Errorf("--format: %w", err)
+		}
+
+		attrs.format = optional[morc.ProofFormat]{set: true, v: format}
+	}
+
+	if f.Changed("exp-scraper") {
+		scraper, err := morc.ParseVarScraperSpec("expiration", flags.ExpirationScraper)
+		if err != nil {
+			return fmt.Errorf("--exp-scraper/-X: %w", err)
+		}
+		attrs.expirationSpec = optional[morc.Scraper]{set: true, v: scraper}
+	}
+
+	if f.Changed("exp-layout") {
+		if flags.ExpirationLayout == "" {
+			return fmt.Errorf("--exp-layout/-L: layout must not be empty")
+		}
+
+		// parse for the special go time layout constants
+		layout := flags.ExpirationLayout
+		layoutUpper := strings.ToUpper(layout)
+
+		if layoutUpper == "RFC822" {
+			layout = time.RFC822
+		} else if layoutUpper == "RFC822Z" {
+			layout = time.RFC822Z
+		} else if layoutUpper == "RFC850" {
+			layout = time.RFC850
+		} else if layoutUpper == "RFC1123" {
+			layout = time.RFC1123
+		} else if layoutUpper == "RFC1123Z" {
+			layout = time.RFC1123Z
+		} else if layoutUpper == "RFC3339" {
+			layout = time.RFC3339
+		} else if layoutUpper == "RFC3339NANO" {
+			layout = time.RFC3339Nano
+		}
+
+		attrs.expirationLayout = optional[string]{set: true, v: layout}
 	}
 
 	return nil

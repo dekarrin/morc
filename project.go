@@ -430,6 +430,10 @@ func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 			return SendResult{}, fmt.Errorf("request template %s references non-existent auth %s", tmpl.Name, tmpl.Auth)
 		}
 		auth = &authItem
+
+		if !auth.Sendable() {
+			return SendResult{}, fmt.Errorf("request template %s uses auth method %s, which is incomplete", tmpl.Name, auth.Name)
+		}
 	}
 
 	// retry failed auth ONLY if we did not just get it.

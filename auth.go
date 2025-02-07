@@ -91,6 +91,7 @@ type ProofFormat string
 const (
 	ProofFormatTypeNone   ProofFormat = ""
 	ProofFormatTypeBearer ProofFormat = "bearer"
+	ProofFormatTypeBasic  ProofFormat = "basic"
 )
 
 func (pf ProofFormat) String() string {
@@ -103,6 +104,8 @@ func ParseProofFormat(s string) (ProofFormat, error) {
 		return ProofFormatTypeNone, nil
 	case "bearer":
 		return ProofFormatTypeBearer, nil
+	case "basic":
+		return ProofFormatTypeBasic, nil
 	default:
 		return "", fmt.Errorf("unknown proof format %q", s)
 	}
@@ -528,6 +531,173 @@ type Auth struct {
 	Fetcher *AuthFetcher
 }
 
+// ValueScraper returns the scraper used to extract the value of an AuthProof in
+// authentication requests. If the Auth is static, an empty Scraper will be
+// returned.
+func (a Auth) ValueScraper() Scraper {
+	if a.Type == AuthTypeHTTPBasic || a.Type == AuthTypeNone {
+		return Scraper{}
+	}
+
+	if a.Fetcher == nil {
+		return Scraper{}
+	}
+
+	valVarName := a.Fetcher.Value.VarName
+	if valVarName == "" {
+		return Scraper{}
+	}
+
+	// find the scraper for the value var
+	for _, scraper := range a.Fetcher.Caps {
+		if scraper.Name == valVarName {
+			return scraper
+		}
+	}
+
+	panic("scraper for value var %q not found; should never happen")
+}
+
+// ExpirationScraper returns the scraper used to extract the expiration of an
+// AuthProof in authentication requests. If the Auth is static or does not have
+// an expiration scraper, an empty Scraper will be returned.
+func (a Auth) ExpirationScraper() Scraper {
+	if a.Type == AuthTypeHTTPBasic || a.Type == AuthTypeNone {
+		return Scraper{}
+	}
+
+	if a.Fetcher == nil {
+		return Scraper{}
+	}
+
+	expVarName := a.Fetcher.Expires.VarName
+	if expVarName == "" {
+		return Scraper{}
+	}
+
+	// find the scraper for the expiration var
+	for _, scraper := range a.Fetcher.Caps {
+		if scraper.Name == expVarName {
+			return scraper
+		}
+	}
+
+	panic("scraper for expiration var %q not found; should never happen")
+}
+
+// Destination returns the destination for AuthProofs in authenticated requests.
+// For static auths, one will be created and returned; otherwise, the
+// destination from the Auth's Fetcher will be returned. If no Fetcher is set,
+// an empty ProofDestination will be returned.
+func (a Auth) Destination() ProofDestination {
+	if a.Type == AuthTypeHTTPBasic {
+		return ProofDestination{
+			Location: ProofLocationHeader,
+			Key:      "Authorization",
+			Format:   ProofFormatTypeBasic,
+		}
+	}
+
+	if a.Fetcher == nil {
+		return ProofDestination{}
+	}
+
+	return a.Fetcher.Dest
+}
+
+// CookieName is a helper function that pulls the name of the cookie out of the
+// Fetcher if it is a session Auth. If it is not a session Auth, it will return
+// an empty string.
+func (a Auth) CookieName() string {
+	if a.Type != AuthTypeSession {
+		return ""
+	}
+
+	if a.Fetcher == nil {
+		return ""
+	}
+
+	// get var name of cookie cap
+	cookieVarName := a.Fetcher.Value.VarName
+	if cookieVarName == "" {
+		panic("cookie var name not set; should never happen")
+	}
+
+	// find the scraper for the cookie var
+	for _, scraper := range a.Fetcher.Caps {
+		if scraper.Name == cookieVarName {
+			return scraper.CookieName
+		}
+	}
+
+	panic("scraper for cookie var %q not found; should never happen")
+}
+
+func (a Auth) IsDetectingExpiration() bool {
+	switch a.Type {
+	case AuthTypeNone:
+		return false
+	case AuthTypeHTTPBasic:
+		return false
+	case AuthTypeSession:
+		if a.Fetcher == nil {
+			return false
+		}
+
+		// get var name of cookie cap
+		cookieVarName := a.Fetcher.Value.VarName
+		if cookieVarName == "" {
+			panic("cookie var name not set; should never happen")
+		}
+
+		// find the scraper for the cookie var
+		for _, scraper := range a.Fetcher.Caps {
+			if scraper.Name == cookieVarName {
+				return scraper.CookieExpiration
+			}
+		}
+
+		panic("scraper for cookie var %q not found; should never happen")
+	case AuthTypeJWT:
+		return true
+	case AuthTypeToken:
+		return a.Fetcher.Expires.VarName != ""
+	}
+
+	panic(fmt.Sprintf("unknown auth type %q", a.Type))
+}
+
+func (a Auth) RetrievalSequence() RequestSequence {
+	if a.Fetcher == nil {
+		return RequestSequence{}
+	}
+	return a.Fetcher.Seq
+}
+
+// Sendable returns whether the Auth is able to be used to retrieve an auth
+// proof. This will be true if the Auth is all necessary config based on its
+// type has been set.
+func (a Auth) Sendable() bool {
+	switch a.Type {
+	case AuthTypeNone:
+		return false
+	case AuthTypeHTTPBasic:
+		// always sendable, unless Proof is nil
+		return a.Proof != nil
+	case AuthTypeSession:
+		// needs to have cookie name and request sequence set
+		return a.RetrievalSequence().Name != "" && a.CookieName() == ""
+	case AuthTypeJWT:
+		// needs to have request sequence set and scraper set
+		return a.RetrievalSequence().Name != "" && a.ValueScraper().IsUsable()
+	case AuthTypeToken:
+		// needs to have request sequence, scraper, and dest set
+		return a.RetrievalSequence().Name != "" && a.ValueScraper().IsUsable() && a.Destination().Key != ""
+	}
+
+	return false
+}
+
 // IsSuccessfulAuthUse returns whether the given response from an authenticated
 // request is considered successful. This is generally always the case unless the
 // returned status is 401 Unauthorized.
@@ -686,6 +856,9 @@ func NewJWTFetcher(seq RequestSequence, scraper Scraper) (*AuthFetcher, error) {
 		return &AuthFetcher{}, errors.New("flow/template name must be set")
 	}
 
+	// override whatever caller had set
+	scraper.Name = "token"
+
 	// TODO: validate flow, template actually exist in caller.
 
 	return &AuthFetcher{
@@ -723,12 +896,13 @@ func NewTokenFetcher(seq RequestSequence, tokenScraper Scraper, dest ProofDestin
 		return &AuthFetcher{}, errors.New("flow/template name must be set")
 	}
 
-	if tokenScraper.Name == "" {
-		return &AuthFetcher{}, errors.New("token scraper name cannot be empty")
-	}
-
-	if expiresScraper != nil && expiresScraper.Name == "" {
-		return &AuthFetcher{}, errors.New("expires scraper name cannot be empty")
+	// override whatever caller had set
+	tokenScraper.Name = "token"
+	if expiresScraper != nil {
+		// copy expires scraper to avoid modifying caller's
+		scr := *expiresScraper
+		expiresScraper = &scr
+		expiresScraper.Name = "expires"
 	}
 
 	// TODO: validate flow, template actually exist in caller.
@@ -745,15 +919,18 @@ func NewTokenFetcher(seq RequestSequence, tokenScraper Scraper, dest ProofDestin
 		Dest: dest,
 	}
 
-	if expiresScraper != nil {
+	if expiresScraper != nil || expiresTimeLayout != "" {
 		da.Expires = ScrapeTimeExtractor{
-			VarName: expiresScraper.Name,
 			Transform: TimeTransformer{
 				FuncName: TransformerFuncParsedTime,
 				Params:   map[string]any{"layout": expiresTimeLayout},
 			},
 		}
-		da.Caps = append(da.Caps, *expiresScraper)
+
+		if expiresScraper != nil {
+			da.Expires.VarName = expiresScraper.Name
+			da.Caps = append(da.Caps, *expiresScraper)
+		}
 	}
 
 	return da, nil

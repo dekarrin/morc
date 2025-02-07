@@ -44,6 +44,8 @@ var authsCmd = &cobra.Command{
 		io.Quiet = flags.BQuiet
 
 		switch args.action {
+		case authsActionList:
+			return invokeAuthsList(io, args.projFile)
 		default:
 			panic(fmt.Sprintf("unhandled auths action %q", args.action))
 		}
@@ -103,6 +105,46 @@ func init() {
 	reqsCmd.MarkFlagsMutuallyExclusive("no-exp", "exp")
 
 	rootCmd.AddCommand(authsCmd)
+}
+
+func invokeAuthsList(io cmdio.IO, projFile string) error {
+	p, err := readProject(projFile, true)
+	if err != nil {
+		return err
+	}
+
+	if len(p.Auths) == 0 {
+		io.PrintLoudln("(none)")
+	} else {
+		// alphabetize the templates
+		var sortedNames []string
+		// 	for name := range p.Auths {
+		// 		sortedNames = append(sortedNames, name)
+		// 	}
+		// 	sort.Strings(sortedNames)
+
+		// 	// get the longest method name
+		// 	maxLen := 0
+		// 	for _, name := range sortedNames {
+		// 		meth := p.Templates[name].Method
+		// 		if meth == "" {
+		// 			meth = "???"
+		// 		}
+		// 		if len(meth) > maxLen {
+		// 			maxLen = len(meth)
+		// 		}
+		// 	}
+
+		// 	for _, name := range sortedNames {
+		// 		meth := p.Templates[name].Method
+		// 		if meth == "" {
+		// 			meth = "???"
+		// 		}
+		// 		io.Printf("%-*s %s\n", maxLen, meth, name)
+		// 	}
+	}
+
+	return nil
 }
 
 type authsArgs struct {

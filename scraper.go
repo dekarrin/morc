@@ -18,6 +18,7 @@ const (
 type SpecType string
 
 const (
+	SpecNone       SpecType = ""
 	SpecBodyJSON   SpecType = "body_json"
 	SpecBodyOffset SpecType = "body_offset"
 	SpecHeader     SpecType = "header"
@@ -43,6 +44,23 @@ type Scraper struct {
 	// only used when type is SpecHeader or SpecTrailer
 	Key   string
 	Index int
+}
+
+// IsUsable whether the Scraper's properties are set such that it could
+// successfully be used to scrape a response.
+func (sc Scraper) IsUsable() bool {
+	switch sc.Type {
+	case SpecBodyJSON:
+		return len(sc.Steps) > 0
+	case SpecBodyOffset:
+		return true
+	case SpecCookie:
+		return sc.CookieName != ""
+	case SpecHeader, SpecTrailer:
+		return sc.Key != ""
+	}
+
+	return false
 }
 
 func (sc Scraper) String() string {

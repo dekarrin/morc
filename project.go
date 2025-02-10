@@ -228,6 +228,17 @@ func (p Project) IsExecableFlow(name string) bool {
 		if !req.Sendable() {
 			return false
 		}
+
+		if req.Auth != "" {
+			auth, exists := p.Auths[strings.ToLower(req.Auth)]
+			if !exists {
+				return false
+			}
+
+			if !auth.Sendable() {
+				return false
+			}
+		}
 	}
 
 	return true
@@ -328,6 +339,17 @@ func (p *Project) Exec(flowName string, initialVarOverrides map[string]string, s
 		}
 		if !tmpl.Sendable() {
 			return nil, fmt.Errorf("flow %s calls incomplete request template %s in step #%d", flowName, step.Template, i-1)
+		}
+
+		if tmpl.Auth != "" {
+			auth, exists := p.Auths[strings.ToLower(tmpl.Auth)]
+			if !exists {
+				return nil, fmt.Errorf("flow %s calls request template %s with non-existent auth method %s in step #%d", flowName, step.Template, tmpl.Auth, i-1)
+			}
+
+			if !auth.Sendable() {
+				return nil, fmt.Errorf("flow %s calls request template %s with incomplete auth method %s in step #%d", flowName, step.Template, auth.Name, i-1)
+			}
 		}
 
 		templates = append(templates, tmpl)

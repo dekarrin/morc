@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -46,6 +47,8 @@ var authsCmd = &cobra.Command{
 		switch args.action {
 		case authsActionList:
 			return invokeAuthsList(io, args.projFile)
+		case authsActionShow:
+			return invokeAuthsShow(io, args.projFile, args.auth, args.unmask)
 		default:
 			panic(fmt.Sprintf("unhandled auths action %q", args.action))
 		}
@@ -53,9 +56,7 @@ var authsCmd = &cobra.Command{
 }
 
 func init() {
-
 	// TODO: make these all non-required.
-	// TODO: add concept of "useable" auth that has its properties set.
 
 	// cli invoke: morc auths -N basic-login -t basic -u username -p password
 	// cli invoke: morc auths -N auth-name -t session -r retrievial-spec -c cookie --no-exp
@@ -80,6 +81,7 @@ func init() {
 	authsCmd.PersistentFlags().StringVarP(&flags.Format, "format", "", "", "Set the format of the token proof in the authenticated to `FORMAT`. If not set, the token's exact value is used. If set to `bearer`, it's value will be preceded by the word 'Bearer'. Only valid when --type is 'token'.")
 	authsCmd.PersistentFlags().StringVarP(&flags.ExpirationScraper, "exp-scraper", "X", "", "Set the scraper to use to extract the expiration time of the token from the last response of auth proof retrieval. Only valid when --type is 'token'.")
 	authsCmd.PersistentFlags().StringVarP(&flags.ExpirationLayout, "exp-layout", "L", "RFC3339", "Set the layout of the expiration time of the token to `LAYOUT`. This can either be a custom string that is Go time layout format, or one of the following constants: 'RFC822', 'RFC822Z', 'RFC850', 'RFC1123', 'RFC1123Z', 'RFC3339', or 'RFC3339Nano'. Only valid when --type is 'token'.")
+	authsCmd.PersistentFlags().BoolVarP(&flags.BUnmask, "unmask", "", false, "Show passwords and other secrets in output. Only valid when getting properties of an auth method.")
 
 	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "clear")
 
@@ -98,6 +100,7 @@ func init() {
 	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exp-scraper")
 	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exp-layout")
 
+	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "clear", "unmask")
 	reqsCmd.MarkFlagsMutuallyExclusive("new", "get", "clear", "force")
 	reqsCmd.MarkFlagsMutuallyExclusive("no-exp", "exp-scraper")
 	reqsCmd.MarkFlagsMutuallyExclusive("no-exp", "exp-layout")
@@ -116,32 +119,163 @@ func invokeAuthsList(io cmdio.IO, projFile string) error {
 	if len(p.Auths) == 0 {
 		io.PrintLoudln("(none)")
 	} else {
-		// alphabetize the templates
+		// alphabetize the auths
 		var sortedNames []string
-		// 	for name := range p.Auths {
-		// 		sortedNames = append(sortedNames, name)
-		// 	}
-		// 	sort.Strings(sortedNames)
+		for name := range p.Auths {
+			sortedNames = append(sortedNames, name)
+		}
+		sort.Strings(sortedNames)
 
-		// 	// get the longest method name
-		// 	maxLen := 0
-		// 	for _, name := range sortedNames {
-		// 		meth := p.Templates[name].Method
-		// 		if meth == "" {
-		// 			meth = "???"
-		// 		}
-		// 		if len(meth) > maxLen {
-		// 			maxLen = len(meth)
-		// 		}
-		// 	}
+		for _, name := range sortedNames {
+			auth := p.Auths[name]
 
-		// 	for _, name := range sortedNames {
-		// 		meth := p.Templates[name].Method
-		// 		if meth == "" {
-		// 			meth = "???"
-		// 		}
-		// 		io.Printf("%-*s %s\n", maxLen, meth, name)
-		// 	}
+			notUsableBang := ""
+			if !auth.Sendable() {
+				notUsableBang = "!"
+			}
+
+			t := strings.ToUpper(string(auth.Type))
+			if t == "" {
+				t = "???"
+			}
+
+			io.Printf("%s:%s %s\n", auth.Name, notUsableBang, t)
+		}
+	}
+
+	return nil
+}
+
+func invokeAuthsShow(io cmdio.IO, projFile, authName string, unmaskSecrets bool) error {
+	// load the project file
+	p, err := readProject(projFile, true)
+	if err != nil {
+		return err
+	}
+
+	// case doesn't matter for auth template names
+	authLower := strings.ToLower(authName)
+	auth, ok := p.Auths[authLower]
+	if !ok {
+		return morc.NewReqNotFoundError(authLower)
+	}
+
+	// print out type:
+	t := strings.ToUpper(string(auth.Type))
+	if t == "" {
+		t = "(no-type)"
+	}
+
+	io.Printf("%s\n", t)
+
+	// layout is different based on the type of auth.
+	switch auth.Type {
+	case morc.AuthTypeNone:
+		io.PrintLoudf("(no other attributes)\n")
+	case morc.AuthTypeHTTPBasic:
+		// username and password
+		if auth.Proof == nil {
+			io.Printf("(no credentials set)\n")
+		} else {
+			io.Printf("Username: ")
+			user := auth.Username()
+			if user == "" && !io.Quiet {
+				user = "(empty)"
+			} else {
+				user = fmt.Sprintf("%q", user)
+			}
+			io.Printf("%s\n", user)
+
+			io.Printf("Password: ")
+			pass := auth.Password()
+			if pass == "" && !io.Quiet {
+				pass = "(empty)"
+			} else {
+				if !unmaskSecrets {
+					pass = strings.Repeat("*", len(pass))
+				}
+				pass = fmt.Sprintf("%q", pass)
+			}
+			io.Printf("%s\n", pass)
+		}
+	case morc.AuthTypeSession:
+		// retrieval
+		seq := auth.RetrievalSequence()
+		seqLine := ""
+		if seq.Name == "" && !io.Quiet {
+			seqLine = "(not set)"
+		} else if io.Quiet {
+			seqLine = seq.String()
+		} else {
+			// keep flowOrReq to same number of words for each for consistency
+			flowOrReq := "request"
+			if seq.IsFlow {
+				flowOrReq = "flow"
+			}
+			seqLine = fmt.Sprintf("%s %q\n", flowOrReq, seq.Name)
+		}
+		io.Printf("Retrieval: %s\n", seqLine)
+
+		// cookie
+		cookie := auth.CookieName()
+		if cookie == "" && !io.Quiet {
+			cookie = "(not set)"
+		}
+		io.Printf("Cookie: %s\n", cookie)
+
+		// expiration detection
+		expDetect := "disabled"
+		if auth.IsDetectingExpiration() {
+			expDetect = "enabled"
+		}
+		io.Printf("Expiration Detection: %t\n", expDetect)
+
+		// currently held-value
+		cached := ""
+		if auth.Proof != nil {
+			cached = auth.CachedValue()
+			cacheEmpty := cached == ""
+
+			if !unmaskSecrets {
+				cached = strings.Repeat("*", len(cached))
+			}
+
+			// add expiration if needed
+			exp := auth.CachedExpiration()
+			if !cacheEmpty {
+				if !exp.IsZero() {
+					if io.Quiet {
+						cached += fmt.Sprintf(" :%s", exp.Format(time.RFC3339))
+					}
+					cached += fmt.Sprintf(" :expires %s", exp.Format(time.RFC3339))
+				} else {
+					if io.Quiet {
+						cached += " :?"
+					} else {
+						cached += " :expiration unknown"
+					}
+				}
+			}
+		}
+		if cached == "" && !io.Quiet {
+			cached = "(empty)"
+		}
+		io.Printf("Cached Proof: %s\n", cached)
+	}
+
+	// finally, print out if this is useable currently.
+	if auth.Sendable() {
+		if io.Quiet {
+			io.Printf("usable\n")
+		} else {
+			io.PrintLoudf("Auth method is fully configured and useable.\n")
+		}
+	} else {
+		if io.Quiet {
+			io.Printf("not-usable\n")
+		} else {
+			io.PrintLoudf("! Auth method requires additional config before use.\n")
+		}
 	}
 
 	return nil
@@ -153,6 +287,7 @@ type authsArgs struct {
 	getItem  authKey
 	force    bool
 	auth     string
+	unmask   bool
 
 	sets authAttrValues
 }
@@ -197,6 +332,8 @@ func parseAuthsArgs(cmd *cobra.Command, posArgs []string, args *authsArgs) error
 	case authsActionShow:
 		// use arg 1 as the auth name
 		args.auth = posArgs[0]
+
+		args.unmask = flags.BUnmask
 	case authsActionClear:
 		// special case of auth name set from a CLI flag rather than pos arg.
 		args.auth = flags.Clear
@@ -213,6 +350,8 @@ func parseAuthsArgs(cmd *cobra.Command, posArgs []string, args *authsArgs) error
 		if err != nil {
 			return err
 		}
+
+		args.unmask = flags.BUnmask
 	case authsActionNew:
 		// above action parsing already checked that invalid set opts will not
 		// be present so we can just call parseAuthsSetFlags and then use
@@ -245,6 +384,7 @@ func parseAuthsActionFromFlags(cmd *cobra.Command, posArgs []string) (authsActio
 	// * --get with mod flags
 	// * --clear with mod flags
 	// * --force with --get, --clear, and --new
+	// * --unmask with --new, --delete, and --clear
 	// * --no-exp with any flag that indicates expiration detection
 
 	// make sure user isn't invalidly using -f because cobra is not enforcing this

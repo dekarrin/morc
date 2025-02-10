@@ -31,3 +31,10 @@ func NewReqExistsError(name string) error {
 	}
 	return fmt.Errorf("request named %s already exists in project", name)
 }
+
+func NewAuthNotFoundError(name string) error {
+	if name == "" {
+		name = `""`
+	}
+	return fmt.Errorf("no auth method named %s exists in project", name)
+}

@@ -551,6 +551,10 @@ type cliFlags struct {
 	// otherwise would.
 	BNoDates bool
 
+	// BUnmask is a switch flag that indicates that secrets should be
+	// shown rather than masked in show output for an auth method.
+	BUnmask bool
+
 	// BInfo is a switch flag that indicates that the requested operation is
 	// retrieval of a summary of the resource.
 	BInfo bool

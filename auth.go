@@ -33,12 +33,12 @@ type AuthProof interface {
 }
 
 type HTTPBasicCredentials struct {
-	username string
-	password string
+	Username string
+	Password string
 }
 
 func (b HTTPBasicCredentials) Apply(req *http.Request) error {
-	req.SetBasicAuth(b.username, b.password)
+	req.SetBasicAuth(b.Username, b.Password)
 	return nil
 }
 
@@ -48,8 +48,8 @@ func (b HTTPBasicCredentials) Valid() bool {
 
 func (b HTTPBasicCredentials) Export() map[string]any {
 	return map[string]any{
-		"username": b.username,
-		"password": b.password,
+		"username": b.Username,
+		"password": b.Password,
 	}
 }
 
@@ -59,8 +59,8 @@ func (b HTTPBasicCredentials) Type() AuthProofType {
 
 func NewHTTPBasicCredentials(username, password string) AuthProof {
 	return HTTPBasicCredentials{
-		username: username,
-		password: password,
+		Username: username,
+		Password: password,
 	}
 }
 
@@ -111,23 +111,23 @@ func ParseProofFormat(s string) (ProofFormat, error) {
 	}
 }
 
-type dynamicProof struct {
-	value     string
-	dest      ProofDestination
-	expiresAt time.Time
+type DynamicProof struct {
+	Value     string
+	Dest      ProofDestination
+	ExpiresAt time.Time
 }
 
-func (dp dynamicProof) Apply(req *http.Request) error {
-	value := dp.value
-	if dp.dest.Format == ProofFormatTypeBearer {
+func (dp DynamicProof) Apply(req *http.Request) error {
+	value := dp.Value
+	if dp.Dest.Format == ProofFormatTypeBearer {
 		value = "Bearer " + value
 	}
 
-	if dp.dest.Location == ProofLocationHeader {
-		req.Header.Set(dp.dest.Key, value)
-	} else if dp.dest.Location == ProofLocationCookie {
+	if dp.Dest.Location == ProofLocationHeader {
+		req.Header.Set(dp.Dest.Key, value)
+	} else if dp.Dest.Location == ProofLocationCookie {
 		req.AddCookie(&http.Cookie{
-			Name:  dp.dest.Key,
+			Name:  dp.Dest.Key,
 			Value: value,
 		})
 	} else {
@@ -137,25 +137,25 @@ func (dp dynamicProof) Apply(req *http.Request) error {
 	return nil
 }
 
-func (dp dynamicProof) Valid() bool {
-	if dp.expiresAt.IsZero() {
+func (dp DynamicProof) Valid() bool {
+	if dp.ExpiresAt.IsZero() {
 		return true
 	}
 
-	return time.Now().Before(dp.expiresAt)
+	return time.Now().Before(dp.ExpiresAt)
 }
 
-func (dp dynamicProof) Export() map[string]any {
+func (dp DynamicProof) Export() map[string]any {
 	return map[string]any{
-		"expires_at": dp.expiresAt.Format(time.RFC3339),
-		"value":      dp.value,
-		"dest":       dp.dest.Export(),
+		"expires_at": dp.ExpiresAt.Format(time.RFC3339),
+		"value":      dp.Value,
+		"dest":       dp.Dest.Export(),
 	}
 }
 
 // Type returns the type of AuthProof that this is. It is used for selecting
 // the correct constructor to recreate an AuthProof from an Exported string.
-func (dp dynamicProof) Type() AuthProofType {
+func (dp DynamicProof) Type() AuthProofType {
 	return AuthProofCustom
 }
 
@@ -198,10 +198,10 @@ func ImportDynamicProof(exported map[string]any) (AuthProof, error) {
 		}
 	}
 
-	return dynamicProof{
-		expiresAt: expiresAt,
-		value:     value,
-		dest:      dest,
+	return DynamicProof{
+		ExpiresAt: expiresAt,
+		Value:     value,
+		Dest:      dest,
 	}, nil
 }
 
@@ -227,8 +227,8 @@ func ImportHTTPBasicCreds(exported map[string]any) (AuthProof, error) {
 	}
 
 	return HTTPBasicCredentials{
-		username: username,
-		password: password,
+		Username: username,
+		Password: password,
 	}, nil
 }
 
@@ -529,6 +529,75 @@ type Auth struct {
 	Type    AuthType
 	Proof   AuthProof
 	Fetcher *AuthFetcher
+}
+
+// CachedExpiration returns the current expiration of a dynamic AuthProof. If
+// the Auth is not of a type that uses a dynamic proof, the zero time will be
+// returned. If the proof is nil, the zero time will be returned. If the proof
+// does not have an expiration specified, the zero time will be returned.
+func (a Auth) CachedExpiration() time.Time {
+	if a.Proof == nil {
+		return time.Time{}
+	}
+
+	if creds, ok := a.Proof.(DynamicProof); ok {
+		return creds.ExpiresAt
+	} else {
+		panic("auth proof is not DynamicProof; should never happen")
+	}
+}
+
+// CachedValue returns the current value of a dynamic AuthProof. If the Auth is
+// not of a type that uses a dynamic proof, an empty string will be returned. If
+// the proof is nil, an empty string will be returned.
+func (a Auth) CachedValue() string {
+	if a.Proof == nil {
+		return ""
+	}
+
+	if creds, ok := a.Proof.(DynamicProof); ok {
+		return creds.Value
+	} else {
+		panic("auth proof is not DynamicProof; should never happen")
+	}
+}
+
+// Password returns the currently-configured password for the Auth. If the Auth
+// is not of type HTTPBasic, an empty string will be returned. If the Auth is
+// HTTPBasic but the proof is nil, an empty string will be returned.
+func (a Auth) Password() string {
+	if a.Type != AuthTypeHTTPBasic {
+		return ""
+	}
+
+	if a.Proof == nil {
+		return ""
+	}
+
+	if creds, ok := a.Proof.(HTTPBasicCredentials); ok {
+		return creds.Password
+	} else {
+		panic("auth proof is not HTTPBasicCredentials; should never happen")
+	}
+}
+
+// Username returns the currently-configured username for the Auth. If the Auth
+// is not of type HTTPBasic, an empty string will be returned. If the Auth is
+// HTTPBasic but the proof is nil, an empty string will be returned.
+func (a Auth) Username() string {
+	if a.Type != AuthTypeHTTPBasic {
+		return ""
+	}
+
+	if a.Proof == nil {
+		return ""
+	}
+
+	if creds, ok := a.Proof.(HTTPBasicCredentials); ok {
+		return creds.Username
+	} else {
+		panic("auth proof is not HTTPBasicCredentials; should never happen")
+	}
 }
 
 // ValueScraper returns the scraper used to extract the value of an AuthProof in
@@ -1018,9 +1087,9 @@ func (da *AuthFetcher) ScrapeFromResult(r SendResult) (AuthProof, error) {
 		return nil, fmt.Errorf("failed to transform value %q: %w", valueEx.VarName, err)
 	}
 
-	ap := dynamicProof{
-		value: value,
-		dest:  da.Dest,
+	ap := DynamicProof{
+		Value: value,
+		Dest:  da.Dest,
 	}
 
 	// okay, do we have an expiration?
@@ -1035,7 +1104,7 @@ func (da *AuthFetcher) ScrapeFromResult(r SendResult) (AuthProof, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to transform expiration %q: %w", expiresEx.VarName, err)
 		}
-		ap.expiresAt = expTime
+		ap.ExpiresAt = expTime
 	}
 
 	return ap, nil

@@ -430,6 +430,9 @@ type cliFlags struct {
 	// URL is the URL to send the request to.
 	URL string
 
+	// Auth is the auth method to use for the request.
+	Auth string
+
 	// Type is the type of the resource.
 	Type string
 

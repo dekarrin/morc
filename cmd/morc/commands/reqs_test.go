@@ -839,6 +839,7 @@ func resetReqsFlags() {
 	flags.Headers = nil
 	flags.Method = ""
 	flags.URL = ""
+	flags.Auth = ""
 	flags.Name = ""
 	flags.BForce = false
 	flags.BQuiet = false

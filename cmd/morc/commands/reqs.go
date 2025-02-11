@@ -19,10 +19,10 @@ var reqsCmd = &cobra.Command{
 		annotationKeyHelpUsages: "" +
 			"reqs\n" +
 			"reqs --delete REQ [-f]\n" +
-			"reqs --new REQ [-d DATA | -d @FILE] [-XuH]...\n" +
+			"reqs --new REQ [-d DATA | -d @FILE] [-AXuH]...\n" +
 			"reqs REQ\n" +
 			"reqs REQ --get ATTR\n" +
-			"reqs REQ [-ndXuHrR]...",
+			"reqs REQ [-ndAXuHrR]...",
 	},
 	GroupID: "project",
 	Short:   "Show or modify request templates",
@@ -33,7 +33,8 @@ var reqsCmd = &cobra.Command{
 		"The payload in the request body is set with the -d/--data flag, either directly by providing the body as the " +
 		"argument or indirectly by loading from a filename given after a leading '@'. Headers are set with the " +
 		"-H/--header flag. Multiple headers may be specified by providing multiple -H flags. The URL of the request " +
-		"is set with the the -u/--url flag.\n\n" +
+		"is set with the the -u/--url flag. An authentication method to use prior to making the request is set with " +
+		"the -A/--auth flag.\n\n" +
 		"A particular request can be viewed by providing the name of the request, REQ, as a positional argument to " +
 		"the flows command. This will show all details of a request template. To see only a specific attribute of a " +
 		"request, provide --get along with the name of the attribute of the request to show. The attribute, ATTR, " +
@@ -43,7 +44,7 @@ var reqsCmd = &cobra.Command{
 		"Modifications to existing request templates are performed by giving REQ as a positional argument followed by " +
 		"one or more flag that sets a property of the request. For example, to change the method of a request, " +
 		"provide the -X flag followed by the new method. All flags that are supported during request creation are " +
-		"also supported when modifying a request (-X, -d, -u, -H), in addition to a few others. The name of the " +
+		"also supported when modifying a request (-X, -d, -u, -H, -A), in addition to a few others. The name of the " +
 		"request is updated with -n/--name. Since -H only *adds* new header values, --remove-header/-r can be used to " +
 		"remove an existing header from the request. If it is a multi-valued header, only the last value added is " +
 		"removed. Finally, calling --remove-body/-R will remove the body payload entirely, which may differ from " +
@@ -93,6 +94,7 @@ func init() {
 	reqsCmd.PersistentFlags().StringArrayVarP(&flags.Headers, "header", "H", []string{}, "Add a header to the request. Format is `KEY:VALUE`. Multiple headers may be set by providing multiple -H flags. If multiple headers with the same key are set, they will be set in the order they were given.")
 	reqsCmd.PersistentFlags().StringVarP(&flags.Method, "method", "X", "GET", "Set the request method to `METHOD`.")
 	reqsCmd.PersistentFlags().StringVarP(&flags.URL, "url", "u", "http://example.com", "Specify the `URL` for the request.")
+	reqsCmd.PersistentFlags().StringVarP(&flags.Auth, "auth", "A", "", "Set the auth method for the request to `AUTH`.")
 	reqsCmd.PersistentFlags().BoolVarP(&flags.BRemoveBody, "remove-body", "R", false, "Delete all existing body data from the request")
 	reqsCmd.PersistentFlags().BoolVarP(&flags.BForce, "force", "f", false, "Force deletion of the request template even if it is used in flows. Only valid with --delete/-D.")
 	reqsCmd.PersistentFlags().BoolVarP(&flags.BQuiet, "quiet", "q", false, "Suppress all unnecessary output.")
@@ -104,6 +106,7 @@ func init() {
 	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "get-header", "method")
 	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "get-header", "header")
 	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "get-header", "url")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "get-header", "auth")
 	reqsCmd.MarkFlagsMutuallyExclusive("data", "remove-body")
 	reqsCmd.MarkFlagsMutuallyExclusive("new", "get", "get-header", "force")
 
@@ -266,6 +269,19 @@ func invokeReqsEdit(io cmdio.IO, projFile, reqName string, attrs reqAttrValues) 
 		}
 	}
 
+	// auth method
+	if attrs.auth.set {
+		if req.Auth != attrs.auth.v {
+			if _, exists := p.Auths[strings.ToLower(attrs.auth.v)]; !exists {
+				return morc.NewAuthNotFoundError(attrs.auth.v)
+			}
+			req.Auth = attrs.auth.v
+			modifiedVals[reqKeyAuthMethod] = attrs.auth.v
+		} else {
+			noChangeVals[reqKeyAuthMethod] = attrs.auth.v
+		}
+	}
+
 	p.Templates[strings.ToLower(req.Name)] = req
 
 	// save the project file
@@ -294,6 +310,13 @@ func invokeReqsNew(io cmdio.IO, projFile, reqName string, attrs reqAttrValues) e
 		return morc.NewReqExistsError(reqLower)
 	}
 
+	// if we're setting an auth method, make sure it exists
+	if attrs.auth.set {
+		if _, exists := p.Auths[strings.ToLower(attrs.auth.v)]; !exists {
+			return morc.NewAuthNotFoundError(attrs.auth.v)
+		}
+	}
+
 	// create the new request template
 	req := morc.RequestTemplate{
 		Name:    reqName,
@@ -301,6 +324,7 @@ func invokeReqsNew(io cmdio.IO, projFile, reqName string, attrs reqAttrValues) e
 		URL:     attrs.url.Or("http://example.com"),
 		Headers: attrs.headers.v,
 		Body:    attrs.body.v,
+		Auth:    attrs.auth.v,
 	}
 
 	if p.Templates == nil {
@@ -544,7 +568,7 @@ func invokeReqsGet(io cmdio.IO, projFile, reqName string, item reqKey) error {
 				}
 			}
 		}
-	case reqKeyAuthFlow:
+	case reqKeyAuthMethod:
 		if req.Auth == "" {
 			io.PrintLoudf("(none)\n")
 		} else {
@@ -602,6 +626,7 @@ type reqAttrValues struct {
 	body          optional[[]byte]
 	headers       optional[http.Header]
 	removeHeaders optional[[]string]
+	auth          optional[string]
 }
 
 func parseReqsArgs(cmd *cobra.Command, posArgs []string, args *reqsArgs) error {
@@ -727,6 +752,10 @@ func parseReqsSetFlags(cmd *cobra.Command, attrs *reqAttrValues) error {
 		attrs.name = optional[string]{set: true, v: flags.Name}
 	}
 
+	if f.Changed("auth") {
+		attrs.auth = optional[string]{set: true, v: flags.Auth}
+	}
+
 	if f.Changed("method") {
 		attrs.method = optional[string]{set: true, v: strings.ToUpper(flags.Method)}
 	}
@@ -823,13 +852,13 @@ type reqKey struct {
 }
 
 var (
-	reqKeyName     reqKey = reqKey{name: "NAME"}
-	reqKeyMethod   reqKey = reqKey{name: "METHOD"}
-	reqKeyURL      reqKey = reqKey{name: "URL"}
-	reqKeyData     reqKey = reqKey{name: "DATA"}
-	reqKeyHeaders  reqKey = reqKey{name: "HEADERS"}
-	reqKeyAuthFlow reqKey = reqKey{name: "AUTH"}
-	reqKeyCaptures reqKey = reqKey{name: "CAPTURES"}
+	reqKeyName       reqKey = reqKey{name: "NAME"}
+	reqKeyMethod     reqKey = reqKey{name: "METHOD"}
+	reqKeyURL        reqKey = reqKey{name: "URL"}
+	reqKeyData       reqKey = reqKey{name: "DATA"}
+	reqKeyHeaders    reqKey = reqKey{name: "HEADERS"}
+	reqKeyAuthMethod reqKey = reqKey{name: "AUTH"}
+	reqKeyCaptures   reqKey = reqKey{name: "CAPTURES"}
 
 	// OR a specific header key denoted via leading ":".
 )
@@ -851,8 +880,8 @@ func (rk reqKey) Human() string {
 		return "request body"
 	case reqKeyHeaders.name:
 		return "request headers"
-	case reqKeyAuthFlow.name:
-		return "request auth flow"
+	case reqKeyAuthMethod.name:
+		return "request auth method"
 	case reqKeyCaptures.name:
 		return "request var captures"
 	default:
@@ -877,7 +906,7 @@ var (
 		reqKeyURL,
 		reqKeyData,
 		reqKeyHeaders,
-		reqKeyAuthFlow,
+		reqKeyAuthMethod,
 		reqKeyCaptures,
 	}
 )
@@ -902,8 +931,8 @@ func parseReqAttrKey(s string) (reqKey, error) {
 		return reqKeyData, nil
 	case reqKeyHeaders.Name():
 		return reqKeyHeaders, nil
-	case reqKeyAuthFlow.Name():
-		return reqKeyAuthFlow, nil
+	case reqKeyAuthMethod.Name():
+		return reqKeyAuthMethod, nil
 	case reqKeyCaptures.Name():
 		return reqKeyCaptures, nil
 	default:

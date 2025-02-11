@@ -603,6 +603,29 @@ func (a Auth) Password() string {
 	}
 }
 
+// SetPassword is a helper function that sets the password for an Auth. If the
+// Auth is not of type HTTPBasic, an error will be returned. If the Auth is
+// HTTPBasic but the proof is nil, an error will be returned.
+func (a *Auth) SetPassword(s string) error {
+	if a.Type != AuthTypeHTTPBasic {
+		return fmt.Errorf("cannot set password on non-HTTPBasic auth")
+	}
+
+	if a.Proof == nil {
+		a.Proof = NewHTTPBasicCredentials("", s)
+		return nil
+	}
+
+	if creds, ok := a.Proof.(HTTPBasicCredentials); ok {
+		creds.Password = s
+		a.Proof = creds
+	} else {
+		panic("auth proof is not HTTPBasicCredentials; should never happen")
+	}
+
+	return nil
+}
+
 // Username returns the currently-configured username for the Auth. If the Auth
 // is not of type HTTPBasic, an empty string will be returned. If the Auth is
 // HTTPBasic but the proof is nil, an empty string will be returned.
@@ -620,6 +643,29 @@ func (a Auth) Username() string {
 	} else {
 		panic("auth proof is not HTTPBasicCredentials; should never happen")
 	}
+}
+
+// SetUsername is a helper function that sets the username for an Auth. If the
+// Auth is not of type HTTPBasic, an error will be returned. If the Auth is
+// HTTPBasic but the proof is nil, an error will be returned.
+func (a *Auth) SetUsername(s string) error {
+	if a.Type != AuthTypeHTTPBasic {
+		return fmt.Errorf("cannot set username on non-HTTPBasic auth")
+	}
+
+	if a.Proof == nil {
+		a.Proof = NewHTTPBasicCredentials(s, "")
+		return nil
+	}
+
+	if creds, ok := a.Proof.(HTTPBasicCredentials); ok {
+		creds.Username = s
+		a.Proof = creds
+	} else {
+		panic("auth proof is not HTTPBasicCredentials; should never happen")
+	}
+
+	return nil
 }
 
 // ValueScraper returns the scraper used to extract the value of an AuthProof in
@@ -646,7 +692,38 @@ func (a Auth) ValueScraper() Scraper {
 		}
 	}
 
-	panic("scraper for value var %q not found; should never happen")
+	panic(fmt.Sprintf("scraper for value var %q not found; should never happen", valVarName))
+}
+
+func (a *Auth) SetValueScraper(scraper Scraper) error {
+	if a.Type == AuthTypeNone {
+		return fmt.Errorf("cannot set value scraper on auth with no type set")
+	}
+	if a.Type == AuthTypeHTTPBasic {
+		return fmt.Errorf("cannot set value scraper on HTTP Basic auth")
+	}
+
+	if a.Fetcher == nil {
+		a.Fetcher = newEmptyFetcher(a.Type)
+	}
+
+	valVarName := a.Fetcher.Value.VarName
+	if valVarName == "" {
+		panic("value var name not set; should never happen")
+	}
+
+	// find the scraper for the value var and exclude it in a copied list
+	newCaps := make([]Scraper, 0, len(a.Fetcher.Caps))
+	for _, scraper := range a.Fetcher.Caps {
+		if scraper.Name != valVarName {
+			newCaps = append(newCaps, scraper)
+		}
+	}
+	scraper.Name = valVarName
+	newCaps = append(newCaps, scraper)
+	a.Fetcher.Caps = newCaps
+
+	return nil
 }
 
 // ExpirationScraper returns the scraper used to extract the expiration of an
@@ -673,7 +750,7 @@ func (a Auth) ExpirationScraper() Scraper {
 		}
 	}
 
-	panic("scraper for expiration var %q not found; should never happen")
+	panic(fmt.Sprintf("scraper for expiration var %q not found; should never happen", expVarName))
 }
 
 // ExpirationLayout returns the layout used for the expiration scraper in
@@ -719,6 +796,23 @@ func (a Auth) Destination() ProofDestination {
 	return a.Fetcher.Dest
 }
 
+// SetDestination is a helper function that sets the destination for AuthProofs.
+// It is an error to alter the destination for HTTP Basic type auths.
+func (a *Auth) SetDestination(pd ProofDestination) error {
+	if a.Type == AuthTypeHTTPBasic {
+		return fmt.Errorf("cannot set destination on HTTP Basic auth")
+	} else if a.Type == AuthTypeNone {
+		return fmt.Errorf("cannot set destination on auth with no type set")
+	}
+
+	if a.Fetcher == nil {
+		a.Fetcher = newEmptyFetcher(a.Type)
+	}
+
+	a.Fetcher.Dest = pd
+	return nil
+}
+
 // CookieName is a helper function that pulls the name of the cookie out of the
 // Fetcher if it is a session Auth. If it is not a session Auth, it will return
 // an empty string.
@@ -744,7 +838,44 @@ func (a Auth) CookieName() string {
 		}
 	}
 
-	panic("scraper for cookie var %q not found; should never happen")
+	panic(fmt.Sprintf("scraper for cookie var %q not found; should never happen", cookieVarName))
+}
+
+// SetCookieName is a helper function that sets the name of the cookie in the
+// Fetcher if it is a session Auth.
+func (a *Auth) SetCookieName(name string) error {
+	if a.Type != AuthTypeSession {
+		return fmt.Errorf("cannot set cookie name on non-session auth")
+	}
+
+	if a.Fetcher == nil {
+		a.Fetcher = NewSessionCookieFetcher(RequestSequence{}, name, false)
+		return nil
+	}
+
+	// get var name of cookie cap
+	cookieVarName := a.Fetcher.Value.VarName
+	if cookieVarName == "" {
+		panic("cookie var name not set; should never happen")
+	}
+
+	// find the scraper for the cookie var
+	var matchedIdx int = -1
+	for idx, scraper := range a.Fetcher.Caps {
+		if scraper.Name == cookieVarName {
+			matchedIdx = idx
+			break
+		}
+	}
+	if matchedIdx < 0 {
+		panic(fmt.Sprintf("scraper for cookie var %q not found; should never happen", cookieVarName))
+	}
+
+	s := a.Fetcher.Caps[matchedIdx]
+	s.CookieName = name
+	a.Fetcher.Caps[matchedIdx] = s
+
+	return nil
 }
 
 func (a Auth) IsDetectingExpiration() bool {
@@ -771,7 +902,7 @@ func (a Auth) IsDetectingExpiration() bool {
 			}
 		}
 
-		panic("scraper for cookie var %q not found; should never happen")
+		panic(fmt.Sprintf("scraper for cookie var %q not found; should never happen", cookieVarName))
 	case AuthTypeJWT:
 		return true
 	case AuthTypeToken:
@@ -786,6 +917,21 @@ func (a Auth) RetrievalSequence() RequestSequence {
 		return RequestSequence{}
 	}
 	return a.Fetcher.Seq
+}
+
+func (a *Auth) SetRetrievalSequence(seq RequestSequence) error {
+	if a.Type == AuthTypeNone {
+		return fmt.Errorf("cannot set retrieval sequence on auth with no type set")
+	}
+	if a.Type == AuthTypeHTTPBasic {
+		return fmt.Errorf("cannot set retrieval sequence on HTTP Basic auth")
+	}
+
+	if a.Fetcher == nil {
+		a.Fetcher = newEmptyFetcher(a.Type)
+	}
+	a.Fetcher.Seq = seq
+	return nil
 }
 
 // Sendable returns whether the Auth is able to be used to retrieve an auth
@@ -892,6 +1038,23 @@ type AuthFetcher struct {
 	Expires ScrapeTimeExtractor
 
 	Dest ProofDestination
+}
+
+func newEmptyFetcher(t AuthType) *AuthFetcher {
+	switch t {
+	case AuthTypeNone:
+		return nil
+	case AuthTypeHTTPBasic:
+		return nil
+	case AuthTypeSession:
+		return NewSessionCookieFetcher(RequestSequence{}, "", false)
+	case AuthTypeToken:
+		return NewTokenFetcher(RequestSequence{}, Scraper{}, ProofDestination{}, nil, "")
+	case AuthTypeJWT:
+		return NewJWTFetcher(RequestSequence{}, Scraper{})
+	default:
+		panic(fmt.Sprintf("unknown auth type %q", t))
+	}
 }
 
 // NewJWTFetcher returns an AuthFetcher that is configured to pull a JWT token from

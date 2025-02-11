@@ -54,6 +54,8 @@ var authsCmd = &cobra.Command{
 			return invokeAuthsDelete(io, args.projFile, args.auth, args.force)
 		case authsActionNew:
 			return invokeAuthsNew(io, args.projFile, args.auth, args.sets)
+		case authsActionEdit:
+			return invokeAuthsEdit(io, args.projFile, args.auth, args.sets, args.unmask)
 		default:
 			panic(fmt.Sprintf("unhandled auths action %q", args.action))
 		}
@@ -87,7 +89,7 @@ func init() {
 	authsCmd.PersistentFlags().StringVarP(&flags.Format, "format", "", "", "Set the format of the token proof in the authenticated to `FORMAT`. If not set, the token's exact value is used. If set to `bearer`, it's value will be preceded by the word 'Bearer'. Only valid when --type is 'token'.")
 	authsCmd.PersistentFlags().StringVarP(&flags.ExpirationScraper, "exp-scraper", "x", "", "Set the scraper to use to extract the expiration time of the token from the last response of auth proof retrieval. Only valid when --type is 'token'.")
 	authsCmd.PersistentFlags().StringVarP(&flags.ExpirationLayout, "exp-layout", "L", "RFC3339", "Set the layout of the expiration time of the token to `LAYOUT`. This can either be a custom string that is Go time layout format, or one of the following constants: 'RFC822', 'RFC822Z', 'RFC850', 'RFC1123', 'RFC1123Z', 'RFC3339', or 'RFC3339Nano'. Only valid when --type is 'token'.")
-	authsCmd.PersistentFlags().BoolVarP(&flags.BUnmask, "unmask", "", false, "Show passwords and other secrets in output. Only valid when getting properties of an auth method.")
+	authsCmd.PersistentFlags().BoolVarP(&flags.BUnmask, "unmask", "", false, "Show passwords and other secrets in output. Only valid when getting or editing properties of an auth method.")
 
 	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "clear", "exec")
 
@@ -332,6 +334,178 @@ func invokeAuthsShow(io cmdio.IO, projFile, authName string, unmaskSecrets bool)
 	return nil
 }
 
+func invokeAuthsEdit(io cmdio.IO, projFile, authName string, attrs authAttrValues, unmaskSecrets bool) error {
+	// load the project file
+	p, err := readProject(projFile, false)
+	if err != nil {
+		return err
+	}
+
+	// case doesn't matter for auth names
+	authLower := strings.ToLower(authName)
+	auth, ok := p.Auths[authLower]
+	if !ok {
+		return morc.NewAuthNotFoundError(authName)
+	}
+
+	// check attrs for validity
+	err = validateAttrCombos(attrs, &auth)
+	if err != nil {
+		return err
+	}
+
+	modifiedVals := map[authKey]interface{}{}
+	noChangeVals := map[authKey]interface{}{}
+
+	// if changing names, do that first
+	if attrs.name.set {
+		newNameLower := strings.ToLower(attrs.name.v)
+		if newNameLower != authLower {
+			if newNameLower == "" {
+				return fmt.Errorf("new name cannot be empty")
+			}
+			if _, exists := p.Auths[newNameLower]; exists {
+				return fmt.Errorf("auth method named %s already exists", newNameLower)
+			}
+
+			auth.Name = newNameLower
+			delete(p.Auths, authLower)
+			modifiedVals[authKeyName] = newNameLower
+		} else {
+			noChangeVals[authKeyName] = authLower
+		}
+	}
+
+	// any name changes will have gone to auth.Name at this point; be shore to
+	// use that for any name displaying from this point forward
+
+	// need to do type immediately after name as we invoke SetX methods that
+	// depend on the correct type being set.
+	if attrs.authType.set {
+		if attrs.authType.v != auth.Type {
+			auth.Type = attrs.authType.v
+
+			// this invalidates all fields besides the name
+			auth.Proof = nil
+			auth.Fetcher = nil // other sets will automagically refill this
+
+			modifiedVals[authKeyType] = attrs.authType.v
+		} else {
+			noChangeVals[authKeyType] = auth.Type
+		}
+	}
+
+	if attrs.username.set {
+		if attrs.username.v != auth.Username() {
+			if err := auth.SetUsername(attrs.username.v); err != nil {
+				return fmt.Errorf("set username: %w", err)
+			}
+
+			modifiedVals[authKeyUsername] = attrs.username.v
+		} else {
+			noChangeVals[authKeyUsername] = auth.Username()
+		}
+	}
+
+	if attrs.password.set {
+		if attrs.password.v != auth.Password() {
+			if err := auth.SetPassword(attrs.password.v); err != nil {
+				return fmt.Errorf("set password: %w", err)
+			}
+
+			dispVal := attrs.password.v
+			if !unmaskSecrets {
+				dispVal = strings.Repeat("*", len(dispVal))
+			}
+			modifiedVals[authKeyPassword] = dispVal
+		} else {
+			dispVal := auth.Password()
+			if !unmaskSecrets {
+				dispVal = strings.Repeat("*", len(dispVal))
+			}
+			noChangeVals[authKeyPassword] = dispVal
+		}
+	}
+
+	if attrs.cookie.set {
+		if attrs.cookie.v != auth.CookieName() {
+			if err := auth.SetCookieName(attrs.cookie.v); err != nil {
+				return fmt.Errorf("set cookie name: %w", err)
+			}
+
+			modifiedVals[authKeyCookie] = attrs.cookie.v
+		} else {
+			noChangeVals[authKeyCookie] = auth.CookieName()
+		}
+	}
+
+	if attrs.dest.set {
+		// need to exclusively check the non-format part to detect for change
+		compDest := attrs.dest.v
+		compDest.Format = auth.Destination().Format
+
+		if compDest != auth.Destination() {
+			if err := auth.SetDestination(compDest); err != nil {
+				return fmt.Errorf("set destination: %w", err)
+			}
+
+			modifiedVals[authKeyDest] = attrs.dest.v.Location.String() + ":" + attrs.dest.v.Key
+		} else {
+			noChangeVals[authKeyDest] = auth.Destination().Location.String() + ":" + auth.Destination().Key
+		}
+	}
+
+	if attrs.format.set {
+		// need to exclusively check only the format part to detect for change
+		if attrs.format.v != auth.Destination().Format {
+			// create the entire destination object to set it
+			dest := auth.Destination()
+			dest.Format = attrs.format.v
+
+			if err := auth.SetDestination(dest); err != nil {
+				return fmt.Errorf("set format: %w", err)
+			}
+
+			modifiedVals[authKeyFormat] = attrs.format.v
+		} else {
+			noChangeVals[authKeyFormat] = auth.Destination().Format
+		}
+	}
+
+	if attrs.retrieval.set {
+		if attrs.retrieval.v != auth.RetrievalSequence() {
+			if err := auth.SetRetrievalSequence(attrs.retrieval.v); err != nil {
+				return fmt.Errorf("set retrieval sequence: %w", err)
+			}
+
+			modifiedVals[authKeyRetrieval] = attrs.retrieval.v.String()
+		} else {
+			noChangeVals[authKeyRetrieval] = auth.RetrievalSequence().String()
+		}
+	}
+
+	if attrs.tokenSpec.set {
+		if attrs.tokenSpec.v.Spec() != auth.ValueScraper().Spec() {
+			if err := auth.SetValueScraper(attrs.tokenSpec.v); err != nil {
+				return fmt.Errorf("set token scraper: %w", err)
+			}
+
+			modifiedVals[authKeyTokenScraper] = attrs.tokenSpec.v.Spec()
+		} else {
+			noChangeVals[authKeyTokenScraper] = auth.ValueScraper().Spec()
+		}
+	}
+
+	err = writeProject(p, false)
+	if err != nil {
+		return err
+	}
+
+	cmdio.OutputLoudEditAttrsResult(io, modifiedVals, noChangeVals, authAttrKeys)
+
+	return nil
+}
+
 func invokeAuthsNew(io cmdio.IO, projFile, authName string, attrs authAttrValues) error {
 	// load the project file
 	p, err := readProject(projFile, true)
@@ -377,10 +551,13 @@ func invokeAuthsNew(io cmdio.IO, projFile, authName string, attrs authAttrValues
 			attrs.tokenSpec.v,
 		)
 	} else if auth.Type == morc.AuthTypeToken {
+		dest := attrs.dest.v
+		dest.Format = attrs.format.v
+
 		auth.Fetcher = morc.NewTokenFetcher(
 			attrs.retrieval.v,
 			attrs.tokenSpec.v,
-			attrs.dest.v,
+			dest,
 			attrs.expirationSpec.Ptr(),
 			attrs.expirationLayout.v,
 		)

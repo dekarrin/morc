@@ -157,7 +157,7 @@ func OutputLoudEditAttrsResult[K CAttrKey](io IO, modifiedVals map[K]interface{}
 			setMessages = append(setMessages, fmt.Sprintf("%s to %s", k.Human(), v))
 		}
 
-		io.PrintLoudf("%s\n", io.OxfordCommaJoin(setMessages))
+		io.PrintLoudf("%s\n", io.OxfordCommaJoin(setMessages, "and"))
 	}
 
 	if len(noChangeVals) > 0 {
@@ -178,15 +178,19 @@ func OutputLoudEditAttrsResult[K CAttrKey](io IO, modifiedVals map[K]interface{}
 	}
 }
 
-func (io IO) OxfordCommaJoin(items []string) string {
+func (io IO) OxfordCommaJoin(items []string, conjunction string) string {
+	return OxfordCommaJoin(items, conjunction)
+}
+
+func OxfordCommaJoin[K any](items []K, conjunction string) string {
 	if len(items) == 0 {
 		return ""
 	}
 	if len(items) == 1 {
-		return items[0]
+		return fmt.Sprintf("%v", items[0])
 	}
 	if len(items) == 2 {
-		return items[0] + " and " + items[1]
+		return fmt.Sprintf("%v %s %v", items[0], conjunction, items[1])
 	}
 
 	// more than 2 items means commas
@@ -196,16 +200,21 @@ func (io IO) OxfordCommaJoin(items []string) string {
 			sb.WriteString(", ")
 		}
 		if i+1 == len(items) {
-			sb.WriteString("and ")
+			sb.WriteString(conjunction)
+			sb.WriteString(" ")
 		}
 
-		sb.WriteString(item)
+		sb.WriteString(fmt.Sprintf("%v", item))
 	}
 
 	return sb.String()
 }
 
 func (io IO) OnOrOff(on bool) string {
+	return OnOrOff(on)
+}
+
+func OnOrOff(on bool) string {
 	if on {
 		return "ON"
 	}
@@ -219,6 +228,10 @@ func (io IO) OnOrOff(on bool) string {
 // word and adding "s". If suffixes is set, the first element is used for the
 // plural form and the second is used for the singular form.
 func (io IO) CountOf(count int, word string, suffixes ...string) string {
+	return CountOf(count, word, suffixes...)
+}
+
+func CountOf(count int, word string, suffixes ...string) string {
 	pluralSuf := "s"
 	singularSuf := ""
 

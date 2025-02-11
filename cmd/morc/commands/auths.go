@@ -49,6 +49,10 @@ var authsCmd = &cobra.Command{
 			return invokeAuthsList(io, args.projFile)
 		case authsActionShow:
 			return invokeAuthsShow(io, args.projFile, args.auth, args.unmask)
+		case authsActionDelete:
+			return invokeAuthsDelete(io, args.projFile, args.auth, args.force)
+		case authsActionNew:
+			return invokeAuthsNew(io, args.projFile, args.auth, args.sets)
 		default:
 			panic(fmt.Sprintf("unhandled auths action %q", args.action))
 		}
@@ -168,7 +172,62 @@ func invokeAuthsShow(io cmdio.IO, projFile, authName string, unmaskSecrets bool)
 
 	io.Printf("%s\n", t)
 
-	// layout is different based on the type of auth.
+	// layout is different based on the type of auth;
+	// get values used by multiple types, then only print if relevant.
+
+	// retrieval
+	seq := auth.RetrievalSequence()
+	seqLine := ""
+	if seq.Name == "" && !io.Quiet {
+		seqLine = "(not set)"
+	} else if io.Quiet {
+		seqLine = seq.String()
+	} else {
+		// keep flowOrReq to same number of words for each for consistency
+		flowOrReq := "request"
+		if seq.IsFlow {
+			flowOrReq = "flow"
+		}
+		seqLine = fmt.Sprintf("%s %q\n", flowOrReq, seq.Name)
+	}
+
+	// currently held-value
+	cached := ""
+	if auth.Proof != nil {
+		cached = auth.CachedValue()
+		cacheEmpty := cached == ""
+
+		if !unmaskSecrets {
+			cached = strings.Repeat("*", len(cached))
+		}
+
+		// add expiration if needed
+		exp := auth.CachedExpiration()
+		if !cacheEmpty {
+			if !exp.IsZero() {
+				if io.Quiet {
+					cached += fmt.Sprintf(" :%s", exp.Format(time.RFC3339))
+				}
+				cached += fmt.Sprintf(" :expires %s", exp.Format(time.RFC3339))
+			} else {
+				if io.Quiet {
+					cached += " :?"
+				} else {
+					cached += " :expiration unknown"
+				}
+			}
+		}
+	}
+	if cached == "" && !io.Quiet {
+		cached = "(empty)"
+	}
+
+	// expiration detection
+	expDetect := "disabled"
+	if auth.IsDetectingExpiration() {
+		expDetect = "enabled"
+	}
+
 	switch auth.Type {
 	case morc.AuthTypeNone:
 		io.PrintLoudf("(no other attributes)\n")
@@ -199,21 +258,6 @@ func invokeAuthsShow(io cmdio.IO, projFile, authName string, unmaskSecrets bool)
 			io.Printf("%s\n", pass)
 		}
 	case morc.AuthTypeSession:
-		// retrieval
-		seq := auth.RetrievalSequence()
-		seqLine := ""
-		if seq.Name == "" && !io.Quiet {
-			seqLine = "(not set)"
-		} else if io.Quiet {
-			seqLine = seq.String()
-		} else {
-			// keep flowOrReq to same number of words for each for consistency
-			flowOrReq := "request"
-			if seq.IsFlow {
-				flowOrReq = "flow"
-			}
-			seqLine = fmt.Sprintf("%s %q\n", flowOrReq, seq.Name)
-		}
 		io.Printf("Retrieval: %s\n", seqLine)
 
 		// cookie
@@ -223,43 +267,25 @@ func invokeAuthsShow(io cmdio.IO, projFile, authName string, unmaskSecrets bool)
 		}
 		io.Printf("Cookie: %s\n", cookie)
 
-		// expiration detection
-		expDetect := "disabled"
-		if auth.IsDetectingExpiration() {
-			expDetect = "enabled"
-		}
 		io.Printf("Expiration Detection: %t\n", expDetect)
+		io.Printf("Cached Proof: %s\n", cached)
+	case morc.AuthTypeJWT:
+		io.Printf("Retrieval: %s\n", seqLine)
 
-		// currently held-value
-		cached := ""
-		if auth.Proof != nil {
-			cached = auth.CachedValue()
-			cacheEmpty := cached == ""
-
-			if !unmaskSecrets {
-				cached = strings.Repeat("*", len(cached))
-			}
-
-			// add expiration if needed
-			exp := auth.CachedExpiration()
-			if !cacheEmpty {
-				if !exp.IsZero() {
-					if io.Quiet {
-						cached += fmt.Sprintf(" :%s", exp.Format(time.RFC3339))
-					}
-					cached += fmt.Sprintf(" :expires %s", exp.Format(time.RFC3339))
-				} else {
-					if io.Quiet {
-						cached += " :?"
-					} else {
-						cached += " :expiration unknown"
-					}
-				}
-			}
+		// scraper
+		scraper := auth.ValueScraper()
+		if scraper.Name != "" {
+			io.Printf("Token Scraper: %s\n", scraper.String())
+		} else {
+			io.Printf("Token Scraper: (not set)\n")
 		}
-		if cached == "" && !io.Quiet {
-			cached = "(empty)"
-		}
+
+		io.Printf("Expiration Detection: %t\n", expDetect)
+		io.Printf("Cached Proof: %s\n", cached)
+	case morc.AuthTypeToken:
+		io.Printf("Retrieval: %s\n", seqLine)
+
+		// TODO: fill rest in during testing when we can verify
 		io.Printf("Cached Proof: %s\n", cached)
 	}
 
@@ -281,6 +307,204 @@ func invokeAuthsShow(io cmdio.IO, projFile, authName string, unmaskSecrets bool)
 	return nil
 }
 
+func invokeAuthsNew(io cmdio.IO, projFile, authName string, attrs authAttrValues) error {
+	// load the project file
+	p, err := readProject(projFile, true)
+	if err != nil {
+		return err
+	}
+
+	// check all attrs for validity
+	err = validateAttrCombos(attrs, nil)
+	if err != nil {
+		return err
+	}
+
+	// case doesn't matter for auth method names
+	authLower := strings.ToLower(authName)
+	// check if the project already has an auth method with the same name
+	if _, exists := p.Auths[authLower]; exists {
+		return morc.NewAuthExistsError(authLower)
+	}
+
+	if authLower == "" {
+		return fmt.Errorf("name cannot be empty")
+	}
+
+	// create the new auth method. we have helper methods for each type, which
+	// we will invoke now.
+	auth := morc.Auth{
+		Name: authName,
+		Type: morc.AuthType(attrs.authType.Or(morc.AuthTypeNone)),
+	}
+
+	if auth.Type == morc.AuthTypeHTTPBasic {
+		auth.Proof = morc.NewHTTPBasicCredentials(attrs.username.Or(""), attrs.password.Or(""))
+	} else if auth.Type == morc.AuthTypeSession {
+		auth.Fetcher = morc.NewSessionCookieFetcher(
+			attrs.retrieval.Or(morc.RequestSequence{}),
+			attrs.cookie.Or(""),
+			attrs.expirationDetection.Or(false),
+		)
+	} else if auth.Type == morc.AuthTypeJWT {
+		auth.Fetcher = morc.NewJWTFetcher(
+			attrs.retrieval.Or(morc.RequestSequence{}),
+			attrs.tokenSpec.Or(morc.Scraper{}),
+		)
+	} else if auth.Type == morc.AuthTypeToken {
+		auth.Fetcher = morc.NewTokenFetcher(
+			attrs.retrieval.v,
+			attrs.tokenSpec.v,
+			attrs.dest.v,
+			attrs.expirationSpec.Ptr(),
+			attrs.expirationLayout.v,
+		)
+	}
+
+	if p.Auths == nil {
+		p.Auths = make(map[string]morc.Auth)
+	}
+	p.Auths[authLower] = auth
+
+	// save the project file
+	err = writeProject(p, false)
+	if err != nil {
+		return err
+	}
+
+	io.PrintLoudf("Created new auth method %s\n", authLower)
+
+	return nil
+}
+
+func invokeAuthsDelete(io cmdio.IO, projFile, authName string, force bool) error {
+	// load the project file
+	p, err := readProject(projFile, true)
+	if err != nil {
+		return err
+	}
+
+	// case doesn't matter for auth template names
+	authLower := strings.ToLower(authName)
+	if _, ok := p.Auths[authLower]; !ok {
+		return morc.NewAuthNotFoundError(authLower)
+	}
+
+	if !force {
+		// check if this method is used in any requests; cannot delete it if so
+		inReqs := p.TemplatesWithAuth(authLower)
+
+		if len(inReqs) > 0 {
+			reqS := "s"
+			if len(inReqs) == 1 {
+				reqS = ""
+			}
+			return fmt.Errorf("%s is used in request template%s %s\nUse -f to force-delete", authLower, reqS, strings.Join(inReqs, ", "))
+		}
+	}
+
+	// if we are forcing, there's no checks to make.
+
+	delete(p.Auths, authLower)
+
+	// save the project file
+	err = writeProject(p, false)
+	if err != nil {
+		return err
+	}
+
+	io.PrintLoudf("Deleted auth method %s\n", authLower)
+
+	return nil
+}
+
+// validateAttrs returns an error if the combination of attrs is not valid for
+// either a brand new auth method or for an existing one. If existing is nil,
+// the attrs will be validated as though they are creating a brand new one.
+func validateAttrCombos(attrs authAttrValues, existing *morc.Auth) error {
+
+	setType := attrs.authType.v
+	if existing != nil && !attrs.authType.set {
+		setType = existing.Type
+	}
+
+	var errs []error
+
+	if attrs.username.set && setType != morc.AuthTypeHTTPBasic {
+		errs = append(errs, fmt.Errorf("--username/-u is not a valid option for auth type %q", setType))
+	}
+	if attrs.password.set && setType != morc.AuthTypeHTTPBasic {
+		errs = append(errs, fmt.Errorf("--password/-p is not a valid option for auth type %q", setType))
+	}
+	if attrs.cookie.set && setType != morc.AuthTypeSession {
+		errs = append(errs, fmt.Errorf("--cookie/-c is not a valid option for auth type %q", setType))
+	}
+	if attrs.retrieval.set && setType != morc.AuthTypeSession && setType != morc.AuthTypeJWT && setType != morc.AuthTypeToken {
+		errs = append(errs, fmt.Errorf("--retrieval/-r is not a valid option for auth type %q", setType))
+	}
+	if attrs.expirationDetection.set {
+		// disabling expiration detection is valid for both session and token
+		// types, but enabling is stating to use auto-detection which cannot be
+		// done with token, so enabling is only valid for session.
+		if attrs.expirationDetection.v && setType != morc.AuthTypeSession {
+			extraTip := ""
+			if setType == morc.AuthTypeToken {
+				extraTip = "; use --exp-scraper to enable expiration detection"
+			} else if setType == morc.AuthTypeJWT {
+				extraTip = "; expiration is automatically extracted from JWT if present"
+			}
+			errs = append(errs, fmt.Errorf("--exp is not a valid option for auth type %q%s", setType, extraTip))
+		} else if !attrs.expirationDetection.v && setType != morc.AuthTypeSession && setType != morc.AuthTypeToken {
+			var extraTip string
+			if setType == morc.AuthTypeJWT {
+				extraTip = "; expiration is automatically extracted from JWT if present"
+			}
+			errs = append(errs, fmt.Errorf("--no-exp is not a valid option for auth type %q%s", setType, extraTip))
+		}
+	}
+	if attrs.tokenSpec.set && setType != morc.AuthTypeJWT && setType != morc.AuthTypeToken {
+		errs = append(errs, fmt.Errorf("--token-scraper/-T is not a valid option for auth type%q", setType))
+	}
+	if attrs.dest.set && setType != morc.AuthTypeToken {
+		errs = append(errs, fmt.Errorf("--dest/-d is not a valid option for auth type %q", setType))
+	}
+	if attrs.format.set && setType != morc.AuthTypeToken {
+		errs = append(errs, fmt.Errorf("--format is not a valid option for auth type %q", setType))
+	}
+	if attrs.expirationSpec.set && setType != morc.AuthTypeToken {
+		extraTip := ""
+		if setType == morc.AuthTypeSession {
+			extraTip = "; use --exp to enable expiration detection"
+		} else if setType == morc.AuthTypeJWT {
+			extraTip = "; expiration is automatically extracted from JWT if present"
+		}
+		errs = append(errs, fmt.Errorf("--exp-scraper/-X is not a valid option for auth type %q%s", setType, extraTip))
+	}
+	if attrs.expirationLayout.set && setType != morc.AuthTypeToken {
+		extraTip := ""
+		if setType == morc.AuthTypeSession {
+			extraTip = "; expiration format is automatically determined from cookie when present"
+		} else if setType == morc.AuthTypeJWT {
+			extraTip = "; expiration is automatically determined from JWT when present"
+		}
+		errs = append(errs, fmt.Errorf("--exp-layout/-L is not a valid option for auth type %q%s", setType, extraTip))
+	}
+
+	// join all errors together
+	var sb strings.Builder
+	for i, err := range errs {
+		if i > 0 {
+			sb.WriteString("\n")
+		}
+		sb.WriteString(err.Error())
+	}
+
+	if sb.Len() > 0 {
+		return fmt.Errorf(sb.String())
+	}
+	return nil
+}
+
 type authsArgs struct {
 	projFile string
 	action   authsAction
@@ -294,7 +518,7 @@ type authsArgs struct {
 
 type authAttrValues struct {
 	name     optional[string]
-	authType optional[string]
+	authType optional[morc.AuthType]
 
 	username optional[string]
 	password optional[string]
@@ -387,6 +611,11 @@ func parseAuthsActionFromFlags(cmd *cobra.Command, posArgs []string) (authsActio
 	// * --unmask with --new, --delete, and --clear
 	// * --no-exp with any flag that indicates expiration detection
 
+	// * can't really check correct type'd flags here as user might alter type
+	// and it requires knowing the CURRENT type to definitively answer, so it
+	// must be checked in the individual invocation functions which will have
+	// read in any existing auth method.
+
 	// make sure user isn't invalidly using -f because cobra is not enforcing this
 	if flags.BForce && flags.Delete == "" {
 		return authsAction(0), fmt.Errorf("--force/-f can only be used with --delete/-D")
@@ -442,11 +671,11 @@ func parseAuthsSetFlags(cmd *cobra.Command, attrs *authAttrValues) error {
 	}
 
 	if f.Changed("type") {
-		tLower := strings.ToLower(flags.Type)
-		if tLower != "basic" && tLower != "session" && tLower != "jwt" && tLower != "token" {
-			return fmt.Errorf("invalid auth type %q; must be one of 'basic', 'session', 'jwt', or 'token'", flags.Type)
+		t, err := morc.ParseAuthType(flags.Type)
+		if err != nil {
+			return fmt.Errorf("--type/-t: invalid auth type %q; must be one of %s", flags.Type, cmdio.OxfordCommaJoin(morc.AuthTypes, "or"))
 		}
-		attrs.authType = optional[string]{set: true, v: flags.Type}
+		attrs.authType = optional[morc.AuthType]{set: true, v: t}
 	}
 
 	if f.Changed("username") {

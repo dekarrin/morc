@@ -295,6 +295,14 @@ type optional[E any] struct {
 	v   E
 }
 
+// Ptr returns a pointer to the value if it is set, or nil if it is not.
+func (o optional[E]) Ptr() *E {
+	if o.set {
+		return &o.v
+	}
+	return nil
+}
+
 func (o optional[E]) Or(v E) E {
 	if o.set {
 		return o.v

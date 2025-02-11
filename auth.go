@@ -253,6 +253,28 @@ const (
 	AuthTypeJWT       AuthType = "jwt"
 )
 
+var AuthTypes = []AuthType{
+	AuthTypeNone,
+	AuthTypeHTTPBasic,
+	AuthTypeSession,
+	AuthTypeToken,
+	AuthTypeJWT,
+}
+
+func ParseAuthType(s string) (AuthType, error) {
+	lower := strings.ToLower(s)
+	for _, t := range AuthTypes {
+		if strings.ToLower(string(t)) == lower {
+			return t, nil
+		}
+	}
+	return "", fmt.Errorf("unknown auth type %q", s)
+}
+
+func (at AuthType) String() string {
+	return string(at)
+}
+
 type TransformerFuncName string
 
 const (
@@ -835,72 +857,6 @@ func (a *Auth) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// NewHTTPBasicAuth is a command that needs defining.
-func NewHTTPBasicAuth(name string, creds HTTPBasicCredentials) Auth {
-	return Auth{
-		Name:  name,
-		Type:  AuthTypeHTTPBasic,
-		Proof: creds,
-	}
-}
-
-// NewSessionAuth returns an Auth that is configured to pull a cookie
-// containing the session ID from the response of the auth flow/template and use
-// it in authorized requests. The cookieName is the name of the cookie to pull.
-// Give flow or femplate, but not both. If expiration detection is set, this
-// Auth will always attempt to detect expiration info from the initial
-// set-cookie, but if it is not present, it will fallback to error response on
-// the auth'd request's response to detect expiration.
-func NewSessionAuth(name string, retrieval RequestSequence, cookieName string, detectExpiration bool) (Auth, error) {
-	fetcher, err := NewSessionCookieFetcher(retrieval, cookieName, detectExpiration)
-	if err != nil {
-		return Auth{}, err
-	}
-
-	return Auth{
-		Name:    name,
-		Type:    AuthTypeSession,
-		Fetcher: fetcher,
-	}, nil
-}
-
-// NewTokenAuth returns am Auth that is configured to pull a simple token
-// using another flow/template. Expiration is optional and is
-// extracted via the expiresScraper, if present. If not present, expiration will
-// be detected only by auth failure. Give flow or femplate, but not both. Only a
-// single token value may be extracted. If expiresTimeLayout is set, it will be
-// used for parsing expires time, and if set to an empty string, it will default
-// to RFC3339.
-func NewTokenAuth(name string, retrieval RequestSequence, tokenScraper Scraper, dest ProofDestination, expiresScraper *Scraper, expiresTimeLayout string) (Auth, error) {
-	fetcher, err := NewTokenFetcher(retrieval, tokenScraper, dest, expiresScraper, expiresTimeLayout)
-	if err != nil {
-		return Auth{}, err
-	}
-
-	return Auth{
-		Name:    name,
-		Type:    AuthTypeToken,
-		Fetcher: fetcher,
-	}, nil
-}
-
-// NewJWTAuth returns an Auth that is configured to pull a JWT token from
-// the body of the response of the auth flow/template and place it in an
-// Authorization header with the Bearer scheme. The scraper must point to a
-// valid JWT token in the response.
-func NewJWTAuth(name string, retrieval RequestSequence, scraper Scraper) (Auth, error) {
-	fetcher, err := NewJWTFetcher(retrieval, scraper)
-	if err != nil {
-		return Auth{}, err
-	}
-
-	return Auth{
-		Name:    name,
-		Type:    AuthTypeJWT,
-		Fetcher: fetcher,
-	}, nil
-}
-
 // AuthFetcher is used to get a new AuthProof in an Auth. This is used for
 // any Auth mechanism that requires a proof that may change, such as a token or
 // a session ID.
@@ -920,15 +876,9 @@ type AuthFetcher struct {
 // Authorization header with the Bearer scheme. The scraper must point to a
 // valid JWT token in the response body. Give flow or femplate, but not
 // both.
-func NewJWTFetcher(seq RequestSequence, scraper Scraper) (*AuthFetcher, error) {
-	if seq.Name == "" {
-		return &AuthFetcher{}, errors.New("flow/template name must be set")
-	}
-
+func NewJWTFetcher(seq RequestSequence, scraper Scraper) *AuthFetcher {
 	// override whatever caller had set
 	scraper.Name = "token"
-
-	// TODO: validate flow, template actually exist in caller.
 
 	return &AuthFetcher{
 		Seq:  seq,
@@ -950,7 +900,7 @@ func NewJWTFetcher(seq RequestSequence, scraper Scraper) (*AuthFetcher, error) {
 			Key:      "Authorization",
 			Format:   ProofFormatTypeBearer,
 		},
-	}, nil
+	}
 }
 
 // NewTokenFetcher returns an AuthFetcher that is configured to pull a simple token
@@ -960,11 +910,7 @@ func NewJWTFetcher(seq RequestSequence, scraper Scraper) (*AuthFetcher, error) {
 // single token value may be extracted. If expiresTimeLayout is set, it will be
 // used for parsing expires time, and if set to an empty string, it will default
 // to RFC3339.
-func NewTokenFetcher(seq RequestSequence, tokenScraper Scraper, dest ProofDestination, expiresScraper *Scraper, expiresTimeLayout string) (*AuthFetcher, error) {
-	if seq.Name == "" {
-		return &AuthFetcher{}, errors.New("flow/template name must be set")
-	}
-
+func NewTokenFetcher(seq RequestSequence, tokenScraper Scraper, dest ProofDestination, expiresScraper *Scraper, expiresTimeLayout string) *AuthFetcher {
 	// override whatever caller had set
 	tokenScraper.Name = "token"
 	if expiresScraper != nil {
@@ -973,8 +919,6 @@ func NewTokenFetcher(seq RequestSequence, tokenScraper Scraper, dest ProofDestin
 		expiresScraper = &scr
 		expiresScraper.Name = "expires"
 	}
-
-	// TODO: validate flow, template actually exist in caller.
 
 	da := &AuthFetcher{
 		Seq:  seq,
@@ -1002,7 +946,7 @@ func NewTokenFetcher(seq RequestSequence, tokenScraper Scraper, dest ProofDestin
 		}
 	}
 
-	return da, nil
+	return da
 }
 
 // NewSessionCookieFetcher returns an AuthFetcher that is configured to pull a cookie
@@ -1012,11 +956,7 @@ func NewTokenFetcher(seq RequestSequence, tokenScraper Scraper, dest ProofDestin
 // Auth will always attempt to detect expiration info from the initial
 // set-cookie, but if it is not present, it will fallback to error response on
 // the auth'd request's response to detect expiration.
-func NewSessionCookieFetcher(seq RequestSequence, cookieName string, detectExpiration bool) (*AuthFetcher, error) {
-	if seq.Name == "" {
-		return &AuthFetcher{}, errors.New("flow/template name must be set")
-	}
-
+func NewSessionCookieFetcher(seq RequestSequence, cookieName string, detectExpiration bool) *AuthFetcher {
 	const (
 		cookieVarName = "session-cookie"
 	)
@@ -1056,7 +996,7 @@ func NewSessionCookieFetcher(seq RequestSequence, cookieName string, detectExpir
 		}
 	}
 
-	return da, nil
+	return da
 }
 
 func (da *AuthFetcher) ScrapeFromResult(r SendResult) (AuthProof, error) {

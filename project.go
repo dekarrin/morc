@@ -193,6 +193,18 @@ type marshaledProject struct {
 	Auths     map[string]Auth            `json:"auths"`
 }
 
+func (p Project) TemplatesWithAuth(auth string) []string {
+	auth = strings.ToLower(auth)
+
+	var tmpls []string
+	for name, req := range p.Templates {
+		if req.Auth == auth {
+			tmpls = append(tmpls, name)
+		}
+	}
+	return tmpls
+}
+
 func (p Project) FlowsWithTemplate(template string) []string {
 	template = strings.ToLower(template)
 

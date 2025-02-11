@@ -676,6 +676,29 @@ func (a Auth) ExpirationScraper() Scraper {
 	panic("scraper for expiration var %q not found; should never happen")
 }
 
+// ExpirationLayout returns the layout used for the expiration scraper in
+// token auths. If the Auth is static or does not have an expiration scraper, an
+// empty string will be returned.
+func (a Auth) ExpirationLayout() string {
+	if a.Type != AuthTypeToken {
+		return ""
+	}
+
+	if a.Fetcher == nil {
+		return ""
+	}
+
+	if a.Fetcher.Expires.VarName == "" {
+		return ""
+	}
+
+	val, ok := a.Fetcher.Expires.Transform.Params["layout"]
+	if !ok {
+		return ""
+	}
+	return val.(string)
+}
+
 // Destination returns the destination for AuthProofs in authenticated requests.
 // For static auths, one will be created and returned; otherwise, the
 // destination from the Auth's Fetcher will be returned. If no Fetcher is set,

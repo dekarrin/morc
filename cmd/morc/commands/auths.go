@@ -274,18 +274,41 @@ func invokeAuthsShow(io cmdio.IO, projFile, authName string, unmaskSecrets bool)
 
 		// scraper
 		scraper := auth.ValueScraper()
-		if scraper.Name != "" {
-			io.Printf("Token Scraper: %s\n", scraper.String())
-		} else {
-			io.Printf("Token Scraper: (not set)\n")
+		tokenSpec := scraper.Spec()
+		if scraper.Name == "" && !io.Quiet {
+			tokenSpec = "(not set)"
 		}
+		io.Printf("Token Scraper: %s\n", tokenSpec)
 
 		io.Printf("Expiration Detection: %t\n", expDetect)
 		io.Printf("Cached Proof: %s\n", cached)
 	case morc.AuthTypeToken:
 		io.Printf("Retrieval: %s\n", seqLine)
 
-		// TODO: fill rest in during testing when we can verify
+		scraper := auth.ValueScraper()
+		tokenSpec := scraper.Spec()
+		if scraper.Name == "" && !io.Quiet {
+			tokenSpec = "(not set)"
+		}
+		io.Printf("Token Scraper: %s\n", tokenSpec)
+
+		dest := auth.Destination()
+		io.Printf("Token Destination: %s\n", dest.String())
+
+		expScraper := auth.ExpirationScraper()
+		expSpec := expScraper.Spec()
+		if expScraper.Name == "" && !io.Quiet {
+			expSpec = "(not set)"
+		}
+		io.Printf("Expiration Scraper: %s\n", expSpec)
+
+		expLayout := auth.ExpirationLayout()
+		if expLayout != "" {
+			io.Printf("Scraped Expiration Layout: %q\n", expLayout)
+		} else {
+			io.Printf("Scraped Expiration Layout: (not set)\n")
+		}
+
 		io.Printf("Cached Proof: %s\n", cached)
 	}
 
@@ -339,17 +362,17 @@ func invokeAuthsNew(io cmdio.IO, projFile, authName string, attrs authAttrValues
 	}
 
 	if auth.Type == morc.AuthTypeHTTPBasic {
-		auth.Proof = morc.NewHTTPBasicCredentials(attrs.username.Or(""), attrs.password.Or(""))
+		auth.Proof = morc.NewHTTPBasicCredentials(attrs.username.v, attrs.password.v)
 	} else if auth.Type == morc.AuthTypeSession {
 		auth.Fetcher = morc.NewSessionCookieFetcher(
-			attrs.retrieval.Or(morc.RequestSequence{}),
-			attrs.cookie.Or(""),
-			attrs.expirationDetection.Or(false),
+			attrs.retrieval.v,
+			attrs.cookie.v,
+			attrs.expirationDetection.v,
 		)
 	} else if auth.Type == morc.AuthTypeJWT {
 		auth.Fetcher = morc.NewJWTFetcher(
-			attrs.retrieval.Or(morc.RequestSequence{}),
-			attrs.tokenSpec.Or(morc.Scraper{}),
+			attrs.retrieval.v,
+			attrs.tokenSpec.v,
 		)
 	} else if auth.Type == morc.AuthTypeToken {
 		auth.Fetcher = morc.NewTokenFetcher(

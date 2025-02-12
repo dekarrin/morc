@@ -753,13 +753,66 @@ func (a Auth) ExpirationScraper() Scraper {
 	panic(fmt.Sprintf("scraper for expiration var %q not found; should never happen", expVarName))
 }
 
-func (a *Auth) SetExpirationScraper(scraper Scraper) error {
+// RemoveExpirationScraper removes the expiration scraper from the Auth. Note
+// that this will still persist any formatting settings for expiration value
+// extraction.
+func (a *Auth) RemoveExpirationScraper() error {
+	if a.Type == AuthTypeNone {
+		return fmt.Errorf("cannot remove expiration scraper from auth with no type set")
+	}
+
+	if a.Type == AuthTypeHTTPBasic {
+		return fmt.Errorf("cannot remove expiration scraper from HTTP Basic auth")
+	}
+
+	if a.Fetcher == nil {
+		return nil
+	}
+
+	expVarName := a.Fetcher.Expires.VarName
+	if expVarName == "" {
+		return nil
+	}
+
+	// find the scraper for the expiration var and exclude it in a copied list
+	newCaps := make([]Scraper, 0, len(a.Fetcher.Caps))
+	for _, sc := range a.Fetcher.Caps {
+		if sc.Name != expVarName {
+			newCaps = append(newCaps, sc)
+		}
+	}
+	a.Fetcher.Caps = newCaps
+	a.Fetcher.Expires.VarName = ""
+
+	return nil
+}
+
+// SetExpirationScraper sets the expiration scraper for the Auth. If scraper is
+// nil, the expiration scraper is set to an automatically-configured one; this
+// can only be done if the Auth is a JWT or session Auth, otherwise this will
+// cause an error to be returned.
+func (a *Auth) SetExpirationScraper(scraper *Scraper) error {
 	if a.Type == AuthTypeNone {
 		return fmt.Errorf("cannot set expiration scraper on auth with no type set")
 	}
 	if a.Type == AuthTypeHTTPBasic {
 		return fmt.Errorf("cannot set expiration scraper on HTTP Basic auth")
 	}
+
+	if scraper == nil {
+		if a.Type == AuthTypeToken {
+			return fmt.Errorf("cannot automatically infer expiration scraper for token auth")
+		} else if a.Type == AuthTypeSession {
+			a.Fetcher = NewSessionCookieFetcher(a.RetrievalSequence(), a.CookieName(), true)
+		} else if a.Type == AuthTypeJWT {
+			a.Fetcher = NewJWTFetcher(a.RetrievalSequence(), a.ValueScraper())
+		} else {
+			return fmt.Errorf("unknown auth type %q", a.Type)
+		}
+		return nil
+	}
+
+	sVal := *scraper
 
 	if a.Fetcher == nil {
 		a.Fetcher = newEmptyFetcher(a.Type)
@@ -771,7 +824,7 @@ func (a *Auth) SetExpirationScraper(scraper Scraper) error {
 		a.Fetcher = NewSessionCookieFetcher(a.RetrievalSequence(), a.CookieName(), true)
 	} else if a.Type == AuthTypeToken {
 		// simple case; just re-init with existing values
-		a.Fetcher = NewTokenFetcher(a.RetrievalSequence(), a.ValueScraper(), a.Destination(), &scraper, a.ExpirationLayout())
+		a.Fetcher = NewTokenFetcher(a.RetrievalSequence(), a.ValueScraper(), a.Destination(), &sVal, a.ExpirationLayout())
 		return nil
 	}
 
@@ -788,30 +841,9 @@ func (a *Auth) SetExpirationScraper(scraper Scraper) error {
 			newCaps = append(newCaps, sc)
 		}
 	}
-	scraper.Name = expVarName
-	newCaps = append(newCaps, scraper)
+	sVal.Name = expVarName
+	newCaps = append(newCaps, sVal)
 	a.Fetcher.Caps = newCaps
-
-	return nil
-}
-
-// SetExpirationScraperAuto sets the expiration scraper to the automatic version
-// for the Auth. If the Auth is not a JWT or session Auth, an error will be
-// returned.
-func (a *Auth) SetExpirationScraperAuto() error {
-	if a.Type == AuthTypeNone {
-		return fmt.Errorf("cannot set expiration scraper on auth with no type set")
-	} else if a.Type == AuthTypeHTTPBasic {
-		return fmt.Errorf("cannot set expiration scraper on HTTP Basic auth")
-	} else if a.Type == AuthTypeToken {
-		return fmt.Errorf("cannot automatically infer expiration scraper for token auth")
-	} else if a.Type == AuthTypeSession {
-		a.Fetcher = NewSessionCookieFetcher(a.RetrievalSequence(), a.CookieName(), true)
-	} else if a.Type == AuthTypeJWT {
-		a.Fetcher = NewJWTFetcher(a.RetrievalSequence(), a.ValueScraper())
-	} else {
-		return fmt.Errorf("unknown auth type %q", a.Type)
-	}
 
 	return nil
 }

@@ -94,7 +94,7 @@ func init() {
 	reqsCmd.PersistentFlags().StringArrayVarP(&flags.Headers, "header", "H", []string{}, "Add a header to the request. Format is `KEY:VALUE`. Multiple headers may be set by providing multiple -H flags. If multiple headers with the same key are set, they will be set in the order they were given.")
 	reqsCmd.PersistentFlags().StringVarP(&flags.Method, "method", "X", "GET", "Set the request method to `METHOD`.")
 	reqsCmd.PersistentFlags().StringVarP(&flags.URL, "url", "u", "http://example.com", "Specify the `URL` for the request.")
-	reqsCmd.PersistentFlags().StringVarP(&flags.Auth, "auth", "A", "", "Set the auth method for the request to `AUTH`.")
+	reqsCmd.PersistentFlags().StringVarP(&flags.Auth, "auth", "a", "", "Set the auth method for the request to `AUTH`.")
 	reqsCmd.PersistentFlags().BoolVarP(&flags.BRemoveBody, "remove-body", "R", false, "Delete all existing body data from the request")
 	reqsCmd.PersistentFlags().BoolVarP(&flags.BForce, "force", "f", false, "Force deletion of the request template even if it is used in flows. Only valid with --delete/-D.")
 	reqsCmd.PersistentFlags().BoolVarP(&flags.BQuiet, "quiet", "q", false, "Suppress all unnecessary output.")

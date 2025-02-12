@@ -14,7 +14,7 @@ var execCmd = &cobra.Command{
 	Use: "exec EXECABLE",
 	Annotations: map[string]string{
 		annotationKeyHelpUsages: "" +
-			"exec EXECABLE [-Ak] [-p PREFIX] [-V VAR=VALUE]... [output-flags]",
+			"exec EXECABLE [-ak] [-p PREFIX] [-V VAR=VALUE]... [output-flags]",
 	},
 	Short: "Execute a flow of requests or an auth method",
 	Long: "Execute a sequence of requests defined in a flow stored in the project. Initial variable values can be set " +

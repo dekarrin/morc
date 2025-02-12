@@ -529,9 +529,6 @@ type cliFlags struct {
 	// Clear specifies that the given resource should be cleared.
 	Clear string
 
-	// Exec specifies that the given resource should be run.
-	Exec string
-
 	// BRequest is a request output control switch flag that indicates that the
 	// request should be printed in addition to any other output.
 	BRequest bool
@@ -623,4 +620,8 @@ type cliFlags struct {
 	// BQuiet is a switch flag that, when set, suppresses all output except for
 	// output that was specifically requested.
 	BQuiet bool
+
+	// BAuth is a switch flag that, when set, indicates that the requested
+	// object is an auth method rather than a flow.
+	BAuth bool
 }

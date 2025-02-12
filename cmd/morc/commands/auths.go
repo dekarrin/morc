@@ -11,12 +11,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// INVOKES WE MUST SUPPORT:
-// cli invoke: morc auths -N basic-login -t basic -u username -p password
-// cli invoke: morc auths -N auth-name -t session -r retrievial-spec -c cookie --no-exp
-// cli invoke: morc auths -N auth-name -t token -r retrieval-spec --token-from token-scraper --use-in header:key-name --use-format bearer --exp expires-scraper --exp-layout expires-layout
-// cli invoke: morc auths -N auth-name -t jwt -r retrieval-spec --token-from token-scraper
-
 var authsCmd = &cobra.Command{
 	Use: "auths [AUTH]",
 	Annotations: map[string]string{
@@ -27,8 +21,7 @@ var authsCmd = &cobra.Command{
 			"auths AUTH\n" +
 			"auths AUTH --get ATTR\n" +
 			"auths AUTH \n" + // TODO: actual auth parameters.
-			"auths --clear AUTH\n" +
-			"auths --exec AUTH",
+			"auths --clear AUTH",
 	},
 	GroupID: "project",
 	Short:   "Show or modify authorization methods",
@@ -79,7 +72,6 @@ func init() {
 	authsCmd.PersistentFlags().BoolVarP(&flags.BForce, "force", "f", false, "Force deletion of an auth method even if it is used in a request.")
 	authsCmd.PersistentFlags().StringVarP(&flags.Get, "get", "G", "", "Get the value of the given attribute `ATTR` from the auth method. ATTR must be one of: "+strings.Join(authAttrKeyNames(), ", "))
 	authsCmd.PersistentFlags().StringVarP(&flags.Clear, "clear", "C", "", "Clear any currently saved auth proof. Only applicable to auth types that use dynamically-retrieved proofs, such a cookie or a token.")
-	authsCmd.PersistentFlags().StringVarP(&flags.Clear, "exec", "X", "", "Run the auth method, making any requests configured to retrieve proof of auth, and then print what the resulting proof is. For static auths this will immediately return the current proof.")
 	authsCmd.PersistentFlags().StringVarP(&flags.Name, "name", "n", "", "Change the name of an auth method to `NAME`.")
 	authsCmd.PersistentFlags().StringVarP(&flags.Type, "type", "T", "", "Set the type of auth method to `TYPE`. TYPE must be one of 'basic', 'session', 'jwt', or 'token'; the choice determined what other options are available.")
 	authsCmd.PersistentFlags().StringVarP(&flags.Username, "username", "u", "", "Set the `USERNAME` for use with HTTP basic auth. Only valid when --type is 'basic'.")
@@ -95,25 +87,25 @@ func init() {
 	authsCmd.PersistentFlags().StringVarP(&flags.ExpirationLayout, "exp-layout", "L", "RFC3339", "Set the layout of the expiration time of the token to `LAYOUT`. This can either be a custom string that is Go time layout format, or one of the following constants: 'RFC822', 'RFC822Z', 'RFC850', 'RFC1123', 'RFC1123Z', 'RFC3339', or 'RFC3339Nano'. Only valid when --type is 'token'.")
 	authsCmd.PersistentFlags().BoolVarP(&flags.BUnmask, "unmask", "", false, "Show passwords and other secrets in output. Only valid when getting or editing properties of an auth method.")
 
-	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "clear", "exec")
+	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "clear")
 
 	// don't specify attribute args if not creating or setting.
-	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "clear", "exec", "name")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exec", "type")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exec", "username")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exec", "password")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exec", "retrieval")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exec", "cookie")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exec", "no-exp")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exec", "exp")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exec", "token-scraper")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exec", "dest")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exec", "format")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exec", "exp-scraper")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exec", "exp-layout")
+	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "clear", "name")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "type")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "username")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "password")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "retrieval")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "cookie")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "no-exp")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exp")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "token-scraper")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "dest")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "format")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exp-scraper")
+	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exp-layout")
 
-	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "clear", "exec", "unmask")
-	reqsCmd.MarkFlagsMutuallyExclusive("new", "get", "clear", "exec", "force")
+	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "clear", "unmask")
+	reqsCmd.MarkFlagsMutuallyExclusive("new", "get", "clear", "force")
 	reqsCmd.MarkFlagsMutuallyExclusive("no-exp", "exp-scraper")
 	reqsCmd.MarkFlagsMutuallyExclusive("no-exp", "exp-layout")
 
@@ -959,9 +951,6 @@ func parseAuthsArgs(cmd *cobra.Command, posArgs []string, args *authsArgs) error
 	case authsActionClear:
 		// special case of auth name set from a CLI flag rather than pos arg.
 		args.auth = flags.Clear
-	case authsActionExec:
-		// special case of auth name set from a CLI flag rather than pos arg.
-		args.auth = flags.Exec
 	case authsActionDelete:
 		// special case of auth name set from a CLI flag rather than pos arg.
 		args.auth = flags.Delete
@@ -1004,13 +993,12 @@ func parseAuthsArgs(cmd *cobra.Command, posArgs []string, args *authsArgs) error
 
 func parseAuthsActionFromFlags(cmd *cobra.Command, posArgs []string) (authsAction, error) {
 	// mutual exclusions enforced by cobra (and therefore we do not check them here):
-	// * --new, --delete, --get, --clear, and --exec
+	// * --new, --delete, --get, and --clear
 	// * --delete with mod flags
 	// * --get with mod flags
 	// * --clear with mod flags
-	// * --exec with mod flags
-	// * --force with --get, --clear, --new, and --exec
-	// * --unmask with --new, --delete, --clear, and --exec
+	// * --force with --get, --clear, and --new
+	// * --unmask with --new, --delete, and --clear
 	// * --no-exp with any flag that indicates expiration detection
 
 	// * can't really check correct type'd flags here as user might alter type
@@ -1046,11 +1034,6 @@ func parseAuthsActionFromFlags(cmd *cobra.Command, posArgs []string) (authsActio
 			return authsActionClear, fmt.Errorf("unknown positional argument %q", posArgs[0])
 		}
 		return authsActionClear, nil
-	} else if flags.Exec != "" {
-		if len(posArgs) > 0 {
-			return authsActionExec, fmt.Errorf("unknown positional argument %q", posArgs[0])
-		}
-		return authsActionExec, nil
 	} else if authsSetFlagIsPresent(cmd) {
 		if len(posArgs) < 1 {
 			return authsActionEdit, fmt.Errorf("missing name of AUTH to update")
@@ -1218,7 +1201,6 @@ const (
 	authsActionGet
 	authsActionEdit
 	authsActionClear
-	authsActionExec
 )
 
 type authKey string

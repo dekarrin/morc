@@ -497,7 +497,9 @@ func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 				}
 			}
 
-			authProof, authRequested, err = p.ExecAuth(auth, skipVerify, httpClient, authOC)
+			var sendResults []SendResult
+			authProof, sendResults, err = p.ExecAuth(auth, skipVerify, httpClient, authOC)
+			authRequested = len(sendResults) > 0
 			if err != nil {
 				return SendResult{}, err
 			}
@@ -600,36 +602,39 @@ func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 }
 
 // ExecAuth retreives an auth proof with the given auth using the given options.
-// It returns the proof, whether requests were sent to retrieve it (as opposed
-// to simply using an already held and still-valid auth proof), and any error
-// that ocurred retrieving the auth.
-func (p *Project) ExecAuth(auth *Auth, skipVerify bool, httpClient *http.Client, oc OutputControl) (ap AuthProof, requested bool, err error) {
-	requested = false
+// It returns the proof, the results of any requests that were sent to retrieve
+// it, and any error that ocurred retrieving the auth. If an auth proof is
+// already held and is still valid, no requests will be made, and the returned
+// slice of SendResults will be nil.
+func (p *Project) ExecAuth(auth *Auth, skipVerify bool, httpClient *http.Client, oc OutputControl) (ap AuthProof, results []SendResult, err error) {
+	// TODO: this API does not match Exec() at all. Caller is required to
+	// persist any changes to the auth manually to the project. Update this to
+	// be more like Exec() which should be automatically handled.
 
 	if auth.Static() {
-		return auth.Proof, requested, nil
+		return auth.Proof, nil, nil
 	}
 
 	if auth.Proof == nil || !auth.Proof.Valid() {
 		if auth.Fetcher == nil {
-			return nil, requested, errors.New("no static credentials or fetcher configured")
+			return nil, nil, errors.New("no static credentials or fetcher configured")
 		}
 
-		reqs, err := p.Fetch(auth.Fetcher.Seq, nil, skipVerify, "", httpClient, oc)
+		results, err = p.Fetch(auth.Fetcher.Seq, nil, skipVerify, "", httpClient, oc)
 		if err != nil {
-			return nil, requested, fmt.Errorf("fetch auth: %w", err)
+			return nil, nil, fmt.Errorf("fetch auth: %w", err)
 		}
-		requested = true
 
-		proof, err := auth.Fetcher.ScrapeFromResult(reqs[0])
+		lastResult := results[len(results)-1]
+		proof, err := auth.Fetcher.ScrapeFromResult(lastResult)
 		if err != nil {
-			return nil, requested, fmt.Errorf("read auth: %w", err)
+			return nil, results, fmt.Errorf("read auth: %w", err)
 		}
 
 		auth.Proof = proof
 	}
 
-	return auth.Proof, requested, nil
+	return auth.Proof, results, nil
 }
 
 func dumpToFile(path string, dumpFunc func(io.Writer) error) error {

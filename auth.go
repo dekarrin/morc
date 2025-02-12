@@ -30,6 +30,13 @@ type AuthProof interface {
 	// Type returns the type of AuthProof that this is. It is used for selecting
 	// the correct constructor to recreate an AuthProof from an Exported string.
 	Type() AuthProofType
+
+	// Secret returns the secret value of the AuthProof.
+	Secret() string
+
+	// Expiration returns the expiration time of the AuthProof. If it doesn't
+	// have one, the zero time will be returned.
+	Expiration() time.Time
 }
 
 type HTTPBasicCredentials struct {
@@ -55,6 +62,14 @@ func (b HTTPBasicCredentials) Export() map[string]any {
 
 func (b HTTPBasicCredentials) Type() AuthProofType {
 	return AuthProofHTTPBasic
+}
+
+func (b HTTPBasicCredentials) Secret() string {
+	return fmt.Sprintf("%s:%s", b.Username, b.Password)
+}
+
+func (b HTTPBasicCredentials) Expiration() time.Time {
+	return time.Time{}
 }
 
 func NewHTTPBasicCredentials(username, password string) AuthProof {
@@ -115,6 +130,14 @@ type DynamicProof struct {
 	Value     string
 	Dest      ProofDestination
 	ExpiresAt time.Time
+}
+
+func (dp DynamicProof) Secret() string {
+	return dp.Value
+}
+
+func (dp DynamicProof) Expiration() time.Time {
+	return dp.ExpiresAt
 }
 
 func (dp DynamicProof) Apply(req *http.Request) error {

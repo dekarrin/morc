@@ -58,6 +58,8 @@ var authsCmd = &cobra.Command{
 			return invokeAuthsEdit(io, args.projFile, args.auth, args.sets, args.unmask)
 		case authsActionGet:
 			return invokeAuthsGet(io, args.projFile, args.auth, args.getItem, args.unmask)
+		case authsActionClear:
+			return invokeAuthsClear(io, args.projFile, args.auth)
 		default:
 			panic(fmt.Sprintf("unhandled auths action %q", args.action))
 		}
@@ -332,6 +334,36 @@ func invokeAuthsShow(io cmdio.IO, projFile, authName string, unmaskSecrets bool)
 			io.PrintLoudf("! Auth method requires additional config before use.\n")
 		}
 	}
+
+	return nil
+}
+
+func invokeAuthsClear(io cmdio.IO, projFile, authName string) error {
+	// load the project file
+	p, err := readProject(projFile, false)
+	if err != nil {
+		return err
+	}
+
+	// case doesn't matter for auth method names
+	authLower := strings.ToLower(authName)
+	auth, ok := p.Auths[authLower]
+	if !ok {
+		return morc.NewAuthNotFoundError(authName)
+	}
+
+	if auth.Static() {
+		return fmt.Errorf("auth method %s does not cache auth proofs", auth.Name)
+	}
+
+	auth.Proof = nil
+
+	err = writeProject(p, false)
+	if err != nil {
+		return err
+	}
+
+	io.PrintLoudf("Cleared cached proof for auth method %s\n", auth.Name)
 
 	return nil
 }

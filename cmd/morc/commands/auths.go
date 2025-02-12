@@ -189,7 +189,7 @@ func invokeAuthsShow(io cmdio.IO, projFile, authName string, unmaskSecrets bool)
 	// currently held-value
 	cached := ""
 	if auth.Proof != nil {
-		cached = auth.CachedValue()
+		cached = auth.Secret()
 		cacheEmpty := cached == ""
 
 		if !unmaskSecrets {
@@ -197,7 +197,7 @@ func invokeAuthsShow(io cmdio.IO, projFile, authName string, unmaskSecrets bool)
 		}
 
 		// add expiration if needed
-		exp := auth.CachedExpiration()
+		exp := auth.SecretExpiration()
 		if !cacheEmpty {
 			if !exp.IsZero() {
 				if io.Quiet {
@@ -233,7 +233,9 @@ func invokeAuthsShow(io cmdio.IO, projFile, authName string, unmaskSecrets bool)
 			if user == "" && !io.Quiet {
 				user = "(empty)"
 			} else {
-				user = fmt.Sprintf("%q", user)
+				if !io.Quiet {
+					user = fmt.Sprintf("%q", user)
+				}
 			}
 			io.Printf("%s\n", user)
 
@@ -245,7 +247,9 @@ func invokeAuthsShow(io cmdio.IO, projFile, authName string, unmaskSecrets bool)
 				if !unmaskSecrets {
 					pass = strings.Repeat("*", len(pass))
 				}
-				pass = fmt.Sprintf("%q", pass)
+				if !io.Quiet {
+					pass = fmt.Sprintf("%q", pass)
+				}
 			}
 			io.Printf("%s\n", pass)
 		}
@@ -676,6 +680,8 @@ func invokeAuthsEdit(io cmdio.IO, projFile, authName string, attrs authAttrValue
 		}
 	}
 
+	// auth name might have been modified so take the currently set .Name and lowercase it.
+	p.Auths[strings.ToLower(auth.Name)] = auth
 	err = writeProject(p, false)
 	if err != nil {
 		return err
@@ -845,7 +851,7 @@ func validateAttrCombos(attrs authAttrValues, existing *morc.Auth) error {
 		}
 	}
 	if attrs.tokenSpec.set && setType != morc.AuthTypeJWT && setType != morc.AuthTypeToken {
-		errs = append(errs, fmt.Errorf("--token-scraper/-t is not a valid option for auth type%q", setType))
+		errs = append(errs, fmt.Errorf("--token-scraper/-t is not a valid option for auth type %q", setType))
 	}
 	if attrs.dest.set && setType != morc.AuthTypeToken {
 		errs = append(errs, fmt.Errorf("--dest/-d is not a valid option for auth type %q", setType))

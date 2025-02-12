@@ -576,35 +576,26 @@ type Auth struct {
 	Fetcher *AuthFetcher
 }
 
-// CachedExpiration returns the current expiration of a dynamic AuthProof. If
-// the Auth is not of a type that uses a dynamic proof, the zero time will be
-// returned. If the proof is nil, the zero time will be returned. If the proof
-// does not have an expiration specified, the zero time will be returned.
-func (a Auth) CachedExpiration() time.Time {
+// SecretExpiration returns the current expiration of the secret in the Auth's
+// auth proof. If the Auth does not currently have an AuthProof set, the zero
+// time will be returned.
+func (a Auth) SecretExpiration() time.Time {
 	if a.Proof == nil {
 		return time.Time{}
 	}
 
-	if creds, ok := a.Proof.(DynamicProof); ok {
-		return creds.ExpiresAt
-	} else {
-		panic("auth proof is not DynamicProof; should never happen")
-	}
+	return a.Proof.Expiration()
 }
 
-// CachedValue returns the current value of a dynamic AuthProof. If the Auth is
-// not of a type that uses a dynamic proof, an empty string will be returned. If
-// the proof is nil, an empty string will be returned.
-func (a Auth) CachedValue() string {
+// Secret returns the current value of an AuthProof. If the Auth does not
+// currently have one set, for instance due to being Dynamic type that hasn't
+// yet requested one, an empty string is returned.
+func (a Auth) Secret() string {
 	if a.Proof == nil {
 		return ""
 	}
 
-	if creds, ok := a.Proof.(DynamicProof); ok {
-		return creds.Value
-	} else {
-		panic("auth proof is not DynamicProof; should never happen")
-	}
+	return a.Proof.Secret()
 }
 
 // Password returns the currently-configured password for the Auth. If the Auth

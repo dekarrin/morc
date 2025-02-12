@@ -1055,7 +1055,7 @@ func parseAuthsSetFlags(cmd *cobra.Command, attrs *authAttrValues) error {
 	if f.Changed("type") {
 		t, err := morc.ParseAuthType(flags.Type)
 		if err != nil {
-			return fmt.Errorf("--type/-T: invalid auth type %q; must be one of %s", flags.Type, cmdio.OxfordCommaJoin(morc.AuthTypes, "or"))
+			return fmt.Errorf("--type/-T: invalid auth type %q; must be one of %s", flags.Type, cmdio.OxfordCommaJoin(morc.AuthTypes, "or", true))
 		}
 		attrs.authType = optional[morc.AuthType]{set: true, v: t}
 	}

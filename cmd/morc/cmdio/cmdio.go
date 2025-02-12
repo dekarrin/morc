@@ -157,7 +157,7 @@ func OutputLoudEditAttrsResult[K CAttrKey](io IO, modifiedVals map[K]interface{}
 			setMessages = append(setMessages, fmt.Sprintf("%s to %s", k.Human(), v))
 		}
 
-		io.PrintLoudf("%s\n", io.OxfordCommaJoin(setMessages, "and"))
+		io.PrintLoudf("%s\n", io.OxfordCommaJoin(setMessages, "and", false))
 	}
 
 	if len(noChangeVals) > 0 {
@@ -178,19 +178,29 @@ func OutputLoudEditAttrsResult[K CAttrKey](io IO, modifiedVals map[K]interface{}
 	}
 }
 
-func (io IO) OxfordCommaJoin(items []string, conjunction string) string {
-	return OxfordCommaJoin(items, conjunction)
+func (io IO) OxfordCommaJoin(items []string, conjunction string, quote bool) string {
+	return OxfordCommaJoin(items, conjunction, quote)
 }
 
-func OxfordCommaJoin[K any](items []K, conjunction string) string {
+func OxfordCommaJoin[K any](items []K, conjunction string, quote bool) string {
 	if len(items) == 0 {
 		return ""
 	}
 	if len(items) == 1 {
-		return fmt.Sprintf("%v", items[0])
+		s := fmt.Sprintf("%v", items[0])
+		if quote {
+			s = fmt.Sprintf("%q", s)
+		}
+		return s
 	}
 	if len(items) == 2 {
-		return fmt.Sprintf("%v %s %v", items[0], conjunction, items[1])
+		s1 := fmt.Sprintf("%v", items[0])
+		s2 := fmt.Sprintf("%v", items[1])
+		if quote {
+			s1 = fmt.Sprintf("%q", s1)
+			s2 = fmt.Sprintf("%q", s2)
+		}
+		return fmt.Sprintf("%s %s %s", s1, conjunction, s2)
 	}
 
 	// more than 2 items means commas
@@ -204,7 +214,11 @@ func OxfordCommaJoin[K any](items []K, conjunction string) string {
 			sb.WriteString(" ")
 		}
 
-		sb.WriteString(fmt.Sprintf("%v", item))
+		s := fmt.Sprintf("%v", item)
+		if quote {
+			s = fmt.Sprintf("%q", s)
+		}
+		sb.WriteString(s)
 	}
 
 	return sb.String()

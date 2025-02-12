@@ -60,12 +60,6 @@ var authsCmd = &cobra.Command{
 }
 
 func init() {
-	// TODO: make these all non-required.
-
-	// cli invoke: morc auths -N basic-login -t basic -u username -p password
-	// cli invoke: morc auths -N auth-name -t session -r retrievial-spec -c cookie --no-exp
-	// cli invoke: morc auths -N auth-name -t token -r retrieval-spec --token-from token-scraper --use-in header:key-name --use-format bearer --exp-from expires-scraper --exp-layout expires-layout
-	// cli invoke: morc auths -N auth-name -t jwt -r retrieval-spec --token-from token-scraper
 	authsCmd.PersistentFlags().StringVarP(&flags.ProjectFile, "project-file", "F", morc.DefaultProjectPath, "Use `FILE` for project data instead of "+morc.DefaultProjectPath+".")
 	authsCmd.PersistentFlags().StringVarP(&flags.New, "new", "N", "", "Create a new auth method named `AUTH`.")
 	authsCmd.PersistentFlags().StringVarP(&flags.Delete, "delete", "D", "", "Delete the auth method named `AUTH`.")
@@ -86,6 +80,7 @@ func init() {
 	authsCmd.PersistentFlags().StringVarP(&flags.ExpirationScraper, "exp-scraper", "x", "", "Set the scraper to use to extract the expiration time of the token from the last response of auth proof retrieval. Only valid when --type is 'token'.")
 	authsCmd.PersistentFlags().StringVarP(&flags.ExpirationLayout, "exp-layout", "L", "RFC3339", "Set the layout of the expiration time of the token to `LAYOUT`. This can either be a custom string that is Go time layout format, or one of the following constants: 'RFC822', 'RFC822Z', 'RFC850', 'RFC1123', 'RFC1123Z', 'RFC3339', or 'RFC3339Nano'. Only valid when --type is 'token'.")
 	authsCmd.PersistentFlags().BoolVarP(&flags.BUnmask, "unmask", "", false, "Show passwords and other secrets in output. Only valid when getting or editing properties of an auth method.")
+	authsCmd.PersistentFlags().BoolVarP(&flags.BQuiet, "quiet", "q", false, "Suppress all unnecessary output.")
 
 	authsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "clear")
 

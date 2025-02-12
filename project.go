@@ -565,7 +565,7 @@ func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 
 		// auth check here.
 		if auth != nil {
-			if !auth.IsSuccessfulAuthUse(result.Response) {
+			if !auth.CheckSuccessfulAuthUse(result.Response) {
 				// auth failed
 
 				// TODO: error check Fprint output

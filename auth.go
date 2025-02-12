@@ -714,9 +714,9 @@ func (a *Auth) SetValueScraper(scraper Scraper) error {
 
 	// find the scraper for the value var and exclude it in a copied list
 	newCaps := make([]Scraper, 0, len(a.Fetcher.Caps))
-	for _, scraper := range a.Fetcher.Caps {
-		if scraper.Name != valVarName {
-			newCaps = append(newCaps, scraper)
+	for _, sc := range a.Fetcher.Caps {
+		if sc.Name != valVarName {
+			newCaps = append(newCaps, sc)
 		}
 	}
 	scraper.Name = valVarName
@@ -753,6 +753,69 @@ func (a Auth) ExpirationScraper() Scraper {
 	panic(fmt.Sprintf("scraper for expiration var %q not found; should never happen", expVarName))
 }
 
+func (a *Auth) SetExpirationScraper(scraper Scraper) error {
+	if a.Type == AuthTypeNone {
+		return fmt.Errorf("cannot set expiration scraper on auth with no type set")
+	}
+	if a.Type == AuthTypeHTTPBasic {
+		return fmt.Errorf("cannot set expiration scraper on HTTP Basic auth")
+	}
+
+	if a.Fetcher == nil {
+		a.Fetcher = newEmptyFetcher(a.Type)
+	}
+
+	// if a is session cookie type, make sure Fetcher is initialized with
+	// expiration detection enabled.
+	if a.Type == AuthTypeSession {
+		a.Fetcher = NewSessionCookieFetcher(a.RetrievalSequence(), a.CookieName(), true)
+	} else if a.Type == AuthTypeToken {
+		// simple case; just re-init with existing values
+		a.Fetcher = NewTokenFetcher(a.RetrievalSequence(), a.ValueScraper(), a.Destination(), &scraper, a.ExpirationLayout())
+		return nil
+	}
+
+	// all types should be handled with an expires detection scraper now.
+	expVarName := a.Fetcher.Expires.VarName
+	if expVarName == "" {
+		panic("expires var name not set; should never happen")
+	}
+
+	// find the scraper for the expires var and exclude it in a copied list
+	newCaps := make([]Scraper, 0, len(a.Fetcher.Caps))
+	for _, sc := range a.Fetcher.Caps {
+		if sc.Name != expVarName {
+			newCaps = append(newCaps, sc)
+		}
+	}
+	scraper.Name = expVarName
+	newCaps = append(newCaps, scraper)
+	a.Fetcher.Caps = newCaps
+
+	return nil
+}
+
+// SetExpirationScraperAuto sets the expiration scraper to the automatic version
+// for the Auth. If the Auth is not a JWT or session Auth, an error will be
+// returned.
+func (a *Auth) SetExpirationScraperAuto() error {
+	if a.Type == AuthTypeNone {
+		return fmt.Errorf("cannot set expiration scraper on auth with no type set")
+	} else if a.Type == AuthTypeHTTPBasic {
+		return fmt.Errorf("cannot set expiration scraper on HTTP Basic auth")
+	} else if a.Type == AuthTypeToken {
+		return fmt.Errorf("cannot automatically infer expiration scraper for token auth")
+	} else if a.Type == AuthTypeSession {
+		a.Fetcher = NewSessionCookieFetcher(a.RetrievalSequence(), a.CookieName(), true)
+	} else if a.Type == AuthTypeJWT {
+		a.Fetcher = NewJWTFetcher(a.RetrievalSequence(), a.ValueScraper())
+	} else {
+		return fmt.Errorf("unknown auth type %q", a.Type)
+	}
+
+	return nil
+}
+
 // ExpirationLayout returns the layout used for the expiration scraper in
 // token auths. If the Auth is static or does not have an expiration scraper, an
 // empty string will be returned.
@@ -765,7 +828,7 @@ func (a Auth) ExpirationLayout() string {
 		return ""
 	}
 
-	if a.Fetcher.Expires.VarName == "" {
+	if a.Fetcher.Expires.Transform.Params == nil {
 		return ""
 	}
 
@@ -774,6 +837,21 @@ func (a Auth) ExpirationLayout() string {
 		return ""
 	}
 	return val.(string)
+}
+
+func (a *Auth) SetExpirationLayout(layout string) error {
+	if a.Type != AuthTypeToken {
+		return fmt.Errorf("cannot set expiration layout on non-token auth")
+	}
+
+	var oldExpScraper *Scraper
+	sc := a.ExpirationScraper()
+	if sc.Name != "" {
+		oldExpScraper = &sc
+	}
+	a.Fetcher = NewTokenFetcher(a.RetrievalSequence(), a.ValueScraper(), a.Destination(), oldExpScraper, layout)
+
+	return nil
 }
 
 // Destination returns the destination for AuthProofs in authenticated requests.
@@ -958,10 +1036,10 @@ func (a Auth) Sendable() bool {
 	return false
 }
 
-// IsSuccessfulAuthUse returns whether the given response from an authenticated
+// CheckSuccessfulAuthUse returns whether the given response from an authenticated
 // request is considered successful. This is generally always the case unless the
 // returned status is 401 Unauthorized.
-func (a *Auth) IsSuccessfulAuthUse(resp *http.Response) bool {
+func (a *Auth) CheckSuccessfulAuthUse(resp *http.Response) bool {
 	success := resp.StatusCode != http.StatusUnauthorized
 
 	// invalidate proof immediately if auth failed and proof is dynamic

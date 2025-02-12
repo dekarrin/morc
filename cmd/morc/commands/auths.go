@@ -87,29 +87,29 @@ func init() {
 	authsCmd.PersistentFlags().StringVarP(&flags.ExpirationLayout, "exp-layout", "L", "RFC3339", "Set the layout of the expiration time of the token to `LAYOUT`. This can either be a custom string that is Go time layout format, or one of the following constants: 'RFC822', 'RFC822Z', 'RFC850', 'RFC1123', 'RFC1123Z', 'RFC3339', or 'RFC3339Nano'. Only valid when --type is 'token'.")
 	authsCmd.PersistentFlags().BoolVarP(&flags.BUnmask, "unmask", "", false, "Show passwords and other secrets in output. Only valid when getting or editing properties of an auth method.")
 
-	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "clear")
+	authsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "clear")
 
 	// don't specify attribute args if not creating or setting.
-	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "clear", "name")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "type")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "username")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "password")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "retrieval")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "cookie")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "no-exp")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exp")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "token-scraper")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "dest")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "format")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exp-scraper")
-	reqsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exp-layout")
+	authsCmd.MarkFlagsMutuallyExclusive("new", "delete", "get", "clear", "name")
+	authsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "type")
+	authsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "username")
+	authsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "password")
+	authsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "retrieval")
+	authsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "cookie")
+	authsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "no-exp")
+	authsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exp")
+	authsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "token-scraper")
+	authsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "dest")
+	authsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "format")
+	authsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exp-scraper")
+	authsCmd.MarkFlagsMutuallyExclusive("delete", "get", "clear", "exp-layout")
 
-	reqsCmd.MarkFlagsMutuallyExclusive("new", "delete", "clear", "unmask")
-	reqsCmd.MarkFlagsMutuallyExclusive("new", "get", "clear", "force")
-	reqsCmd.MarkFlagsMutuallyExclusive("no-exp", "exp-scraper")
-	reqsCmd.MarkFlagsMutuallyExclusive("no-exp", "exp-layout")
+	authsCmd.MarkFlagsMutuallyExclusive("new", "delete", "clear", "unmask")
+	authsCmd.MarkFlagsMutuallyExclusive("new", "get", "clear", "force")
+	authsCmd.MarkFlagsMutuallyExclusive("no-exp", "exp-scraper")
+	authsCmd.MarkFlagsMutuallyExclusive("no-exp", "exp-layout")
 
-	reqsCmd.MarkFlagsMutuallyExclusive("no-exp", "exp")
+	authsCmd.MarkFlagsMutuallyExclusive("no-exp", "exp")
 
 	rootCmd.AddCommand(authsCmd)
 }
@@ -223,10 +223,7 @@ func invokeAuthsShow(io cmdio.IO, projFile, authName string, unmaskSecrets bool)
 	}
 
 	// expiration detection
-	expDetect := "disabled"
-	if auth.IsDetectingExpiration() {
-		expDetect = "enabled"
-	}
+	expDetect := io.OnOrOff(auth.IsDetectingExpiration())
 
 	switch auth.Type {
 	case morc.AuthTypeNone:
@@ -267,7 +264,7 @@ func invokeAuthsShow(io cmdio.IO, projFile, authName string, unmaskSecrets bool)
 		}
 		io.Printf("Cookie: %s\n", cookie)
 
-		io.Printf("Expiration Detection: %t\n", expDetect)
+		io.Printf("Expiration Detection: %s\n", expDetect)
 		io.Printf("Cached Proof: %s\n", cached)
 	case morc.AuthTypeJWT:
 		io.Printf("Retrieval: %s\n", seqLine)
@@ -280,7 +277,7 @@ func invokeAuthsShow(io cmdio.IO, projFile, authName string, unmaskSecrets bool)
 		}
 		io.Printf("Token Scraper: %s\n", tokenSpec)
 
-		io.Printf("Expiration Detection: %t\n", expDetect)
+		io.Printf("Expiration Detection: %s\n", expDetect)
 		io.Printf("Cached Proof: %s\n", cached)
 	case morc.AuthTypeToken:
 		io.Printf("Retrieval: %s\n", seqLine)

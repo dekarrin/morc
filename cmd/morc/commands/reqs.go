@@ -826,6 +826,7 @@ func reqsSetFlagIsPresent(cmd *cobra.Command) bool {
 	f := cmd.Flags()
 	return f.Changed("method") ||
 		f.Changed("url") ||
+		f.Changed("auth") ||
 		f.Changed("header") ||
 		f.Changed("name") ||
 		f.Changed("header") ||

@@ -334,11 +334,6 @@ func invokeAuthsShow(io cmdio.IO, projFile, authName string, unmaskSecrets bool)
 	return nil
 }
 
-// type authAttrValues struct {
-
-// 	expirationDetection optional[bool]
-// }
-
 func invokeAuthsEdit(io cmdio.IO, projFile, authName string, attrs authAttrValues, unmaskSecrets bool) error {
 	// load the project file
 	p, err := readProject(projFile, false)
@@ -503,7 +498,7 @@ func invokeAuthsEdit(io cmdio.IO, projFile, authName string, attrs authAttrValue
 
 	if attrs.expirationSpec.set {
 		if attrs.expirationSpec.v.Spec() != auth.ExpirationScraper().Spec() {
-			if err := auth.SetExpirationScraper(attrs.expirationSpec.v); err != nil {
+			if err := auth.SetExpirationScraper(&attrs.expirationSpec.v); err != nil {
 				return fmt.Errorf("set expiration scraper: %w", err)
 			}
 
@@ -522,6 +517,26 @@ func invokeAuthsEdit(io cmdio.IO, projFile, authName string, attrs authAttrValue
 			modifiedVals[authKeyExpLayout] = attrs.expirationLayout.v
 		} else {
 			noChangeVals[authKeyExpLayout] = auth.ExpirationLayout()
+		}
+	}
+
+	if attrs.expirationDetection.set {
+		if attrs.expirationDetection.v != auth.IsDetectingExpiration() {
+			if attrs.expirationDetection.v {
+				// only auto-setting is appropriate here
+				if err := auth.SetExpirationScraper(nil); err != nil {
+					return fmt.Errorf("enable expiration detection: %w", err)
+				}
+			} else {
+				// remove expiration scraper
+				if err := auth.RemoveExpirationScraper(); err != nil {
+					return fmt.Errorf("disable expiration detection: %w", err)
+				}
+			}
+
+			modifiedVals[authKeyExpDetection] = attrs.expirationDetection.v
+		} else {
+			noChangeVals[authKeyExpDetection] = auth.IsDetectingExpiration()
 		}
 	}
 

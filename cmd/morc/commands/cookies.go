@@ -258,7 +258,7 @@ func parseCookiesArgs(cmd *cobra.Command, posArgs []string, args *cookiesArgs) e
 	switch args.action {
 	case cookiesActionList:
 		// pick up
-		if flags.URL != "" {
+		if cmd.Flags().Changed("url") {
 			lowerURL := strings.ToLower(flags.URL)
 			if !strings.HasPrefix(lowerURL, "http://") && !strings.HasPrefix(lowerURL, "https://") {
 				flags.URL = "http://" + flags.URL

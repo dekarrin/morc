@@ -56,6 +56,8 @@ var authsCmd = &cobra.Command{
 			return invokeAuthsNew(io, args.projFile, args.auth, args.sets)
 		case authsActionEdit:
 			return invokeAuthsEdit(io, args.projFile, args.auth, args.sets, args.unmask)
+		case authsActionGet:
+			return invokeAuthsGet(io, args.projFile, args.auth, args.getItem, args.unmask)
 		default:
 			panic(fmt.Sprintf("unhandled auths action %q", args.action))
 		}
@@ -334,6 +336,116 @@ func invokeAuthsShow(io cmdio.IO, projFile, authName string, unmaskSecrets bool)
 	return nil
 }
 
+func invokeAuthsGet(io cmdio.IO, projFile, authName string, item authKey, unmaskSecrets bool) error {
+	// load the project file
+	p, err := readProject(projFile, false)
+	if err != nil {
+		return err
+	}
+
+	// case doesn't matter for auth method names
+
+	authLower := strings.ToLower(authName)
+	auth, ok := p.Auths[authLower]
+	if !ok {
+		return morc.NewAuthNotFoundError(authName)
+	}
+
+	switch item {
+	case authKeyName:
+		io.Printf("%s\n", auth.Name)
+	case authKeyType:
+		if auth.Type == morc.AuthTypeNone {
+			io.PrintLoudf("(none)\n")
+		} else {
+			io.Printf("%s\n", auth.Type.String())
+		}
+	case authKeyUsername:
+		if auth.Type != morc.AuthTypeHTTPBasic {
+			io.PrintLoudf("(n/a)\n")
+		} else if auth.Username() == "" {
+			io.PrintLoudf("(empty)\n")
+		} else {
+			io.Printf("%s\n", auth.Username())
+		}
+	case authKeyPassword:
+		if auth.Type != morc.AuthTypeHTTPBasic {
+			io.PrintLoudf("(n/a)\n")
+		} else if auth.Password() == "" {
+			io.PrintLoudf("(empty)\n")
+		} else {
+			pass := auth.Password()
+			if !unmaskSecrets {
+				pass = strings.Repeat("*", len(pass))
+			}
+			io.Printf("%s\n", pass)
+		}
+	case authKeyCookie:
+		if auth.Type != morc.AuthTypeSession {
+			io.PrintLoudf("(n/a)\n")
+		} else if auth.CookieName() == "" {
+			io.PrintLoudf("(none)\n")
+		} else {
+			io.Printf("%s\n", auth.CookieName())
+		}
+	case authKeyDest:
+		if auth.Static() {
+			io.PrintLoudf("(n/a)\n")
+		} else {
+			dest := auth.Destination()
+			io.Printf("%s:%s\n", dest.Location.String(), dest.Key)
+		}
+	case authKeyExpDetection:
+		if auth.Static() {
+			io.PrintLoudf("(n/a)\n")
+		} else {
+			io.Printf("%s\n", io.OnOrOff(auth.IsDetectingExpiration()))
+		}
+	case authKeyExpScraper:
+		if auth.Static() {
+			io.PrintLoudf("(n/a)\n")
+		} else if auth.ExpirationScraper().Spec() == "" {
+			io.PrintLoudf("(none)\n")
+		} else {
+			io.Printf("%s\n", auth.ExpirationScraper().Spec())
+		}
+	case authKeyExpLayout:
+		if auth.Static() {
+			io.PrintLoudf("(n/a)\n")
+		} else if auth.ExpirationLayout() == "" {
+			io.PrintLoudf("(none)\n")
+		} else {
+			io.Printf("%s\n", auth.ExpirationLayout())
+		}
+	case authKeyFormat:
+		if auth.Static() {
+			io.PrintLoudf("(n/a)\n")
+		} else if auth.Destination().Format == morc.ProofFormatTypeNone {
+			io.PrintLoudf("(none)\n")
+		} else {
+			io.Printf("%s\n", auth.Destination().Format)
+		}
+	case authKeyRetrieval:
+		if auth.Static() {
+			io.PrintLoudf("(n/a)\n")
+		} else if auth.RetrievalSequence().Name == "" {
+			io.PrintLoudf("(none)\n")
+		} else {
+			io.Printf("%s\n", auth.RetrievalSequence().String())
+		}
+	case authKeyTokenScraper:
+		if auth.Type != morc.AuthTypeJWT && auth.Type != morc.AuthTypeToken {
+			io.PrintLoudf("(n/a)\n")
+		} else if auth.ValueScraper().Spec() == "" {
+			io.PrintLoudf("(none)\n")
+		} else {
+			io.Printf("%s\n", auth.ValueScraper().Spec())
+		}
+	}
+
+	return nil
+}
+
 func invokeAuthsEdit(io cmdio.IO, projFile, authName string, attrs authAttrValues, unmaskSecrets bool) error {
 	// load the project file
 	p, err := readProject(projFile, false)
@@ -366,6 +478,14 @@ func invokeAuthsEdit(io cmdio.IO, projFile, authName string, attrs authAttrValue
 			}
 			if _, exists := p.Auths[newNameLower]; exists {
 				return fmt.Errorf("auth method named %s already exists", newNameLower)
+			}
+
+			// update the name in any requests that use it
+			for _, tmplName := range p.TemplatesWithAuth(authLower) {
+				tmpl := p.Templates[tmplName]
+				tmpl.Auth = newNameLower
+				delete(p.Templates, tmplName)
+				p.Templates[tmpl.Name] = tmpl
 			}
 
 			auth.Name = newNameLower

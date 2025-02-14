@@ -23,6 +23,63 @@ func mustParseTime(layout, s string) time.Time {
 	return t
 }
 
+func testProof_session(key, value string, exp time.Time) morc.AuthProof {
+	return morc.DynamicProof{
+		Value:     value,
+		ExpiresAt: exp,
+		Dest: morc.ProofDestination{
+			Location: morc.ProofLocationCookie,
+			Key:      key,
+		},
+	}
+}
+
+type seqType int
+
+const (
+	seqTemplate seqType = iota
+	seqFlow
+)
+
+type expDetect int
+
+const (
+	enableExpiration expDetect = iota
+	disableExpiration
+)
+
+func testAuths(auths ...morc.Auth) map[string]morc.Auth {
+	m := make(map[string]morc.Auth)
+	for _, a := range auths {
+		m[a.Name] = a
+	}
+	return m
+}
+
+func testAuth_session(name string, seqType seqType, seqName, cookie string, expDetect expDetect, proof morc.AuthProof) morc.Auth {
+	return morc.Auth{
+		Name: name,
+		Type: morc.AuthTypeSession,
+		Fetcher: morc.NewSessionCookieFetcher(
+			morc.RequestSequence{Name: seqName, IsFlow: seqType == seqFlow},
+			cookie,
+			expDetect == enableExpiration,
+		),
+		Proof: proof,
+	}
+}
+
+func testAuth_basic(name, user, pass string) morc.Auth {
+	return morc.Auth{
+		Name: name,
+		Type: morc.AuthTypeHTTPBasic,
+		Proof: morc.HTTPBasicCredentials{
+			Username: user,
+			Password: pass,
+		},
+	}
+}
+
 func Test_Exec_Auth(t *testing.T) {
 
 	type Creds struct {
@@ -83,6 +140,18 @@ func Test_Exec_Auth(t *testing.T) {
 		}
 	}
 
+	var (
+		testTemplatesWithLogin = map[string]morc.RequestTemplate{
+			"login": {
+				Name:    "login",
+				Method:  "POST",
+				URL:     "/login",
+				Body:    []byte(`{"user":"ectoBiologist","pass":"ghostbusters3"}`),
+				Headers: http.Header{"Content-Type": []string{"application/json"}},
+			},
+		}
+	)
+
 	testCases := []struct {
 		name               string
 		args               []string // DO NOT INCLUDE -F; it is automatically set to a project file
@@ -102,28 +171,10 @@ func Test_Exec_Auth(t *testing.T) {
 			args:   []string{"exec", "auth1", "-a"},
 			respFn: respFnNoContentWithBasicAuth(Creds{User: "doesntmatter", Pass: "nothittingendpoint"}),
 			p: morc.Project{
-				Auths: map[string]morc.Auth{
-					"auth1": {
-						Name: "auth1",
-						Type: morc.AuthTypeHTTPBasic,
-						Proof: morc.HTTPBasicCredentials{
-							Username: "ectoBiologist",
-							Password: "letmein",
-						},
-					},
-				},
+				Auths: testAuths(testAuth_basic("auth1", "ectoBiologist", "letmein")),
 			},
 			expectP: morc.Project{
-				Auths: map[string]morc.Auth{
-					"auth1": {
-						Name: "auth1",
-						Type: morc.AuthTypeHTTPBasic,
-						Proof: morc.HTTPBasicCredentials{
-							Username: "ectoBiologist",
-							Password: "letmein",
-						},
-					},
-				},
+				Auths: testAuths(testAuth_basic("auth1", "ectoBiologist", "letmein")),
 			},
 			expectProjectSaved: false,
 			expectHistorySaved: false,
@@ -141,56 +192,16 @@ Auth proof: ectoBiologist:letmein
 				&http.Cookie{Name: "session", Value: "123456", Expires: expTime},
 			),
 			p: morc.Project{
-				Auths: map[string]morc.Auth{
-					"auth1": {
-						Name: "auth1",
-						Type: morc.AuthTypeSession,
-						Fetcher: morc.NewSessionCookieFetcher(
-							morc.RequestSequence{Name: "log-me-in"},
-							"session",
-							true,
-						),
-					},
-				},
-				Templates: map[string]morc.RequestTemplate{
-					"log-me-in": {
-						Name:    "testreq",
-						Method:  "POST",
-						URL:     "/login",
-						Body:    []byte(`{"user":"ectoBiologist","pass":"ghostbusters3"}`),
-						Headers: http.Header{"Content-Type": []string{"application/json"}},
-					},
-				},
+				Auths: testAuths(
+					testAuth_session("auth1", seqTemplate, "login", "session", enableExpiration, nil),
+				),
+				Templates: testTemplatesWithLogin,
 			},
 			expectP: morc.Project{
-				Auths: map[string]morc.Auth{
-					"auth1": {
-						Name: "auth1",
-						Type: morc.AuthTypeSession,
-						Fetcher: morc.NewSessionCookieFetcher(
-							morc.RequestSequence{Name: "log-me-in"},
-							"session",
-							true,
-						),
-						Proof: morc.DynamicProof{
-							Value:     "123456",
-							ExpiresAt: expTime,
-							Dest: morc.ProofDestination{
-								Location: morc.ProofLocationCookie,
-								Key:      "session",
-							},
-						},
-					},
-				},
-				Templates: map[string]morc.RequestTemplate{
-					"log-me-in": {
-						Name:    "testreq",
-						Method:  "POST",
-						URL:     "/login",
-						Body:    []byte(`{"user":"ectoBiologist","pass":"ghostbusters3"}`),
-						Headers: http.Header{"Content-Type": []string{"application/json"}},
-					},
-				},
+				Auths: testAuths(
+					testAuth_session("auth1", seqTemplate, "login", "session", enableExpiration, testProof_session("session", "123456", expTime)),
+				),
+				Templates: testTemplatesWithLogin,
 			},
 			expectProjectSaved: true,
 			expectHistorySaved: false,
@@ -200,6 +211,33 @@ Auth proof: ectoBiologist:letmein
 Got auth after 1 request
 Auth proof: 123456
 Expires: $EXP_TIME$
+`,
+		},
+		{
+			name:   "session cookie login - no initial, request sequence, no expiration detection",
+			args:   []string{"exec", "auth1", "-a"},
+			respFn: respFnLoginCookieAuth(Creds{User: "ectoBiologist", Pass: "ghostbusters3"}, &http.Cookie{Name: "session", Value: "123456", Expires: expTime}),
+
+			p: morc.Project{
+				Auths: testAuths(
+					testAuth_session("auth1", seqTemplate, "login", "session", disableExpiration, nil),
+				),
+				Templates: testTemplatesWithLogin,
+			},
+			expectP: morc.Project{
+				Auths: testAuths(
+					testAuth_session("auth1", seqTemplate, "login", "session", disableExpiration, testProof_session("session", "123456", time.Time{})),
+				),
+				Templates: testTemplatesWithLogin,
+			},
+			expectProjectSaved: true,
+			expectHistorySaved: false,
+			expectSessionSaved: false,
+			expectStdoutOutput: `HTTP/1.1 204 No Content
+(no response body)
+Got auth after 1 request
+Auth proof: 123456
+(no expiration)
 `,
 		},
 	}

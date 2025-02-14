@@ -15,14 +15,32 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func mustParseTime(layout, s string) time.Time {
+	t, err := time.Parse(layout, s)
+	if err != nil {
+		panic(err)
+	}
+	return t
+}
+
 func Test_Exec_Auth(t *testing.T) {
-	respFnNoContentWithBasicAuth := func(user, pass string) func(w http.ResponseWriter, r *http.Request) {
+
+	type Creds struct {
+		User string `json:"user"`
+		Pass string `json:"pass"`
+	}
+
+	// make sure we use same clock as a parsed version for everything.
+	// guh, time is annoying.
+	expTime := mustParseTime(time.RFC3339, time.Now().UTC().Add(24*time.Hour).Format(time.RFC3339))
+
+	respFnNoContentWithBasicAuth := func(validCredentials Creds) func(w http.ResponseWriter, r *http.Request) {
 		return func(w http.ResponseWriter, r *http.Request) {
 			// suppress date header
 			w.Header()["Date"] = nil
 
 			u, p, ok := r.BasicAuth()
-			if !ok || u != user || p != pass {
+			if !ok || u != validCredentials.User || p != validCredentials.Pass {
 				w.Header().Set("WWW-Authenticate", `Basic realm="test"`)
 				w.WriteHeader(http.StatusUnauthorized)
 				return
@@ -32,46 +50,37 @@ func Test_Exec_Auth(t *testing.T) {
 		}
 	}
 
-	cookieExpTime := time.Now().Add(24 * time.Hour)
+	respFnLoginCookieAuth := func(validCredentials Creds, cookie *http.Cookie) func(w http.ResponseWriter, r *http.Request) {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/login" {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
 
-	respFnCookieLogin := func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/login" {
-			w.WriteHeader(http.StatusNotFound)
-			return
+			if r.Method != http.MethodPost {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+
+			bodyBytes, err := io.ReadAll(r.Body)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+
+			var c Creds
+			if err := json.Unmarshal(bodyBytes, &c); err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			if c != validCredentials {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
+			http.SetCookie(w, cookie)
+			w.WriteHeader(http.StatusNoContent)
 		}
-
-		if r.Method != http.MethodPost {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-
-		bodyBytes, err := io.ReadAll(r.Body)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-		}
-
-		type creds struct {
-			User string `json:"user"`
-			Pass string `json:"pass"`
-		}
-
-		var c creds
-		if err := json.Unmarshal(bodyBytes, &c); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-
-		if c.User != "ectoBiologist" || c.Pass != "ghostbusters3" {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-
-		http.SetCookie(w, &http.Cookie{
-			Name:    "session",
-			Value:   "123456",
-			Expires: cookieExpTime,
-		})
-		w.WriteHeader(http.StatusNoContent)
 	}
 
 	testCases := []struct {
@@ -91,7 +100,7 @@ func Test_Exec_Auth(t *testing.T) {
 		{
 			name:   "basic auth",
 			args:   []string{"exec", "auth1", "-a"},
-			respFn: respFnNoContentWithBasicAuth("doesntmatter", "nothittingendpoint"),
+			respFn: respFnNoContentWithBasicAuth(Creds{User: "doesntmatter", Pass: "nothittingendpoint"}),
 			p: morc.Project{
 				Auths: map[string]morc.Auth{
 					"auth1": {
@@ -119,12 +128,18 @@ func Test_Exec_Auth(t *testing.T) {
 			expectProjectSaved: false,
 			expectHistorySaved: false,
 			expectSessionSaved: false,
-			expectStdoutOutput: "Got auth after 0 requests\nAuth proof: ectoBiologist:letmein\n(no expiration)\n",
+			expectStdoutOutput: `Got auth after 0 requests
+Auth proof: ectoBiologist:letmein
+(no expiration)
+`,
 		},
 		{
-			name:   "session cookie login - no initial, request sequence, detect expiration",
-			args:   []string{"exec", "auth1", "-a"},
-			respFn: respFnCookieLogin,
+			name: "session cookie login - no initial, request sequence, detect expiration",
+			args: []string{"exec", "auth1", "-a"},
+			respFn: respFnLoginCookieAuth(
+				Creds{User: "ectoBiologist", Pass: "ghostbusters3"},
+				&http.Cookie{Name: "session", Value: "123456", Expires: expTime},
+			),
 			p: morc.Project{
 				Auths: map[string]morc.Auth{
 					"auth1": {
@@ -159,7 +174,7 @@ func Test_Exec_Auth(t *testing.T) {
 						),
 						Proof: morc.DynamicProof{
 							Value:     "123456",
-							ExpiresAt: cookieExpTime,
+							ExpiresAt: expTime,
 							Dest: morc.ProofDestination{
 								Location: morc.ProofLocationCookie,
 								Key:      "session",
@@ -180,7 +195,12 @@ func Test_Exec_Auth(t *testing.T) {
 			expectProjectSaved: true,
 			expectHistorySaved: false,
 			expectSessionSaved: false,
-			expectStdoutOutput: "Got auth after 0 requests\nAuth proof: ectoBiologist:letmein\n(no expiration)\n",
+			expectStdoutOutput: `HTTP/1.1 204 No Content
+(no response body)
+Got auth after 1 request
+Auth proof: 123456
+Expires: $EXP_TIME$
+`,
 		},
 	}
 
@@ -217,6 +237,7 @@ func Test_Exec_Auth(t *testing.T) {
 			tc.expectStdoutOutput = strings.ReplaceAll(tc.expectStdoutOutput, "$TESTSERVER_URL$", srv.URL)
 			srvHost := mustParseURL(srv.URL).Host
 			tc.expectStdoutOutput = strings.ReplaceAll(tc.expectStdoutOutput, "$TESTSERVER_HOST$", srvHost)
+			tc.expectStdoutOutput = strings.ReplaceAll(tc.expectStdoutOutput, "$EXP_TIME$", expTime.Format(time.RFC3339))
 
 			cmdio.HTTPClient = srvClient
 

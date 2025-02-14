@@ -113,10 +113,15 @@ func invokeExec(io cmdio.IO, projFile, execName string, isAuth bool, initialVarO
 			break
 		}
 	}
-	for _, r := range results {
-		if r.AuthUpdated {
-			authsUpdated = true
-			break
+
+	if isAuth {
+		authsUpdated = len(results) > 0
+	} else {
+		for _, r := range results {
+			if r.AuthUpdated {
+				authsUpdated = true
+				break
+			}
 		}
 	}
 

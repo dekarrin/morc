@@ -619,6 +619,10 @@ func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 // it, and any error that ocurred retrieving the auth. If an auth proof is
 // already held and is still valid, no requests will be made, and the returned
 // slice of SendResults will be nil.
+//
+// Do not rely on checking for AuthUpdated in results to know if THIS auth was
+// updated; simply put, if requests were made, the auth was updated. The results
+// indicate of those, if any sub-auths were updated.
 func (p *Project) ExecAuth(auth *Auth, skipVerify bool, httpClient *http.Client, oc OutputControl) (ap AuthProof, results []SendResult, err error) {
 	// TODO: this API does not match Exec() at all. Caller is required to
 	// persist any changes to the auth manually to the project. Update this to

@@ -65,7 +65,6 @@ func invokeExec(io cmdio.IO, projFile, execName string, isAuth bool, initialVarO
 	oc.Writer = io.Out
 
 	var results []morc.SendResult
-	var updatedAuths []string
 	if isAuth {
 		execLower := strings.ToLower(execName)
 		auth, ok := p.Auths[execLower]
@@ -74,7 +73,7 @@ func invokeExec(io cmdio.IO, projFile, execName string, isAuth bool, initialVarO
 		}
 
 		var ap morc.AuthProof
-		ap, results, updatedAuths, err = p.ExecAuth(&auth, skipVerify, cmdio.HTTPClient, oc)
+		ap, results, err = p.ExecAuth(&auth, skipVerify, cmdio.HTTPClient, oc)
 		if err != nil {
 			return err
 		}
@@ -95,13 +94,13 @@ func invokeExec(io cmdio.IO, projFile, execName string, isAuth bool, initialVarO
 		}
 	} else {
 		var err error
-		results, updatedAuths, err = p.Exec(execName, initialVarOverrides, skipVerify, prefixOverride.Or(""), cmdio.HTTPClient, oc)
+		results, err = p.Exec(execName, initialVarOverrides, skipVerify, prefixOverride.Or(""), cmdio.HTTPClient, oc)
 		if err != nil {
 			return err
 		}
 	}
 
-	var varsSet, cookiesSet bool
+	var varsSet, cookiesSet, authsUpdated bool
 	for _, r := range results {
 		if len(r.Captures) > 0 {
 			varsSet = true
@@ -114,8 +113,14 @@ func invokeExec(io cmdio.IO, projFile, execName string, isAuth bool, initialVarO
 			break
 		}
 	}
+	for _, r := range results {
+		if r.AuthUpdated {
+			authsUpdated = true
+			break
+		}
+	}
 
-	return persistSendResults(p, varsSet, cookiesSet, len(updatedAuths) > 0)
+	return persistSendResults(p, varsSet, cookiesSet, authsUpdated)
 }
 
 type execArgs struct {

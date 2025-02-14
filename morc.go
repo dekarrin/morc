@@ -659,6 +659,11 @@ type SendResult struct {
 	// Cookies is all cookies available in the client after the request was
 	// sent.
 	Cookies []SetCookiesCall
+
+	// AuthUpdated is set to true if the auth proof was updated during the
+	// request. Note that this will never be true as a result of a Send call, as
+	// Send only uses auth proofs, it does not update their source.
+	AuthUpdated bool
 }
 
 const (

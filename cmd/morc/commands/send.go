@@ -58,12 +58,12 @@ func invokeSend(io cmdio.IO, projFile, reqName string, varOverrides map[string]s
 
 	oc.Writer = io.Out
 
-	results, updatedAuths, err := p.Send(reqName, varOverrides, skipVerify, prefixOverride.Or(""), cmdio.HTTPClient, oc)
+	results, err := p.Send(reqName, varOverrides, skipVerify, prefixOverride.Or(""), cmdio.HTTPClient, oc)
 	if err != nil {
 		return err
 	}
 
-	return persistSendResults(p, len(results.Captures) > 0, len(results.Cookies) > 0, len(updatedAuths) > 0)
+	return persistSendResults(p, len(results.Captures) > 0, len(results.Cookies) > 0, results.AuthUpdated)
 }
 
 type sendArgs struct {

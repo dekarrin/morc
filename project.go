@@ -334,14 +334,14 @@ func (p Project) PersistToDisk(all bool) error {
 // Exec sends the given flow by name and mutates the project accordingly.
 // Returns the results of the sends, any auths that were updated, and any error
 // that occurred.
-func (p *Project) Exec(flowName string, initialVarOverrides map[string]string, skipVerify bool, prefixOverride string, httpClient *http.Client, oc OutputControl) ([]SendResult, []string, error) {
+func (p *Project) Exec(flowName string, initialVarOverrides map[string]string, skipVerify bool, prefixOverride string, httpClient *http.Client, oc OutputControl) ([]SendResult, error) {
 	// case doesn't matter for flow names
 	flowName = strings.ToLower(flowName)
 
 	// check if the project even has a flow with that name
 	flow, ok := p.Flows[flowName]
 	if !ok {
-		return nil, nil, fmt.Errorf("no flow named %s", flowName)
+		return nil, fmt.Errorf("no flow named %s", flowName)
 	}
 
 	// now get all the templates and ensure they are valid
@@ -349,20 +349,20 @@ func (p *Project) Exec(flowName string, initialVarOverrides map[string]string, s
 	for i, step := range flow.Steps {
 		tmpl, ok := p.Templates[strings.ToLower(step.Template)]
 		if !ok {
-			return nil, nil, fmt.Errorf("flow %s calls non-existent request template %q in step #%d", flowName, step.Template, i-1)
+			return nil, fmt.Errorf("flow %s calls non-existent request template %q in step #%d", flowName, step.Template, i-1)
 		}
 		if !tmpl.Sendable() {
-			return nil, nil, fmt.Errorf("flow %s calls incomplete request template %s in step #%d", flowName, step.Template, i-1)
+			return nil, fmt.Errorf("flow %s calls incomplete request template %s in step #%d", flowName, step.Template, i-1)
 		}
 
 		if tmpl.Auth != "" {
 			auth, exists := p.Auths[strings.ToLower(tmpl.Auth)]
 			if !exists {
-				return nil, nil, fmt.Errorf("flow %s calls request template %s with non-existent auth method %s in step #%d", flowName, step.Template, tmpl.Auth, i-1)
+				return nil, fmt.Errorf("flow %s calls request template %s with non-existent auth method %s in step #%d", flowName, step.Template, tmpl.Auth, i-1)
 			}
 
 			if !auth.Sendable() {
-				return nil, nil, fmt.Errorf("flow %s calls request template %s with incomplete auth method %s in step #%d", flowName, step.Template, auth.Name, i-1)
+				return nil, fmt.Errorf("flow %s calls request template %s with incomplete auth method %s in step #%d", flowName, step.Template, auth.Name, i-1)
 			}
 		}
 
@@ -381,15 +381,10 @@ func (p *Project) Exec(flowName string, initialVarOverrides map[string]string, s
 	}
 
 	var results []SendResult
-	var updatedAuths []string
 	for i, tmpl := range templates {
-		result, updated, err := p.SendTemplate(tmpl, p.Vars.MergedSet(varOverrides), skipVerify, prefix, httpClient, oc)
-		if len(updated) > 0 {
-			updatedAuths = append(updatedAuths, updated...)
-		}
-
+		result, err := p.SendTemplate(tmpl, p.Vars.MergedSet(varOverrides), skipVerify, prefix, httpClient, oc)
 		if err != nil {
-			return results, updatedAuths, fmt.Errorf("step #%d: %w", i, err)
+			return results, fmt.Errorf("step #%d: %w", i, err)
 		}
 
 		results = append(results, result)
@@ -401,20 +396,19 @@ func (p *Project) Exec(flowName string, initialVarOverrides map[string]string, s
 		}
 	}
 
-	return results, updatedAuths, nil
+	return results, nil
 }
 
 // Send sends the given request template by name and mutates the project
-// accordingly. Returns the result of the send, any auths that were
-// updated, and any error that occurred.
-func (p *Project) Send(reqName string, varOverrides map[string]string, skipVerify bool, prefixOverride string, httpClient *http.Client, oc OutputControl) (SendResult, []string, error) {
+// accordingly. Returns the result of the send and any error that occurred.
+func (p *Project) Send(reqName string, varOverrides map[string]string, skipVerify bool, prefixOverride string, httpClient *http.Client, oc OutputControl) (SendResult, error) {
 	// case doesn't matter for request template names
 	reqName = strings.ToLower(reqName)
 
 	// check if the project already has a request with the same name
 	tmpl, ok := p.Templates[reqName]
 	if !ok {
-		return SendResult{}, nil, fmt.Errorf("no request template %s", reqName)
+		return SendResult{}, fmt.Errorf("no request template %s", reqName)
 	}
 
 	prefix := p.VarPrefix()
@@ -426,36 +420,29 @@ func (p *Project) Send(reqName string, varOverrides map[string]string, skipVerif
 }
 
 // Fetch performs either a flow or a template send and returns the slice of
-// results for each and any auths that were updated. If a template is specified,
+// results for each. If a template is specified,
 // the returned slice will have only one element. If a flow is specified, it is
 // an error if the flow does not return at least one SendResult.
-// TODO: merge auths updated into results once everything has been converted to
-// use it.
-func (p *Project) Fetch(r RequestSequence, varOverrides map[string]string, skipVerify bool, varPrefixOverride string, httpClient *http.Client, oc OutputControl) ([]SendResult, []string, error) {
+func (p *Project) Fetch(r RequestSequence, varOverrides map[string]string, skipVerify bool, varPrefixOverride string, httpClient *http.Client, oc OutputControl) ([]SendResult, error) {
 	var results []SendResult
-	var updatedAuths []string
 	if r.IsFlow {
-		res, auths, err := p.Exec(r.Name, varOverrides, skipVerify, varPrefixOverride, httpClient, oc)
-		updatedAuths = auths
+		res, err := p.Exec(r.Name, varOverrides, skipVerify, varPrefixOverride, httpClient, oc)
 		if err != nil {
-			return nil, updatedAuths, fmt.Errorf("flow %q failed: %w", r.Name, err)
+			return nil, fmt.Errorf("flow %q failed: %w", r.Name, err)
 		}
 		if len(res) == 0 {
-			return nil, updatedAuths, fmt.Errorf("flow %q did not return any results", r.Name)
+			return nil, fmt.Errorf("flow %q did not return any results", r.Name)
 		}
 		results = res
 	} else {
-		res, updated, err := p.Send(r.Name, varOverrides, skipVerify, varPrefixOverride, httpClient, oc)
-		if len(updated) > 0 {
-			updatedAuths = append(updatedAuths, updated...)
-		}
+		res, err := p.Send(r.Name, varOverrides, skipVerify, varPrefixOverride, httpClient, oc)
 		if err != nil {
-			return nil, updatedAuths, fmt.Errorf("request template %q failed: %w", r.Name, err)
+			return nil, fmt.Errorf("request template %q failed: %w", r.Name, err)
 		}
 		results = []SendResult{res}
 	}
 
-	return results, updatedAuths, nil
+	return results, nil
 }
 
 // SendTemplate sends the request template and mutates the project accordingly. If
@@ -463,41 +450,32 @@ func (p *Project) Fetch(r RequestSequence, varOverrides map[string]string, skipV
 // is only done during testing. Returns results, any template's auths that were
 // updated (which may be more than one if an Auth chains into another Auth), and
 // any error that occurred.
-func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, skipVerify bool, varSymbol string, httpClient *http.Client, oc OutputControl) (SendResult, []string, error) {
-	var authsUpdatedSet map[string]struct{} = make(map[string]struct{})
-	var authsUpdated []string
-	defer func() {
-		if len(authsUpdatedSet) > 0 {
-			for au := range authsUpdatedSet {
-				authsUpdated = append(authsUpdated, au)
-			}
-		}
-	}()
+func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, skipVerify bool, varSymbol string, httpClient *http.Client, oc OutputControl) (SendResult, error) {
 
 	if tmpl.Method == "" {
-		return SendResult{}, authsUpdated, fmt.Errorf("request template %s has no method set", tmpl.Name)
+		return SendResult{}, fmt.Errorf("request template %s has no method set", tmpl.Name)
 	}
 
 	if tmpl.URL == "" {
-		return SendResult{}, authsUpdated, fmt.Errorf("request template %s has no URL set", tmpl.Name)
+		return SendResult{}, fmt.Errorf("request template %s has no URL set", tmpl.Name)
 	}
 
 	var auth *Auth
 	if tmpl.Auth != "" {
 		authItem, ok := p.Auths[strings.ToLower(tmpl.Auth)]
 		if !ok {
-			return SendResult{}, authsUpdated, fmt.Errorf("request template %s references non-existent auth %s", tmpl.Name, tmpl.Auth)
+			return SendResult{}, fmt.Errorf("request template %s references non-existent auth %s", tmpl.Name, tmpl.Auth)
 		}
 		auth = &authItem
 
 		if !auth.Sendable() {
-			return SendResult{}, authsUpdated, fmt.Errorf("request template %s uses auth method %s, which is incomplete", tmpl.Name, auth.Name)
+			return SendResult{}, fmt.Errorf("request template %s uses auth method %s, which is incomplete", tmpl.Name, auth.Name)
 		}
 	}
 
 	// retry failed auth ONLY if we did not just get it.
 	var result SendResult
-
+	var authUpdated bool
 	var retry bool = true
 	for retry {
 		retry = false
@@ -523,17 +501,13 @@ func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 			}
 
 			var sendResults []SendResult
-			var subAuthUpdates []string
-			authProof, sendResults, subAuthUpdates, err = p.ExecAuth(auth, skipVerify, httpClient, authOC)
+			authProof, sendResults, err = p.ExecAuth(auth, skipVerify, httpClient, authOC)
 			authRequested = len(sendResults) > 0
-			for _, su := range subAuthUpdates {
-				authsUpdatedSet[su] = struct{}{}
-			}
 			if err != nil {
-				return SendResult{}, authsUpdated, err
+				return SendResult{}, err
 			}
 			if authRequested {
-				authsUpdatedSet[auth.Name] = struct{}{}
+				authUpdated = true
 
 				// persist any auth changes
 				p.Auths[strings.ToLower(tmpl.Auth)] = *auth
@@ -567,8 +541,9 @@ func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 		var err error
 
 		result, err = Send(tmpl.Method, tmpl.URL, varSymbol, sendOpts)
+		result.AuthUpdated = authUpdated
 		if err != nil {
-			return result, authsUpdated, err
+			return result, err
 		}
 
 		// persist var captures
@@ -605,7 +580,7 @@ func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 				// if auth is non dynamic and it failed, this will clear the
 				// proof
 				if !auth.Static() {
-					authsUpdatedSet[auth.Name] = struct{}{}
+					result.AuthUpdated = true
 				}
 
 				// TODO: error check Fprint output
@@ -636,7 +611,7 @@ func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 		}
 	}
 
-	return result, authsUpdated, nil
+	return result, nil
 }
 
 // ExecAuth retreives an auth proof with the given auth using the given options.
@@ -644,37 +619,35 @@ func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 // it, and any error that ocurred retrieving the auth. If an auth proof is
 // already held and is still valid, no requests will be made, and the returned
 // slice of SendResults will be nil.
-func (p *Project) ExecAuth(auth *Auth, skipVerify bool, httpClient *http.Client, oc OutputControl) (ap AuthProof, results []SendResult, subAuthsUpdated []string, err error) {
+func (p *Project) ExecAuth(auth *Auth, skipVerify bool, httpClient *http.Client, oc OutputControl) (ap AuthProof, results []SendResult, err error) {
 	// TODO: this API does not match Exec() at all. Caller is required to
 	// persist any changes to the auth manually to the project. Update this to
 	// be more like Exec() which should be automatically handled.
 
-	var updatedSubAuths []string
-
 	if auth.Static() {
-		return auth.Proof, nil, nil, nil
+		return auth.Proof, nil, nil
 	}
 
 	if auth.Proof == nil || !auth.Proof.Valid() {
 		if auth.Fetcher == nil {
-			return nil, nil, nil, errors.New("no static credentials or fetcher configured")
+			return nil, nil, errors.New("no static credentials or fetcher configured")
 		}
 
-		results, updatedSubAuths, err = p.Fetch(auth.Fetcher.Seq, nil, skipVerify, "", httpClient, oc)
+		results, err = p.Fetch(auth.Fetcher.Seq, nil, skipVerify, "", httpClient, oc)
 		if err != nil {
-			return nil, nil, updatedSubAuths, fmt.Errorf("fetch auth: %w", err)
+			return nil, nil, fmt.Errorf("fetch auth: %w", err)
 		}
 
 		lastResult := results[len(results)-1]
 		proof, err := auth.Fetcher.ScrapeFromResult(lastResult)
 		if err != nil {
-			return nil, results, updatedSubAuths, fmt.Errorf("read auth: %w", err)
+			return nil, results, fmt.Errorf("read auth: %w", err)
 		}
 
 		auth.Proof = proof
 	}
 
-	return auth.Proof, results, updatedSubAuths, nil
+	return auth.Proof, results, nil
 }
 
 func dumpToFile(path string, dumpFunc func(io.Writer) error) error {

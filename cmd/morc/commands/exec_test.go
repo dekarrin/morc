@@ -150,6 +150,36 @@ func Test_Exec_Auth(t *testing.T) {
 				Headers: http.Header{"Content-Type": []string{"application/json"}},
 			},
 		}
+
+		// TODO: see about combining this with testRequestX functions
+		testTemplatesWithLoginAndKnock = map[string]morc.RequestTemplate{
+			"knock": {
+				Name:   "knock",
+				Method: "GET",
+				URL:    "/knock",
+			},
+			"login": {
+				Name:    "login",
+				Method:  "POST",
+				URL:     "/login",
+				Body:    []byte(`{"user":"ectoBiologist","pass":"ghostbusters3"}`),
+				Headers: http.Header{"Content-Type": []string{"application/json"}},
+			},
+		}
+
+		testFlowsWithLogin = map[string]morc.Flow{
+			"login": {
+				Name: "login",
+				Steps: []morc.FlowStep{
+					{
+						Template: "knock",
+					},
+					{
+						Template: "login",
+					},
+				},
+			},
+		}
 	)
 
 	testCases := []struct {
@@ -238,6 +268,62 @@ Expires: $EXP_TIME$
 Got auth after 1 request
 Auth proof: 123456
 (no expiration)
+`,
+		},
+		{
+			name:   "session cookie login - has initial invalid, flow sequence, expiration detection",
+			args:   []string{"exec", "auth1", "-a"},
+			respFn: respFnLoginCookieAuth(Creds{User: "ectoBiologist", Pass: "ghostbusters3"}, &http.Cookie{Name: "session", Value: "123456", Expires: expTime}),
+			p: morc.Project{
+				Auths: testAuths(
+					testAuth_session("auth1", seqFlow, "login", "session", enableExpiration, testProof_session("session", "BAD", time.Now().Add(-1*time.Hour))),
+				),
+				Flows:     testFlowsWithLogin,
+				Templates: testTemplatesWithLoginAndKnock,
+			},
+			expectP: morc.Project{
+				Auths: testAuths(
+					testAuth_session("auth1", seqFlow, "login", "session", enableExpiration, testProof_session("session", "123456", expTime)),
+				),
+				Flows:     testFlowsWithLogin,
+				Templates: testTemplatesWithLoginAndKnock,
+			},
+			expectProjectSaved: true,
+			expectHistorySaved: false,
+			expectSessionSaved: false,
+			expectStdoutOutput: `HTTP/1.1 404 Not Found
+(no response body)
+HTTP/1.1 204 No Content
+(no response body)
+Got auth after 2 requests
+Auth proof: 123456
+Expires: $EXP_TIME$
+`,
+		},
+		{
+			name:   "session cookie login - has initial valid, flow sequence, expiration detection",
+			args:   []string{"exec", "auth1", "-a"},
+			respFn: respFnLoginCookieAuth(Creds{User: "ectoBiologist", Pass: "ghostbusters3"}, &http.Cookie{Name: "session", Value: "123456", Expires: expTime}),
+			p: morc.Project{
+				Auths: testAuths(
+					testAuth_session("auth1", seqFlow, "login", "session", enableExpiration, testProof_session("session", "GOOD", expTime)),
+				),
+				Flows:     testFlowsWithLogin,
+				Templates: testTemplatesWithLoginAndKnock,
+			},
+			expectP: morc.Project{
+				Auths: testAuths(
+					testAuth_session("auth1", seqFlow, "login", "session", enableExpiration, testProof_session("session", "GOOD", expTime)),
+				),
+				Flows:     testFlowsWithLogin,
+				Templates: testTemplatesWithLoginAndKnock,
+			},
+			expectProjectSaved: false,
+			expectHistorySaved: false,
+			expectSessionSaved: false,
+			expectStdoutOutput: `Got auth after 0 requests
+Auth proof: GOOD
+Expires: $EXP_TIME$
 `,
 		},
 	}

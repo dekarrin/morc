@@ -65,7 +65,7 @@ func invokeExec(io cmdio.IO, projFile, execName string, isAuth bool, initialVarO
 	oc.Writer = io.Out
 
 	var results []morc.SendResult
-
+	var updatedAuths []string
 	if isAuth {
 		execLower := strings.ToLower(execName)
 		auth, ok := p.Auths[execLower]
@@ -74,7 +74,7 @@ func invokeExec(io cmdio.IO, projFile, execName string, isAuth bool, initialVarO
 		}
 
 		var ap morc.AuthProof
-		ap, results, err = p.ExecAuth(&auth, skipVerify, cmdio.HTTPClient, oc)
+		ap, results, updatedAuths, err = p.ExecAuth(&auth, skipVerify, cmdio.HTTPClient, oc)
 		if err != nil {
 			return err
 		}
@@ -95,7 +95,7 @@ func invokeExec(io cmdio.IO, projFile, execName string, isAuth bool, initialVarO
 		}
 	} else {
 		var err error
-		results, err = p.Exec(execName, initialVarOverrides, skipVerify, prefixOverride.Or(""), cmdio.HTTPClient, oc)
+		results, updatedAuths, err = p.Exec(execName, initialVarOverrides, skipVerify, prefixOverride.Or(""), cmdio.HTTPClient, oc)
 		if err != nil {
 			return err
 		}
@@ -115,7 +115,7 @@ func invokeExec(io cmdio.IO, projFile, execName string, isAuth bool, initialVarO
 		}
 	}
 
-	return persistSendResults(p, varsSet, cookiesSet)
+	return persistSendResults(p, varsSet, cookiesSet, len(updatedAuths) > 0)
 }
 
 type execArgs struct {

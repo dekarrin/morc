@@ -58,12 +58,12 @@ func invokeSend(io cmdio.IO, projFile, reqName string, varOverrides map[string]s
 
 	oc.Writer = io.Out
 
-	results, err := p.Send(reqName, varOverrides, skipVerify, prefixOverride.Or(""), cmdio.HTTPClient, oc)
+	results, updatedAuths, err := p.Send(reqName, varOverrides, skipVerify, prefixOverride.Or(""), cmdio.HTTPClient, oc)
 	if err != nil {
 		return err
 	}
 
-	return persistSendResults(p, len(results.Captures) > 0, len(results.Cookies) > 0)
+	return persistSendResults(p, len(results.Captures) > 0, len(results.Cookies) > 0, len(updatedAuths) > 0)
 }
 
 type sendArgs struct {
@@ -119,9 +119,9 @@ func parseSendArgs(cmd *cobra.Command, posArgs []string, args *sendArgs) error {
 	return nil
 }
 
-func persistSendResults(p morc.Project, varsWereSet, cookiesWereSet bool) error {
+func persistSendResults(p morc.Project, varsUpdated, cookiesUpdated, authsUpdated bool) error {
 	// if any variable changes occurred, persist to disk
-	if varsWereSet {
+	if varsUpdated || authsUpdated {
 		err := writeProject(p, false)
 		if err != nil {
 			return fmt.Errorf("save project to disk: %w", err)
@@ -137,7 +137,7 @@ func persistSendResults(p morc.Project, varsWereSet, cookiesWereSet bool) error 
 	}
 
 	// persist cookies to disk, if any
-	if p.Config.RecordSession && cookiesWereSet {
+	if p.Config.RecordSession && cookiesUpdated {
 		err := writeSession(p)
 		if err != nil {
 			return fmt.Errorf("save session to disk: %w", err)

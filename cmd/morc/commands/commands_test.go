@@ -2,8 +2,10 @@ package commands
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -515,4 +517,163 @@ func testFlows_singleFlowWithNSteps(n int) map[string]morc.Flow {
 
 func testFlows_singleFlowWithSequence(reqNums ...int) map[string]morc.Flow {
 	return testFlows_singleFlowWithNameAndSequence(testFlowName, reqNums...)
+}
+
+type seqType int
+
+const (
+	seqTemplate seqType = iota
+	seqFlow
+)
+
+type expDetect int
+
+const (
+	enableExpiration expDetect = iota
+	disableExpiration
+)
+
+func testAuths(auths ...morc.Auth) map[string]morc.Auth {
+	m := make(map[string]morc.Auth)
+	for _, a := range auths {
+		m[a.Name] = a
+	}
+	return m
+}
+
+func testAuth_session(name string, seqType seqType, seqName, cookie string, expDetect expDetect, proof morc.AuthProof) morc.Auth {
+	return morc.Auth{
+		Name: name,
+		Type: morc.AuthTypeSession,
+		Fetcher: morc.NewSessionCookieFetcher(
+			morc.RequestSequence{Name: seqName, IsFlow: seqType == seqFlow},
+			cookie,
+			expDetect == enableExpiration,
+		),
+		Proof: proof,
+	}
+}
+
+func testAuth_basic(name, user, pass string) morc.Auth {
+	return morc.Auth{
+		Name: name,
+		Type: morc.AuthTypeHTTPBasic,
+		Proof: morc.HTTPBasicCredentials{
+			Username: user,
+			Password: pass,
+		},
+	}
+}
+
+type Creds struct {
+	User string `json:"user"`
+	Pass string `json:"pass"`
+}
+
+// testRequests_withProtectedResource_session returns a set of request
+// templates suitable for use with the server handler returned in
+// serverHandler_withProtectedResource_session. "login" will POST to the
+// login endpoint and "resource" will GET the protected resource. The resource
+// request uses the Auth with the given name.
+func testRequests_withProtectedResource_session(creds Creds, auth string) map[string]morc.RequestTemplate {
+	body, err := json.Marshal(creds)
+	if err != nil {
+		panic(fmt.Sprintf("failed to marshal creds: %v", err))
+	}
+
+	reqs := map[string]morc.RequestTemplate{
+		"login": {
+			Name:    "login",
+			Method:  "POST",
+			URL:     "/login",
+			Body:    []byte(body),
+			Headers: http.Header{"Content-Type": []string{"application/json"}},
+		},
+		"resource": {
+			Name:    "resource",
+			Method:  "GET",
+			URL:     "/protected",
+			Headers: http.Header{"Content-Type": []string{"application/json"}},
+			Auth:    auth,
+		},
+	}
+	return reqs
+}
+
+// serverHandler_withProtectedResource_session returns a handler that can be
+// used to test login cookie auth. It has a login endpoint at /login and a
+// protected resource endpoint at /protected. When /login is POST'd to with a
+// JSON body that unmarshals to a Creds object matching validCredentials, the
+// server returns a Set-Cookie containing the provided cookie for the session.
+// When /protected is GET'd with the proper session cookie, the server will
+// return the protected resource as a JSON response.
+func serverHandler_withProtectedResource_session(validCredentials Creds, cookie *http.Cookie, protected interface{}) func(w http.ResponseWriter, r *http.Request) {
+	requiredValue := cookie.Value
+
+	resourceBytes := []byte{}
+	if protected != nil {
+		var err error
+		resourceBytes, err = json.Marshal(protected)
+		if err != nil {
+			panic("failed to marshal protected resource")
+		}
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+
+		switch path {
+		case "/login":
+			switch r.Method {
+			case http.MethodPost:
+				bodyBytes, err := io.ReadAll(r.Body)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+
+				var c Creds
+				if err := json.Unmarshal(bodyBytes, &c); err != nil {
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+
+				if c != validCredentials {
+					w.WriteHeader(http.StatusForbidden)
+					return
+				}
+
+				http.SetCookie(w, cookie)
+				w.WriteHeader(http.StatusNoContent)
+			default:
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+		case "/protected":
+			switch r.Method {
+			case http.MethodGet:
+				sessionCookie, err := r.Cookie(cookie.Name)
+				if err != nil {
+					w.WriteHeader(http.StatusForbidden)
+					return
+				}
+
+				if sessionCookie.Value != requiredValue {
+					w.WriteHeader(http.StatusForbidden)
+					return
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write(resourceBytes)
+				return
+			default:
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+	}
 }

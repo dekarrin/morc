@@ -82,7 +82,7 @@ func invokeCookiesOn(io cmdio.IO, projFile string) error {
 
 	if p.Config.SeshFile == "" {
 		p.Config.HistFile = morc.DefaultSessionPath
-		io.PrintErrf("no session file configured; defaulting to " + p.Config.SessionFSPath())
+		io.PrintErrf("%s", "no session file configured; defaulting to "+p.Config.SessionFSPath())
 	}
 
 	p.Config.RecordSession = true

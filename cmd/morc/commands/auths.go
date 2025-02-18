@@ -888,7 +888,7 @@ func validateAttrCombos(attrs authAttrValues, existing *morc.Auth) error {
 	}
 
 	if sb.Len() > 0 {
-		return fmt.Errorf(sb.String())
+		return fmt.Errorf("%s", sb.String())
 	}
 	return nil
 }

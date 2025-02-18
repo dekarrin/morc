@@ -1,8 +1,6 @@
 package commands
 
 import (
-	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -34,58 +32,7 @@ func testProof_session(key, value string, exp time.Time) morc.AuthProof {
 	}
 }
 
-type seqType int
-
-const (
-	seqTemplate seqType = iota
-	seqFlow
-)
-
-type expDetect int
-
-const (
-	enableExpiration expDetect = iota
-	disableExpiration
-)
-
-func testAuths(auths ...morc.Auth) map[string]morc.Auth {
-	m := make(map[string]morc.Auth)
-	for _, a := range auths {
-		m[a.Name] = a
-	}
-	return m
-}
-
-func testAuth_session(name string, seqType seqType, seqName, cookie string, expDetect expDetect, proof morc.AuthProof) morc.Auth {
-	return morc.Auth{
-		Name: name,
-		Type: morc.AuthTypeSession,
-		Fetcher: morc.NewSessionCookieFetcher(
-			morc.RequestSequence{Name: seqName, IsFlow: seqType == seqFlow},
-			cookie,
-			expDetect == enableExpiration,
-		),
-		Proof: proof,
-	}
-}
-
-func testAuth_basic(name, user, pass string) morc.Auth {
-	return morc.Auth{
-		Name: name,
-		Type: morc.AuthTypeHTTPBasic,
-		Proof: morc.HTTPBasicCredentials{
-			Username: user,
-			Password: pass,
-		},
-	}
-}
-
 func Test_Exec_Auth(t *testing.T) {
-
-	type Creds struct {
-		User string `json:"user"`
-		Pass string `json:"pass"`
-	}
 
 	// make sure we use same clock as a parsed version for everything.
 	// guh, time is annoying.
@@ -103,39 +50,6 @@ func Test_Exec_Auth(t *testing.T) {
 				return
 			}
 
-			w.WriteHeader(http.StatusNoContent)
-		}
-	}
-
-	respFnLoginCookieAuth := func(validCredentials Creds, cookie *http.Cookie) func(w http.ResponseWriter, r *http.Request) {
-		return func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path != "/login" {
-				w.WriteHeader(http.StatusNotFound)
-				return
-			}
-
-			if r.Method != http.MethodPost {
-				w.WriteHeader(http.StatusMethodNotAllowed)
-				return
-			}
-
-			bodyBytes, err := io.ReadAll(r.Body)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-			}
-
-			var c Creds
-			if err := json.Unmarshal(bodyBytes, &c); err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			if c != validCredentials {
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-
-			http.SetCookie(w, cookie)
 			w.WriteHeader(http.StatusNoContent)
 		}
 	}
@@ -217,9 +131,10 @@ Auth proof: ectoBiologist:letmein
 		{
 			name: "session cookie login - no initial, request sequence, detect expiration",
 			args: []string{"exec", "auth1", "-a"},
-			respFn: respFnLoginCookieAuth(
+			respFn: serverHandler_withProtectedResource_session(
 				Creds{User: "ectoBiologist", Pass: "ghostbusters3"},
 				&http.Cookie{Name: "session", Value: "123456", Expires: expTime},
+				nil,
 			),
 			p: morc.Project{
 				Auths: testAuths(
@@ -244,10 +159,13 @@ Expires: $EXP_TIME$
 `,
 		},
 		{
-			name:   "session cookie login - no initial, request sequence, no expiration detection",
-			args:   []string{"exec", "auth1", "-a"},
-			respFn: respFnLoginCookieAuth(Creds{User: "ectoBiologist", Pass: "ghostbusters3"}, &http.Cookie{Name: "session", Value: "123456", Expires: expTime}),
-
+			name: "session cookie login - no initial, request sequence, no expiration detection",
+			args: []string{"exec", "auth1", "-a"},
+			respFn: serverHandler_withProtectedResource_session(
+				Creds{User: "ectoBiologist", Pass: "ghostbusters3"},
+				&http.Cookie{Name: "session", Value: "123456", Expires: expTime},
+				nil,
+			),
 			p: morc.Project{
 				Auths: testAuths(
 					testAuth_session("auth1", seqTemplate, "login", "session", disableExpiration, nil),
@@ -271,9 +189,13 @@ Auth proof: 123456
 `,
 		},
 		{
-			name:   "session cookie login - has initial invalid, flow sequence, expiration detection",
-			args:   []string{"exec", "auth1", "-a"},
-			respFn: respFnLoginCookieAuth(Creds{User: "ectoBiologist", Pass: "ghostbusters3"}, &http.Cookie{Name: "session", Value: "123456", Expires: expTime}),
+			name: "session cookie login - has initial invalid, flow sequence, expiration detection",
+			args: []string{"exec", "auth1", "-a"},
+			respFn: serverHandler_withProtectedResource_session(
+				Creds{User: "ectoBiologist", Pass: "ghostbusters3"},
+				&http.Cookie{Name: "session", Value: "123456", Expires: expTime},
+				nil,
+			),
 			p: morc.Project{
 				Auths: testAuths(
 					testAuth_session("auth1", seqFlow, "login", "session", enableExpiration, testProof_session("session", "BAD", time.Now().Add(-1*time.Hour))),
@@ -301,9 +223,13 @@ Expires: $EXP_TIME$
 `,
 		},
 		{
-			name:   "session cookie login - has initial valid, flow sequence, expiration detection",
-			args:   []string{"exec", "auth1", "-a"},
-			respFn: respFnLoginCookieAuth(Creds{User: "ectoBiologist", Pass: "ghostbusters3"}, &http.Cookie{Name: "session", Value: "123456", Expires: expTime}),
+			name: "session cookie login - has initial valid, flow sequence, expiration detection",
+			args: []string{"exec", "auth1", "-a"},
+			respFn: serverHandler_withProtectedResource_session(
+				Creds{User: "ectoBiologist", Pass: "ghostbusters3"},
+				&http.Cookie{Name: "session", Value: "123456", Expires: expTime},
+				nil,
+			),
 			p: morc.Project{
 				Auths: testAuths(
 					testAuth_session("auth1", seqFlow, "login", "session", enableExpiration, testProof_session("session", "GOOD", expTime)),

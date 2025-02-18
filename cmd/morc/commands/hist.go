@@ -119,7 +119,7 @@ func invokeHistOn(io cmdio.IO, projFile string) error {
 
 	if p.Config.HistFile == "" {
 		p.Config.HistFile = morc.DefaultHistoryPath
-		io.PrintErrf("no history file configured; defaulting to " + p.Config.HistoryFSPath())
+		io.PrintErrf("%s", "no history file configured; defaulting to "+p.Config.HistoryFSPath())
 	}
 
 	p.Config.RecordHistory = true

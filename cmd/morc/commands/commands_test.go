@@ -264,6 +264,15 @@ func runTestCommand(cmd *cobra.Command, projFilePath string, args []string) (std
 	return stdoutCapture.String(), stderrCapture.String(), err
 }
 
+func (f *cliFlags) resetOutputControl() {
+	f.BHeaders = false
+	f.BCaptures = false
+	f.BNoBody = false
+	f.BRequest = false
+	f.BHideAuth = false
+	f.Format = "pretty" // TODO: make this default not be magic but rather have the cmd flag init and the reset use it
+}
+
 func createTestProjectIO(t *testing.T, p morc.Project) string {
 	projReader = nil
 	projWriter = nil

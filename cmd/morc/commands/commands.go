@@ -192,9 +192,12 @@ Usage:
 func addRequestOutputFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().BoolVarP(&flags.BHeaders, "headers", "", false, "(Output flag) Output the headers of the response")
 	cmd.PersistentFlags().BoolVarP(&flags.BCaptures, "captures", "", false, "(Output flag) Output the captures from the response")
+
+	// TODO: change this to hide-body or something so we can be consistent with --hide-auth
 	cmd.PersistentFlags().BoolVarP(&flags.BNoBody, "no-body", "", false, "(Output flag) Suppress the output of the response body")
 	cmd.PersistentFlags().BoolVarP(&flags.BRequest, "request", "", false, "(Output flag) Output the filled request prior to sending it")
 	cmd.PersistentFlags().StringVarP(&flags.Format, "format", "f", "pretty", "(Output flag) Set output format. `FMT` must be one of 'pretty', 'line', or 'sr')")
+	cmd.PersistentFlags().BoolVarP(&flags.BHideAuth, "hide-auth", "", false, "(Output flag) Suppress the output of any auth requests made")
 }
 
 func gatherRequestOutputFlags(cmd *cobra.Command) (morc.OutputControl, error) {
@@ -225,6 +228,7 @@ func gatherRequestOutputFlags(cmd *cobra.Command) (morc.OutputControl, error) {
 	oc.Headers = flags.BHeaders
 	oc.Captures = flags.BCaptures
 	oc.SuppressResponseBody = flags.BNoBody
+	oc.SuppressAuthRequests = flags.BHideAuth
 
 	return oc, nil
 }
@@ -546,6 +550,10 @@ type cliFlags struct {
 	// BNoBody is a request output control switch flag that indicates that the
 	// body of the response should not be printed.
 	BNoBody bool
+
+	// BHideAuth is a request output control switch flag that indicates that
+	// requests made to get auth data should not be printed.
+	BHideAuth bool
 
 	// BNoExpiration is a switch flag that indicates that a session-based
 	// authentication should not attempt to track auth proof expiration and

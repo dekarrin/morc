@@ -92,8 +92,8 @@ func Test_Send(t *testing.T) {
 		expectStdoutOutput string // set with expected output to stdout
 	}{
 		{
-			name: "request requires cookie-based auth, history properly saved",
-			args: []string{"send", "resource"},
+			name: "request requires cookie-based auth - history saved - no output for auth req",
+			args: []string{"send", "resource", "--hide-auth"},
 			respFn: serverHandler_withProtectedResource_session(
 				Creds{User: "test", Pass: "TEsT123!"},
 				&http.Cookie{Name: "session", Value: "ABCDEFG", Expires: cookieExpTime},
@@ -926,13 +926,9 @@ func resetSendFlags() {
 	flags.ProjectFile = ""
 	flags.Vars = nil
 	flags.BInsecure = false
-	flags.BHeaders = false
-	flags.BCaptures = false
-	flags.BNoBody = false
-	flags.BRequest = false
-	flags.Format = "pretty" // TODO: make this default not be magic but rather have the cmd flag init and the reset use it
 	flags.VarPrefix = "$"
 	flags.BQuiet = false
+	flags.resetOutputControl()
 
 	sendCmd.Flags().VisitAll(func(fl *pflag.Flag) {
 		fl.Changed = false

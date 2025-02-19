@@ -345,11 +345,7 @@ func resetExecFlags() {
 	flags.VarPrefix = "$"
 	flags.BQuiet = false
 	flags.BAuth = false
-	flags.BHeaders = false
-	flags.BCaptures = false
-	flags.BNoBody = false
-	flags.BRequest = false
-	flags.Format = "pretty" // TODO: make this default not be magic but rather have the cmd flag init and the reset use it
+	flags.resetOutputControl()
 
 	execCmd.Flags().VisitAll(func(fl *pflag.Flag) {
 		fl.Changed = false

@@ -93,7 +93,7 @@ func Test_Send(t *testing.T) {
 	}{
 		{
 			name: "request requires cookie-based auth, history properly saved",
-			args: []string{"send", "testreq"},
+			args: []string{"send", "resource"},
 			respFn: serverHandler_withProtectedResource_session(
 				Creds{User: "test", Pass: "TEsT123!"},
 				&http.Cookie{Name: "session", Value: "ABCDEFG", Expires: cookieExpTime},

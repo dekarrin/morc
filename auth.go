@@ -1070,7 +1070,7 @@ func (a Auth) Sendable() bool {
 		return a.Proof != nil
 	case AuthTypeSession:
 		// needs to have cookie name and request sequence set
-		return a.RetrievalSequence().Name != "" && a.CookieName() == ""
+		return a.RetrievalSequence().Name != "" && a.CookieName() != ""
 	case AuthTypeJWT:
 		// needs to have request sequence set and scraper set
 		return a.RetrievalSequence().Name != "" && a.ValueScraper().IsUsable()

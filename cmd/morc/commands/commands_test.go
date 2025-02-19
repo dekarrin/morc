@@ -86,6 +86,12 @@ func assert_projectPersistedToBuffer(assert *assert.Assertions, expected morc.Pr
 	updatedProj.Config.HistFile = ""
 	updatedProj.Config.SeshFile = ""
 
+	// also ignore actual history and session data
+	expected.History = []morc.HistoryEntry{{Template: "HISTORY IGNORED FOR THIS CHECK"}}
+	updatedProj.History = []morc.HistoryEntry{{Template: "HISTORY IGNORED FOR THIS CHECK"}}
+	expected.Session = morc.Session{Cookies: []morc.SetCookiesCall{{Cookies: []*http.Cookie{{Name: "SESSION IGNORED FOR THIS CHECK"}}}}}
+	updatedProj.Session = morc.Session{Cookies: []morc.SetCookiesCall{{Cookies: []*http.Cookie{{Name: "SESSION IGNORED FOR THIS CHECK"}}}}}
+
 	return assert.Equal(expected, updatedProj, "project in buffer does not match expected")
 }
 

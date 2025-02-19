@@ -521,6 +521,7 @@ type Format int
 const (
 	FormatPretty Format = iota
 	FormatLine
+	FormatEmpty
 )
 
 type OutputControl struct {

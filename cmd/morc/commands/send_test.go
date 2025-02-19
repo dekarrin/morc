@@ -140,7 +140,7 @@ func Test_Send(t *testing.T) {
 				},
 			},
 			expectStdoutOutput: `HTTP/1.1 200 OK
-(no response body)
+{"name":"VRISKA","number":8,"title":"Thief of Light"}
 `,
 			expectProjectSaved: true,
 			expectHistorySaved: true,

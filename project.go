@@ -494,7 +494,7 @@ func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 					Headers:              false,
 					SuppressResponseBody: true,
 					Format:               oc.Format,
-					Writer:               oc.Writer,
+					Writer:               io.Discard, // use a null writer for writing output
 					SuppressAuthFailures: oc.SuppressAuthFailures,
 					SuppressAuthRequests: true,
 				}

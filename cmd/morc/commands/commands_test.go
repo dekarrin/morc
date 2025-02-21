@@ -19,24 +19,24 @@ type MorcIOAssertions struct {
 }
 
 func assert_noProjectMutations(assert *assert.Assertions) bool {
-	if projWriter == nil {
+	if fileRWs.proj.Writer == nil {
 		panic("project buffer was never set up")
 	}
 
-	projBuf := projWriter.(*bytes.Buffer)
+	projBuf := fileRWs.proj.Writer.(*bytes.Buffer)
 	if projBuf.Len() > 0 {
 		return assert.Fail("project buffer was written to")
 	}
 
-	if histWriter != nil {
-		histBuf := histWriter.(*bytes.Buffer)
+	if fileRWs.hist.Writer != nil {
+		histBuf := fileRWs.hist.Writer.(*bytes.Buffer)
 		if histBuf.Len() > 0 {
 			return assert.Fail("history buffer was written to")
 		}
 	}
 
-	if seshWriter != nil {
-		seshBuf := seshWriter.(*bytes.Buffer)
+	if fileRWs.sesh.Writer != nil {
+		seshBuf := fileRWs.sesh.Writer.(*bytes.Buffer)
 		if seshBuf.Len() > 0 {
 			return assert.Fail("session buffer was written to")
 		}
@@ -58,11 +58,11 @@ func assert_projectPersistedToBuffer(assert *assert.Assertions, expected morc.Pr
 	// input
 	var projR io.Reader
 
-	if projWriter == nil {
+	if fileRWs.proj.Writer == nil {
 		return assert.Fail("project buffer was not set up\nMake sure to call createTestProjectIO() in same test first")
 	}
 
-	projBuf := projWriter.(*bytes.Buffer)
+	projBuf := fileRWs.proj.Writer.(*bytes.Buffer)
 
 	// it exists, but was not necessarily written to. all writes should result
 	// in at least two chars being written for an empty list/object, so we will
@@ -104,11 +104,11 @@ func assert_sessionPersistedToBuffer(assert *assert.Assertions, expected morc.Se
 	// input
 	var seshR io.Reader
 
-	if seshWriter == nil {
+	if fileRWs.sesh.Writer == nil {
 		return assert.Fail("session buffer was not set up\nMake sure to call createTestProjectIO() in same test first")
 	}
 
-	seshBuf := seshWriter.(*bytes.Buffer)
+	seshBuf := fileRWs.sesh.Writer.(*bytes.Buffer)
 
 	// it exists, but was not necessarily written to. all writes should result
 	// in at least two chars being written for an empty list/object, so we will
@@ -137,11 +137,11 @@ func assert_historyPersistedToBuffer(assert *assert.Assertions, expected []morc.
 	// input
 	var histR io.Reader
 
-	if histWriter == nil {
+	if fileRWs.hist.Writer == nil {
 		return assert.Fail("history buffer was not set up\nMake sure to call createTestProjectIO() in same test first")
 	}
 
-	histBuf := histWriter.(*bytes.Buffer)
+	histBuf := fileRWs.hist.Writer.(*bytes.Buffer)
 
 	// it exists, but was not necessarily written to. all writes should result
 	// in at least two chars being written for an empty list/object, so we will
@@ -162,11 +162,11 @@ func assert_historyPersistedToBuffer(assert *assert.Assertions, expected []morc.
 
 // specifically ensures that the project file was not written.
 func assert_noProjectFileMutations(assert *assert.Assertions) bool {
-	if projWriter == nil {
+	if fileRWs.proj.Writer == nil {
 		panic("project IO buffers were never set up")
 	}
 
-	projBuf := projWriter.(*bytes.Buffer)
+	projBuf := fileRWs.proj.Writer.(*bytes.Buffer)
 	if projBuf.Len() > 0 {
 		return assert.Fail("project buffer was written to")
 	}
@@ -176,12 +176,12 @@ func assert_noProjectFileMutations(assert *assert.Assertions) bool {
 
 // specifically ensures that the project file was not written.
 func assert_noHistoryFileMutations(assert *assert.Assertions) bool {
-	if projWriter == nil {
+	if fileRWs.proj.Writer == nil {
 		panic("project IO buffers were never set up")
 	}
 
-	if histWriter != nil {
-		histBuf := histWriter.(*bytes.Buffer)
+	if fileRWs.hist.Writer != nil {
+		histBuf := fileRWs.hist.Writer.(*bytes.Buffer)
 		if histBuf.Len() > 0 {
 			return assert.Fail("history buffer was written to")
 		}
@@ -192,12 +192,12 @@ func assert_noHistoryFileMutations(assert *assert.Assertions) bool {
 
 // specifically ensures that the project file was not written.
 func assert_noSessionFileMutations(assert *assert.Assertions) bool {
-	if projWriter == nil {
+	if fileRWs.proj.Writer == nil {
 		panic("project IO buffers were never set up")
 	}
 
-	if seshWriter != nil {
-		seshBuf := seshWriter.(*bytes.Buffer)
+	if fileRWs.sesh.Writer != nil {
+		seshBuf := fileRWs.sesh.Writer.(*bytes.Buffer)
 		if seshBuf.Len() > 0 {
 			return assert.Fail("session buffer was written to")
 		}
@@ -211,20 +211,20 @@ func assert_projectFilesInBuffersMatch(assert *assert.Assertions, expected morc.
 	// input
 	var projR, histR, seshR io.Reader
 
-	if projWriter == nil {
+	if fileRWs.proj.Writer == nil {
 		panic("nothing to read; project writer buffer is nil")
 	}
 
-	projBuf := projWriter.(*bytes.Buffer)
+	projBuf := fileRWs.proj.Writer.(*bytes.Buffer)
 	projR = projBuf
 
-	if histWriter != nil {
-		histBuf := histWriter.(*bytes.Buffer)
+	if fileRWs.hist.Writer != nil {
+		histBuf := fileRWs.hist.Writer.(*bytes.Buffer)
 		histR = histBuf
 	}
 
-	if seshWriter != nil {
-		seshBuf := seshWriter.(*bytes.Buffer)
+	if fileRWs.sesh.Writer != nil {
+		seshBuf := fileRWs.sesh.Writer.(*bytes.Buffer)
 		seshR = seshBuf
 	}
 
@@ -279,13 +279,22 @@ func (f *cliFlags) resetOutputControl() {
 	f.Format = "pretty" // TODO: make this default not be magic but rather have the cmd flag init and the reset use it
 }
 
+// NewAssertionsForInMemoryProject creates a new MorcIOAssertions struct for
+// testing that wraps the given assertion and sets file readers/writers to point
+// to in-memory locations.
+func NewAssertionsForInMemoryProject(t *testing.T, p morc.Project) *MorcIOAssertions {
+	//projFilePath := createTestProjectIO(t, p)
+	//return MorcIOAssertions{assert.New(t)}
+	return &MorcIOAssertions{*assert.New(t)}
+}
+
 func createTestProjectIO(t *testing.T, p morc.Project) string {
-	projReader = nil
-	projWriter = nil
-	histReader = nil
-	histWriter = nil
-	seshReader = nil
-	seshWriter = nil
+	fileRWs.proj.Reader = nil
+	fileRWs.proj.Writer = nil
+	fileRWs.hist.Reader = nil
+	fileRWs.hist.Writer = nil
+	fileRWs.sesh.Reader = nil
+	fileRWs.sesh.Writer = nil
 
 	projFilePath := "(in-memory)"
 
@@ -300,8 +309,8 @@ func createTestProjectIO(t *testing.T, p morc.Project) string {
 		return ""
 	}
 
-	projReader = projBuf
-	projWriter = &bytes.Buffer{}
+	fileRWs.proj.Reader = projBuf
+	fileRWs.proj.Writer = &bytes.Buffer{}
 
 	// next do hist file, if one is given
 	if p.Config.HistFile != "" {
@@ -317,8 +326,8 @@ func createTestProjectIO(t *testing.T, p morc.Project) string {
 			return ""
 		}
 
-		histReader = histBuf
-		histWriter = &bytes.Buffer{}
+		fileRWs.hist.Reader = histBuf
+		fileRWs.hist.Writer = &bytes.Buffer{}
 	}
 
 	// next do sesh file, if one is given
@@ -335,8 +344,8 @@ func createTestProjectIO(t *testing.T, p morc.Project) string {
 			return ""
 		}
 
-		seshReader = seshBuf
-		seshWriter = &bytes.Buffer{}
+		fileRWs.sesh.Reader = seshBuf
+		fileRWs.sesh.Writer = &bytes.Buffer{}
 	}
 
 	return projFilePath

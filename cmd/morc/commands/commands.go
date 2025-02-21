@@ -233,41 +233,45 @@ func gatherRequestOutputFlags(cmd *cobra.Command) (morc.OutputControl, error) {
 	return oc, nil
 }
 
+type rwPair struct {
+	Reader io.Reader
+	Writer io.Writer
+}
+
+type projectFileIO struct {
+	proj rwPair
+	hist rwPair
+	sesh rwPair
+}
+
 // if set, will override loading project from disk.
 var (
-	projReader io.Reader
-	projWriter io.Writer
-
-	histReader io.Reader
-	histWriter io.Writer
-
-	seshReader io.Reader
-	seshWriter io.Writer
+	fileRWs projectFileIO
 )
 
 func readProject(filename string, all bool) (morc.Project, error) {
-	if projReader != nil {
-		return morc.LoadProject(projReader, seshReader, histReader)
+	if fileRWs.proj.Reader != nil {
+		return morc.LoadProject(fileRWs.proj.Reader, fileRWs.sesh.Reader, fileRWs.hist.Reader)
 	}
 	return morc.LoadProjectFromDisk(filename, all)
 }
 
 func writeProject(p morc.Project, all bool) error {
-	if projWriter != nil {
-		err := p.Dump(projWriter)
+	if fileRWs.proj.Writer != nil {
+		err := p.Dump(fileRWs.proj.Writer)
 		if err != nil {
 			return fmt.Errorf("persist project: %w", err)
 		}
 
 		if all {
-			if p.Config.SessionFSPath() != "" && seshWriter != nil {
-				if err := p.Session.Dump(seshWriter); err != nil {
+			if p.Config.SessionFSPath() != "" && fileRWs.sesh.Writer != nil {
+				if err := p.Session.Dump(fileRWs.sesh.Writer); err != nil {
 					return fmt.Errorf("persist session: %w", err)
 				}
 			}
 
-			if p.Config.HistoryFSPath() != "" && histWriter != nil {
-				if err := p.DumpHistory(histWriter); err != nil {
+			if p.Config.HistoryFSPath() != "" && fileRWs.hist.Writer != nil {
+				if err := p.DumpHistory(fileRWs.hist.Writer); err != nil {
 					return fmt.Errorf("persist history: %w", err)
 				}
 			}
@@ -279,16 +283,16 @@ func writeProject(p morc.Project, all bool) error {
 }
 
 func writeHistory(p morc.Project) error {
-	if histWriter != nil {
-		return p.DumpHistory(histWriter)
+	if fileRWs.hist.Writer != nil {
+		return p.DumpHistory(fileRWs.hist.Writer)
 	}
 
 	return p.PersistHistoryToDisk()
 }
 
 func writeSession(p morc.Project) error {
-	if seshWriter != nil {
-		return p.Session.Dump(seshWriter)
+	if fileRWs.sesh.Writer != nil {
+		return p.Session.Dump(fileRWs.sesh.Writer)
 	}
 
 	return p.PersistSessionToDisk()

@@ -238,7 +238,7 @@ type rwPair struct {
 	Writer io.Writer
 }
 
-type projectFileIO struct {
+type morcFileIO struct {
 	proj rwPair
 	hist rwPair
 	sesh rwPair
@@ -246,7 +246,7 @@ type projectFileIO struct {
 
 // if set, will override loading project from disk.
 var (
-	fileRWs projectFileIO
+	fileRWs morcFileIO
 )
 
 func readProject(filename string, all bool) (morc.Project, error) {

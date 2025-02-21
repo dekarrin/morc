@@ -29,6 +29,7 @@ func AssertProjectInFileMatches(assert *assert.Assertions, expected Project, pro
 }
 
 // TODO: move all this to a custom asserter.
+// TODO: they are moving, delete these.
 func AssertHistoriesMatch(assert *assert.Assertions, expected, actual []HistoryEntry) bool {
 	if !assert.Len(actual, len(expected), "history entry count does not match expected") {
 		return false

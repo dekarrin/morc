@@ -16,6 +16,120 @@ import (
 
 type MorcIOAssertions struct {
 	assert.Assertions
+
+	t *testing.T
+
+	projFilePath string
+	fio          *morcFileIO
+}
+
+// NewAssertionsForInMemoryProject creates a new MorcIOAssertions struct for
+// testing that wraps the given assertion and sets file readers/writers to point
+// to in-memory locations.
+func NewAssertionsForInMemoryProject(t *testing.T, p morc.Project, fio *morcFileIO) *MorcIOAssertions {
+	if fio == nil {
+		panic("fio must be non-nil")
+	}
+	if t == nil {
+		panic("t must be non-nil")
+	}
+
+	m := &MorcIOAssertions{
+		Assertions: *assert.New(t),
+
+		t:   t,
+		fio: fio,
+	}
+
+	m.fio.proj.Reader = nil
+	m.fio.proj.Writer = nil
+	m.fio.hist.Reader = nil
+	m.fio.hist.Writer = nil
+	m.fio.sesh.Reader = nil
+	m.fio.sesh.Writer = nil
+
+	m.projFilePath = "(in-memory)"
+
+	projBuf := &bytes.Buffer{}
+
+	// set the proj file path in project at this point or there will be issues
+	// on persistence
+	p.Config.ProjFile = m.projFilePath
+
+	if err := p.Dump(projBuf); err != nil {
+		t.Fatal(err)
+		return nil
+	}
+
+	m.fio.proj.Reader = projBuf
+	m.fio.proj.Writer = &bytes.Buffer{}
+
+	// next do hist file, if one is given
+	if p.Config.HistFile != "" {
+		if !strings.HasPrefix(p.Config.HistFile, morc.ProjDirVar) {
+			t.Fatal("hist file path must start with " + morc.ProjDirVar + " if present in tests")
+			return nil
+		}
+
+		histBuf := &bytes.Buffer{}
+
+		if err := p.DumpHistory(histBuf); err != nil {
+			t.Fatal(err)
+			return nil
+		}
+
+		m.fio.hist.Reader = histBuf
+		m.fio.hist.Writer = &bytes.Buffer{}
+	}
+
+	// next do sesh file, if one is given
+	if p.Config.SeshFile != "" {
+		if !strings.HasPrefix(p.Config.SeshFile, morc.ProjDirVar) {
+			t.Fatal("session file path must start with " + morc.ProjDirVar + " if present in tests")
+			return nil
+		}
+
+		seshBuf := &bytes.Buffer{}
+
+		if err := p.Session.Dump(seshBuf); err != nil {
+			t.Fatal(err)
+			return nil
+		}
+
+		m.fio.sesh.Reader = seshBuf
+		m.fio.sesh.Writer = &bytes.Buffer{}
+	}
+
+	return m
+}
+
+func (m *MorcIOAssertions) NoProjectMutations() bool {
+	m.t.Helper()
+
+	if m.fio.proj.Writer == nil {
+		panic("project buffer was never set up")
+	}
+
+	projBuf := m.fio.proj.Writer.(*bytes.Buffer)
+	if projBuf.Len() > 0 {
+		return m.Fail("project buffer was written to")
+	}
+
+	if m.fio.hist.Writer != nil {
+		histBuf := m.fio.hist.Writer.(*bytes.Buffer)
+		if histBuf.Len() > 0 {
+			return m.Fail("history buffer was written to")
+		}
+	}
+
+	if m.fio.sesh.Writer != nil {
+		seshBuf := m.fio.sesh.Writer.(*bytes.Buffer)
+		if seshBuf.Len() > 0 {
+			return m.Fail("session buffer was written to")
+		}
+	}
+
+	return true
 }
 
 func assert_noProjectMutations(assert *assert.Assertions) bool {
@@ -43,6 +157,58 @@ func assert_noProjectMutations(assert *assert.Assertions) bool {
 	}
 
 	return true
+}
+
+// ProjectPersistedToBuffer checks that the project writer buffer was
+// initially created (will be true if createTestProjectIO was called in the test
+// this comes from) that it was written to, and that reading from it results in
+// the expected Project. Note that this check specifically does *not* do loading
+// of any history or session data that may have been written, and the checks
+// will ignore expected.History and expected.Session; to check those at the same
+// time, use assert_projectFilesInBuffersMatch. Additionally, all project file
+// paths in expected.Config are ignored.
+func (m *MorcIOAssertions) ProjectPersistedToBuffer(expected morc.Project) bool {
+	m.t.Helper()
+
+	// we just did writes so assume they hold *bytes.Buffers and use it as the
+	// input
+	var projR io.Reader
+
+	if m.fio.proj.Writer == nil {
+		return m.Fail("project buffer was not set up\nMake sure to call createTestProjectIO() in same test first")
+	}
+
+	projBuf := m.fio.proj.Writer.(*bytes.Buffer)
+
+	// it exists, but was not necessarily written to. all writes should result
+	// in at least two chars being written for an empty list/object, so we will
+	// rely on that fact here glub.
+	if !m.Greater(projBuf.Len(), 0, "project was not persisted") {
+		return false
+	}
+
+	projR = projBuf
+
+	updatedProj, err := morc.LoadProject(projR, nil, nil)
+	if !m.NoError(err, "error loading project to check expectations: %v", err) {
+		return false
+	}
+
+	// ignore project file paths
+	expected.Config.ProjFile = ""
+	expected.Config.HistFile = ""
+	expected.Config.SeshFile = ""
+	updatedProj.Config.ProjFile = ""
+	updatedProj.Config.HistFile = ""
+	updatedProj.Config.SeshFile = ""
+
+	// also ignore actual history and session data
+	expected.History = []morc.HistoryEntry{{Template: "HISTORY IGNORED FOR THIS CHECK"}}
+	updatedProj.History = []morc.HistoryEntry{{Template: "HISTORY IGNORED FOR THIS CHECK"}}
+	expected.Session = morc.Session{Cookies: []morc.SetCookiesCall{{Cookies: []*http.Cookie{{Name: "SESSION IGNORED FOR THIS CHECK"}}}}}
+	updatedProj.Session = morc.Session{Cookies: []morc.SetCookiesCall{{Cookies: []*http.Cookie{{Name: "SESSION IGNORED FOR THIS CHECK"}}}}}
+
+	return m.Equal(expected, updatedProj, "project in buffer does not match expected")
 }
 
 // assert_projectPersistedToBuffer checks that the project writer buffer was
@@ -95,6 +261,77 @@ func assert_projectPersistedToBuffer(assert *assert.Assertions, expected morc.Pr
 	return assert.Equal(expected, updatedProj, "project in buffer does not match expected")
 }
 
+// SessionPersistedToBuffer checks that the session writer buffer was
+// initially created (as creation depends on same conditions as writting to
+// file, TODO: upd8 that!!!!!!!! It is super 8ad), that it was written to, and
+// that reading from it results in the expected session data.
+func (m *MorcIOAssertions) SessionPersistedToBuffer(expected morc.Session) bool {
+	m.t.Helper()
+
+	// we just did writes so assume they hold *bytes.Buffers and use it as the
+	// input
+	var seshR io.Reader
+
+	if m.fio.sesh.Writer == nil {
+		return m.Fail("session buffer was not set up\nMake sure to call createTestProjectIO() in same test first")
+	}
+
+	seshBuf := m.fio.sesh.Writer.(*bytes.Buffer)
+
+	// it exists, but was not necessarily written to. all writes should result
+	// in at least two chars being written for an empty list/object, so we will
+	// rely on that fact here glub.
+	if !m.Greater(seshBuf.Len(), 0, "session was not persisted") {
+		return false
+	}
+
+	seshR = seshBuf
+
+	updatedSesh, err := morc.LoadSession(seshR)
+	if !m.NoError(err, "error loading session to check expectations: %v", err) {
+		return false
+	}
+
+	return m.SessionsMatch(expected, updatedSesh)
+}
+
+func (m *MorcIOAssertions) SessionsMatch(expected morc.Session, actual morc.Session) bool {
+	m.t.Helper()
+
+	if !m.Len(actual.Cookies, len(expected.Cookies), "session set-cookie-call count does not match expected") {
+		return false
+	}
+
+	var failed bool
+
+	for i := range actual.Cookies {
+		if !m.SetCookiesMatch(expected.Cookies, actual.Cookies, i) {
+			failed = true
+		}
+	}
+
+	return !failed
+}
+
+// note: does not check time.
+func (m *MorcIOAssertions) SetCookiesMatch(expectedCookies []morc.SetCookiesCall, actualCookies []morc.SetCookiesCall, idx int) bool {
+	m.t.Helper()
+
+	var failed bool
+
+	expected := expectedCookies[idx]
+	actual := actualCookies[idx]
+
+	if !m.Equalf(expected.URL, actual.URL, "set-cookie[%d] URL does not match expected", idx) {
+		failed = true
+	}
+	if !m.Equalf(expected.Cookies, actual.Cookies, "set-cookie[%d] cookies does not match expected", idx) {
+		failed = true
+	}
+
+	return !failed
+}
+
 // assert_sessionPersistedToBuffer checks that the history writer buffer was
 // initially created (as creation depends on same conditions as writting to
 // file, TODO: upd8 that!!!!!!!! It is super 8ad), that it was written to, and
@@ -125,6 +362,84 @@ func assert_sessionPersistedToBuffer(assert *assert.Assertions, expected morc.Se
 	}
 
 	return morc.AssertSessionsMatch(assert, expected, updatedSesh)
+}
+
+// HistoryPersistedToBuffer checks that the history writer buffer was
+// initially created (as creation depends on same conditions as writting to
+// file, TODO: upd8 that!!!!!!!! It is super 8ad), that it was written to, and
+// that reading from it results in the expected list of entries. The dates of
+// the entries are not checked.
+func (m *MorcIOAssertions) HistoryPersistedToBuffer(expected []morc.HistoryEntry) bool {
+	m.t.Helper()
+
+	// we just did writes so assume they hold *bytes.Buffers and use it as the
+	// input
+	var histR io.Reader
+
+	if m.fio.hist.Writer == nil {
+		return m.Fail("history buffer was not set up\nMake sure to call createTestProjectIO() in same test first")
+	}
+
+	histBuf := m.fio.hist.Writer.(*bytes.Buffer)
+
+	// it exists, but was not necessarily written to. all writes should result
+	// in at least two chars being written for an empty list/object, so we will
+	// rely on that fact here glub.
+	if !m.Greater(histBuf.Len(), 0, "history was not persisted") {
+		return false
+	}
+
+	histR = histBuf
+
+	updatedHist, err := morc.LoadHistory(histR)
+	if !m.NoError(err, "error loading history to check expectations: %v", err) {
+		return false
+	}
+
+	return m.HistoriesMatch(expected, updatedHist)
+}
+
+func (m *MorcIOAssertions) HistoriesMatch(expected, actual []morc.HistoryEntry) bool {
+	m.t.Helper()
+
+	if !m.Len(actual, len(expected), "history entry count does not match expected") {
+		return false
+	}
+
+	var failed bool
+
+	for i := range actual {
+		if !m.HistEntryMatches(expected, actual, i) {
+			failed = true
+		}
+	}
+
+	return !failed
+}
+
+// note: does not check time.
+func (m *MorcIOAssertions) HistEntryMatches(expectedHist []morc.HistoryEntry, actualHist []morc.HistoryEntry, idx int) bool {
+	m.t.Helper()
+
+	var failed bool
+
+	expected := expectedHist[idx]
+	actual := actualHist[idx]
+
+	if !m.Equalf(expected.Template, actual.Template, "history entry[%d] template does not match expected", idx) {
+		failed = true
+	}
+	if !m.Equalf(expected.Request, actual.Request, "history entry[%d] request does not match expected", idx) {
+		failed = true
+	}
+	if !m.Equalf(expected.Response, actual.Response, "history entry[%d] response does not match expected", idx) {
+		failed = true
+	}
+	if !m.Equalf(expected.Captures, actual.Captures, "history entry[%d] captures do not match expected", idx) {
+		failed = true
+	}
+
+	return !failed
 }
 
 // assert_historyPersistedToBuffer checks that the history writer buffer was
@@ -161,6 +476,22 @@ func assert_historyPersistedToBuffer(assert *assert.Assertions, expected []morc.
 }
 
 // specifically ensures that the project file was not written.
+func (m *MorcIOAssertions) NoProjectFileMutations() bool {
+	m.t.Helper()
+
+	if m.fio.proj.Writer == nil {
+		panic("project IO buffers were never set up")
+	}
+
+	projBuf := m.fio.proj.Writer.(*bytes.Buffer)
+	if projBuf.Len() > 0 {
+		return m.Fail("project buffer was written to")
+	}
+
+	return true
+}
+
+// specifically ensures that the project file was not written.
 func assert_noProjectFileMutations(assert *assert.Assertions) bool {
 	if fileRWs.proj.Writer == nil {
 		panic("project IO buffers were never set up")
@@ -174,7 +505,25 @@ func assert_noProjectFileMutations(assert *assert.Assertions) bool {
 	return true
 }
 
-// specifically ensures that the project file was not written.
+// specifically ensures that the history file was not written.
+func (m *MorcIOAssertions) NoHistoryFileMutations() bool {
+	m.t.Helper()
+
+	if m.fio.proj.Writer == nil {
+		panic("project IO buffers were never set up")
+	}
+
+	if m.fio.hist.Writer != nil {
+		histBuf := m.fio.hist.Writer.(*bytes.Buffer)
+		if histBuf.Len() > 0 {
+			return m.Fail("history buffer was written to")
+		}
+	}
+
+	return true
+}
+
+// specifically ensures that the history file was not written.
 func assert_noHistoryFileMutations(assert *assert.Assertions) bool {
 	if fileRWs.proj.Writer == nil {
 		panic("project IO buffers were never set up")
@@ -190,7 +539,25 @@ func assert_noHistoryFileMutations(assert *assert.Assertions) bool {
 	return true
 }
 
-// specifically ensures that the project file was not written.
+// specifically ensures that the session file was not written.
+func (m *MorcIOAssertions) NoSessionFileMutations() bool {
+	m.t.Helper()
+
+	if m.fio.proj.Writer == nil {
+		panic("project IO buffers were never set up")
+	}
+
+	if m.fio.sesh.Writer != nil {
+		seshBuf := m.fio.sesh.Writer.(*bytes.Buffer)
+		if seshBuf.Len() > 0 {
+			return m.Fail("session buffer was written to")
+		}
+	}
+
+	return true
+}
+
+// specifically ensures that the session file was not written.
 func assert_noSessionFileMutations(assert *assert.Assertions) bool {
 	if fileRWs.proj.Writer == nil {
 		panic("project IO buffers were never set up")
@@ -204,6 +571,45 @@ func assert_noSessionFileMutations(assert *assert.Assertions) bool {
 	}
 
 	return true
+}
+
+func (m *MorcIOAssertions) ProjectFilesInBuffersMatch(expected morc.Project) bool {
+	m.t.Helper()
+
+	// we just did writes so assume they hold *bytes.Buffers and use it as the
+	// input
+	var projR, histR, seshR io.Reader
+
+	if m.fio.proj.Writer == nil {
+		panic("nothing to read; project writer buffer is nil")
+	}
+
+	projBuf := m.fio.proj.Writer.(*bytes.Buffer)
+	projR = projBuf
+
+	if m.fio.hist.Writer != nil {
+		histBuf := m.fio.hist.Writer.(*bytes.Buffer)
+		histR = histBuf
+	}
+
+	if m.fio.sesh.Writer != nil {
+		seshBuf := m.fio.sesh.Writer.(*bytes.Buffer)
+		seshR = seshBuf
+	}
+
+	updatedProj, err := morc.LoadProject(projR, seshR, histR)
+	if !m.NoError(err, "error loading project to check expectations: %v", err) {
+		return false
+	}
+
+	// ignore project file paths
+	expected.Config.ProjFile = ""
+	expected.Config.HistFile = ""
+	expected.Config.SeshFile = ""
+	updatedProj.Config.ProjFile = ""
+	updatedProj.Config.HistFile = ""
+	updatedProj.Config.SeshFile = ""
+	return m.Equal(expected, updatedProj, "project in file does not match expected")
 }
 
 func assert_projectFilesInBuffersMatch(assert *assert.Assertions, expected morc.Project) bool {
@@ -277,15 +683,6 @@ func (f *cliFlags) resetOutputControl() {
 	f.BRequest = false
 	f.BHideAuth = false
 	f.Format = "pretty" // TODO: make this default not be magic but rather have the cmd flag init and the reset use it
-}
-
-// NewAssertionsForInMemoryProject creates a new MorcIOAssertions struct for
-// testing that wraps the given assertion and sets file readers/writers to point
-// to in-memory locations.
-func NewAssertionsForInMemoryProject(t *testing.T, p morc.Project) *MorcIOAssertions {
-	//projFilePath := createTestProjectIO(t, p)
-	//return MorcIOAssertions{assert.New(t)}
-	return &MorcIOAssertions{*assert.New(t)}
 }
 
 func createTestProjectIO(t *testing.T, p morc.Project) string {

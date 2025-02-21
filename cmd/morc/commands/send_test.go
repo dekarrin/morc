@@ -12,7 +12,6 @@ import (
 	"github.com/dekarrin/morc"
 	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/spf13/pflag"
-	"github.com/stretchr/testify/assert"
 )
 
 func mustParseURL(s string) *url.URL {
@@ -841,8 +840,6 @@ HTTP/1.1 200 OK
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert := assert.New(t)
-
 			// setup test server
 			srv := httptest.NewServer(http.HandlerFunc(tc.respFn))
 			defer srv.Close()
@@ -875,12 +872,11 @@ HTTP/1.1 200 OK
 
 			cmdio.HTTPClient = srvClient
 
+			assert := NewAssertionsForInMemoryProject(t, tc.p, &fileRWs)
 			resetSendFlags()
 
-			// create project and dump config to a temp dir
-			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
-			output, outputErr, err := runTestCommand(sendCmd, projFilePath, tc.args)
+			output, outputErr, err := runTestCommand(sendCmd, assert.ProjFilePath, tc.args)
 
 			// assert and check stdout and stderr
 			if err != nil {
@@ -902,21 +898,21 @@ HTTP/1.1 200 OK
 			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
 
 			if tc.expectProjectSaved {
-				assert_projectPersistedToBuffer(assert, tc.expectP)
+				assert.ProjectPersistedToBuffer(tc.expectP)
 			} else {
-				assert_noProjectFileMutations(assert)
+				assert.NoProjectFileMutations()
 			}
 
 			if tc.expectHistorySaved {
-				assert_historyPersistedToBuffer(assert, tc.expectP.History)
+				assert.HistoryPersistedToBuffer(tc.expectP.History)
 			} else {
-				assert_noHistoryFileMutations(assert)
+				assert.NoHistoryFileMutations()
 			}
 
 			if tc.expectSessionSaved {
-				assert_sessionPersistedToBuffer(assert, tc.expectP.Session)
+				assert.SessionPersistedToBuffer(tc.expectP.Session)
 			} else {
-				assert_noSessionFileMutations(assert)
+				assert.NoSessionFileMutations()
 			}
 		})
 	}

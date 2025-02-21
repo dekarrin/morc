@@ -10,7 +10,6 @@ import (
 	"github.com/dekarrin/morc"
 	"github.com/dekarrin/morc/cmd/morc/cmdio"
 	"github.com/spf13/pflag"
-	"github.com/stretchr/testify/assert"
 )
 
 func mustParseTime(layout, s string) time.Time {
@@ -256,7 +255,7 @@ Expires: $EXP_TIME$
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert := assert.New(t)
+			assert := NewAssertionsForInMemoryProject(t, tc.p, &fileRWs)
 
 			// setup test server
 			srv := httptest.NewServer(http.HandlerFunc(tc.respFn))
@@ -293,10 +292,8 @@ Expires: $EXP_TIME$
 
 			resetExecFlags()
 
-			// create project and dump config to a temp dir
-			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
-			output, outputErr, err := runTestCommand(execCmd, projFilePath, tc.args)
+			output, outputErr, err := runTestCommand(execCmd, assert.ProjFilePath, tc.args)
 
 			// assert and check stdout and stderr
 			if err != nil {
@@ -318,21 +315,21 @@ Expires: $EXP_TIME$
 			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
 
 			if tc.expectProjectSaved {
-				assert_projectPersistedToBuffer(assert, tc.expectP)
+				assert.ProjectPersistedToBuffer(tc.expectP)
 			} else {
-				assert_noProjectFileMutations(assert)
+				assert.NoProjectFileMutations()
 			}
 
 			if tc.expectHistorySaved {
-				assert_historyPersistedToBuffer(assert, tc.expectP.History)
+				assert.HistoryPersistedToBuffer(tc.expectP.History)
 			} else {
-				assert_noHistoryFileMutations(assert)
+				assert.NoHistoryFileMutations()
 			}
 
 			if tc.expectSessionSaved {
-				assert_sessionPersistedToBuffer(assert, tc.expectP.Session)
+				assert.SessionPersistedToBuffer(tc.expectP.Session)
 			} else {
-				assert_noSessionFileMutations(assert)
+				assert.NoSessionFileMutations()
 			}
 		})
 	}

@@ -6,7 +6,6 @@ import (
 
 	"github.com/dekarrin/morc"
 	"github.com/spf13/pflag"
-	"github.com/stretchr/testify/assert"
 )
 
 func Test_Proj_Show(t *testing.T) {
@@ -35,13 +34,11 @@ Cookie record lifetime: 0s`,
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert := assert.New(t)
+			assert := NewAssertionsForInMemoryProject(t, tc.p, &fileRWs)
 			resetProjFlags()
 
-			// create project and dump config to a temp dir
-			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
-			output, outputErr, err := runTestCommand(projCmd, projFilePath, tc.args)
+			output, outputErr, err := runTestCommand(projCmd, assert.ProjFilePath, tc.args)
 
 			// assert and check stdout and stderr
 			if err != nil {
@@ -64,7 +61,7 @@ Cookie record lifetime: 0s`,
 				assert.Contains(outputErr, tc.expectStderrOutput, "stderr output mismatch")
 			}
 
-			assert_noProjectMutations(assert)
+			assert.NoProjectMutations()
 		})
 	}
 }
@@ -98,13 +95,11 @@ func Test_Proj_Get(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert := assert.New(t)
+			assert := NewAssertionsForInMemoryProject(t, tc.p, &fileRWs)
 			resetProjFlags()
 
-			// create project and dump config to a temp dir
-			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
-			output, outputErr, err := runTestCommand(projCmd, projFilePath, tc.args)
+			output, outputErr, err := runTestCommand(projCmd, assert.ProjFilePath, tc.args)
 
 			// assert and check stdout and stderr
 			if err != nil {
@@ -123,7 +118,7 @@ func Test_Proj_Get(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
 			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
 
-			assert_noProjectMutations(assert)
+			assert.NoProjectMutations()
 		})
 	}
 }

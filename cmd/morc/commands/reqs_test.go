@@ -9,7 +9,6 @@ import (
 
 	"github.com/dekarrin/morc"
 	"github.com/spf13/pflag"
-	"github.com/stretchr/testify/assert"
 )
 
 func Test_Reqs_Delete(t *testing.T) {
@@ -105,13 +104,11 @@ func Test_Reqs_Delete(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert := assert.New(t)
+			assert := NewAssertionsForInMemoryProject(t, tc.p, &fileRWs)
 			resetReqsFlags()
 
-			// create project and dump config to a temp dir
-			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
-			output, outputErr, err := runTestCommand(reqsCmd, projFilePath, tc.args)
+			output, outputErr, err := runTestCommand(reqsCmd, assert.ProjFilePath, tc.args)
 
 			// assert and check stdout and stderr
 			if err != nil {
@@ -130,7 +127,7 @@ func Test_Reqs_Delete(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
 			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
 
-			assert_projectFilesInBuffersMatch(assert, tc.expectP)
+			assert.ProjectFilesInBuffersMatch(tc.expectP)
 		})
 	}
 }
@@ -277,13 +274,11 @@ func Test_Reqs_Edit(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert := assert.New(t)
+			assert := NewAssertionsForInMemoryProject(t, tc.p, &fileRWs)
 			resetReqsFlags()
 
-			// create project and dump config to a temp dir
-			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
-			output, outputErr, err := runTestCommand(reqsCmd, projFilePath, tc.args)
+			output, outputErr, err := runTestCommand(reqsCmd, assert.ProjFilePath, tc.args)
 
 			// assert and check stdout and stderr
 			if err != nil {
@@ -302,20 +297,18 @@ func Test_Reqs_Edit(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
 			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
 
-			assert_projectFilesInBuffersMatch(assert, tc.expectP)
+			assert.ProjectFilesInBuffersMatch(tc.expectP)
 		})
 	}
 
 	t.Run("set body from file", func(t *testing.T) {
-		assert := assert.New(t)
 		resetReqsFlags()
 
 		p := testProject_withRequests(morc.RequestTemplate{Name: "req1"})
 		expectP := testProject_withRequests(morc.RequestTemplate{Name: "req1", Body: []byte(`{"name":"JACK NOIR"}`)})
 		expectStdoutOutput := "Set request body to data with length 20\n"
+		assert := NewAssertionsForInMemoryProject(t, p, &fileRWs)
 
-		// create project and dump config to a temp dir
-		projFilePath := createTestProjectIO(t, p)
 		bodyFilePath := filepath.Join(t.TempDir(), "body.json")
 		err := os.WriteFile(bodyFilePath, []byte(`{"name":"JACK NOIR"}`), 0644)
 		if err != nil {
@@ -325,7 +318,7 @@ func Test_Reqs_Edit(t *testing.T) {
 		args := []string{"reqs", "req1", "-d", "@" + bodyFilePath}
 
 		// set up the root command and run
-		output, outputErr, err := runTestCommand(reqsCmd, projFilePath, args)
+		output, outputErr, err := runTestCommand(reqsCmd, assert.ProjFilePath, args)
 
 		// assert and check stdout and stderr
 		if !assert.NoError(err) {
@@ -337,7 +330,7 @@ func Test_Reqs_Edit(t *testing.T) {
 		assert.Equal(expectStdoutOutput, output)
 		assert.Equal("", outputErr)
 
-		assert_projectFilesInBuffersMatch(assert, expectP)
+		assert.ProjectFilesInBuffersMatch(expectP)
 	})
 
 }
@@ -399,13 +392,11 @@ func Test_Reqs_New(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert := assert.New(t)
+			assert := NewAssertionsForInMemoryProject(t, tc.p, &fileRWs)
 			resetReqsFlags()
 
-			// create project and dump config to a temp dir
-			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
-			output, outputErr, err := runTestCommand(reqsCmd, projFilePath, tc.args)
+			output, outputErr, err := runTestCommand(reqsCmd, assert.ProjFilePath, tc.args)
 
 			// assert and check stdout and stderr
 			if err != nil {
@@ -424,20 +415,18 @@ func Test_Reqs_New(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output)
 			assert.Equal(tc.expectStderrOutput, outputErr)
 
-			assert_projectFilesInBuffersMatch(assert, tc.expectP)
+			assert.ProjectFilesInBuffersMatch(tc.expectP)
 		})
 	}
 
 	t.Run("body initially set from file", func(t *testing.T) {
-		assert := assert.New(t)
 		resetReqsFlags()
 
 		p := morc.Project{}
 		expectP := testProject_withRequests(morc.RequestTemplate{Name: "req1", Method: "GET", URL: "http://example.com", Body: []byte(`{"name":"JACK NOIR"}`)})
 		expectStdoutOutput := "Created new request req1\n"
+		assert := NewAssertionsForInMemoryProject(t, p, &fileRWs)
 
-		// create project and dump config to a temp dir
-		projFilePath := createTestProjectIO(t, p)
 		bodyFilePath := filepath.Join(t.TempDir(), "body.json")
 		err := os.WriteFile(bodyFilePath, []byte(`{"name":"JACK NOIR"}`), 0644)
 		if err != nil {
@@ -447,7 +436,7 @@ func Test_Reqs_New(t *testing.T) {
 		args := []string{"reqs", "--new", "req1", "-d", "@" + bodyFilePath}
 
 		// set up the root command and run
-		output, outputErr, err := runTestCommand(reqsCmd, projFilePath, args)
+		output, outputErr, err := runTestCommand(reqsCmd, assert.ProjFilePath, args)
 
 		// assert and check stdout and stderr
 		if !assert.NoError(err) {
@@ -459,7 +448,7 @@ func Test_Reqs_New(t *testing.T) {
 		assert.Equal(expectStdoutOutput, output)
 		assert.Equal("", outputErr)
 
-		assert_projectFilesInBuffersMatch(assert, expectP)
+		assert.ProjectFilesInBuffersMatch(expectP)
 	})
 }
 
@@ -542,13 +531,11 @@ func Test_Reqs_Get(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert := assert.New(t)
+			assert := NewAssertionsForInMemoryProject(t, tc.p, &fileRWs)
 			resetReqsFlags()
 
-			// create project and dump config to a temp dir
-			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
-			output, outputErr, err := runTestCommand(reqsCmd, projFilePath, tc.args)
+			output, outputErr, err := runTestCommand(reqsCmd, assert.ProjFilePath, tc.args)
 
 			// assert and check stdout and stderr
 			if err != nil {
@@ -567,7 +554,7 @@ func Test_Reqs_Get(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output)
 			assert.Equal(tc.expectStderrOutput, outputErr)
 
-			assert_noProjectMutations(assert)
+			assert.NoProjectMutations()
 		})
 	}
 
@@ -709,13 +696,11 @@ func Test_Reqs_Show(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert := assert.New(t)
+			assert := NewAssertionsForInMemoryProject(t, tc.p, &fileRWs)
 			resetReqsFlags()
 
-			// create project and dump config to a temp dir
-			profFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
-			output, outputErr, err := runTestCommand(reqsCmd, profFilePath, tc.args)
+			output, outputErr, err := runTestCommand(reqsCmd, assert.ProjFilePath, tc.args)
 
 			// assert and check stdout and stderr
 			if err != nil {
@@ -734,7 +719,7 @@ func Test_Reqs_Show(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output)
 			assert.Equal(tc.expectStderrOutput, outputErr)
 
-			assert_noProjectMutations(assert)
+			assert.NoProjectMutations()
 		})
 	}
 }
@@ -798,13 +783,11 @@ func Test_Reqs_List(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert := assert.New(t)
+			assert := NewAssertionsForInMemoryProject(t, tc.p, &fileRWs)
 			resetReqsFlags()
 
-			// create project and dump config to a temp dir
-			projFilePath := createTestProjectIO(t, tc.p)
 			// set up the root command and run
-			output, outputErr, err := runTestCommand(reqsCmd, projFilePath, tc.args)
+			output, outputErr, err := runTestCommand(reqsCmd, assert.ProjFilePath, tc.args)
 
 			// assert and check stdout and stderr
 			if err != nil {
@@ -823,7 +806,7 @@ func Test_Reqs_List(t *testing.T) {
 			assert.Equal(tc.expectStdoutOutput, output)
 			assert.Equal(tc.expectStderrOutput, outputErr)
 
-			assert_noProjectMutations(assert)
+			assert.NoProjectMutations()
 		})
 	}
 }

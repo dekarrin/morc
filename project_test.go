@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func Test_LoadProjectFromDisk(t *testing.T) {
@@ -85,7 +83,7 @@ func Test_LoadProjectFromDisk(t *testing.T) {
 		},
 	}
 
-	assert := assert.New(t)
+	assert := NewAssertions(t)
 
 	projFilePath := createTestProjectFiles(t, p)
 	if projFilePath == "" {
@@ -94,7 +92,7 @@ func Test_LoadProjectFromDisk(t *testing.T) {
 	}
 
 	// compare loaded to original
-	AssertProjectInFileMatches(assert, p, projFilePath)
+	assert.ProjectInFileMatches(p, projFilePath)
 }
 
 func mustParseURL(s string) *url.URL {

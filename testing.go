@@ -1,10 +1,35 @@
 package morc
 
-import "github.com/stretchr/testify/assert"
+import (
+	"testing"
 
-func AssertProjectInFileMatches(assert *assert.Assertions, expected Project, projFilePath string) bool {
+	"github.com/stretchr/testify/assert"
+)
+
+// TODO: maybe move this to testing package or internal package so it doesn't
+// show up in godoc
+type Assertions struct {
+	assert.Assertions
+
+	T *testing.T
+}
+
+func NewAssertions(t *testing.T) *Assertions {
+	if t == nil {
+		panic("t must be non-nil")
+	}
+
+	return &Assertions{
+		Assertions: *assert.New(t),
+		T:          t,
+	}
+}
+
+func (m *Assertions) ProjectInFileMatches(expected Project, projFilePath string) bool {
+	m.T.Helper()
+
 	updatedProj, err := LoadProjectFromDisk(projFilePath, true)
-	if !assert.NoError(err, "error loading project to check expectations: %v", err) {
+	if !m.NoError(err, "error loading project to check expectations: %v", err) {
 		return false
 	}
 
@@ -16,8 +41,8 @@ func AssertProjectInFileMatches(assert *assert.Assertions, expected Project, pro
 	updatedProj.Config.HistFile = ""
 	updatedProj.Config.SeshFile = ""
 
-	AssertHistoriesMatch(assert, expected.History, updatedProj.History)
-	AssertSessionsMatch(assert, expected.Session, updatedProj.Session)
+	m.HistoriesMatch(expected.History, updatedProj.History)
+	m.SessionsMatch(expected.Session, updatedProj.Session)
 
 	// unset histories and sessions on both as they are checked separately above
 	expected.History = nil
@@ -25,20 +50,20 @@ func AssertProjectInFileMatches(assert *assert.Assertions, expected Project, pro
 	updatedProj.History = nil
 	updatedProj.Session = Session{}
 
-	return assert.Equal(expected, updatedProj, "project in file does not match expected")
+	return m.Equal(expected, updatedProj, "project in file does not match expected")
 }
 
-// TODO: move all this to a custom asserter.
-// TODO: they are moving, delete these.
-func AssertHistoriesMatch(assert *assert.Assertions, expected, actual []HistoryEntry) bool {
-	if !assert.Len(actual, len(expected), "history entry count does not match expected") {
+func (m *Assertions) HistoriesMatch(expected, actual []HistoryEntry) bool {
+	m.T.Helper()
+
+	if !m.Len(actual, len(expected), "history entry count does not match expected") {
 		return false
 	}
 
 	var failed bool
 
 	for i := range actual {
-		if !AssertHistEntryMatches(assert, expected, actual, i) {
+		if !m.HistEntryMatches(expected, actual, i) {
 			failed = true
 		}
 	}
@@ -46,15 +71,17 @@ func AssertHistoriesMatch(assert *assert.Assertions, expected, actual []HistoryE
 	return !failed
 }
 
-func AssertSessionsMatch(assert *assert.Assertions, expected, actual Session) bool {
-	if !assert.Len(actual.Cookies, len(expected.Cookies), "session set-cookie-call count does not match expected") {
+func (m *Assertions) SessionsMatch(expected Session, actual Session) bool {
+	m.T.Helper()
+
+	if !m.Len(actual.Cookies, len(expected.Cookies), "session set-cookie-call count does not match expected") {
 		return false
 	}
 
 	var failed bool
 
 	for i := range actual.Cookies {
-		if !AssertSetCookiesMatches(assert, expected.Cookies, actual.Cookies, i) {
+		if !m.SetCookiesMatch(expected.Cookies, actual.Cookies, i) {
 			failed = true
 		}
 	}
@@ -63,16 +90,24 @@ func AssertSessionsMatch(assert *assert.Assertions, expected, actual Session) bo
 }
 
 // note: does not check time.
-func AssertSetCookiesMatches(assert *assert.Assertions, expectedCookies []SetCookiesCall, actualCookies []SetCookiesCall, idx int) bool {
+func (m *Assertions) HistEntryMatches(expectedHist []HistoryEntry, actualHist []HistoryEntry, idx int) bool {
+	m.T.Helper()
+
 	var failed bool
 
-	expected := expectedCookies[idx]
-	actual := actualCookies[idx]
+	expected := expectedHist[idx]
+	actual := actualHist[idx]
 
-	if !assert.Equalf(expected.URL, actual.URL, "set-cookie[%d] URL does not match expected", idx) {
+	if !m.Equalf(expected.Template, actual.Template, "history entry[%d] template does not match expected", idx) {
 		failed = true
 	}
-	if !assert.Equalf(expected.Cookies, actual.Cookies, "set-cookie[%d] cookies does not match expected", idx) {
+	if !m.Equalf(expected.Request, actual.Request, "history entry[%d] request does not match expected", idx) {
+		failed = true
+	}
+	if !m.Equalf(expected.Response, actual.Response, "history entry[%d] response does not match expected", idx) {
+		failed = true
+	}
+	if !m.Equalf(expected.Captures, actual.Captures, "history entry[%d] captures do not match expected", idx) {
 		failed = true
 	}
 
@@ -80,23 +115,18 @@ func AssertSetCookiesMatches(assert *assert.Assertions, expectedCookies []SetCoo
 }
 
 // note: does not check time.
-func AssertHistEntryMatches(assert *assert.Assertions, expectedHist []HistoryEntry, actualHist []HistoryEntry, idx int) bool {
+func (m *Assertions) SetCookiesMatch(expectedCookies []SetCookiesCall, actualCookies []SetCookiesCall, idx int) bool {
+	m.T.Helper()
 
 	var failed bool
 
-	expected := expectedHist[idx]
-	actual := actualHist[idx]
+	expected := expectedCookies[idx]
+	actual := actualCookies[idx]
 
-	if !assert.Equalf(expected.Template, actual.Template, "history entry[%d] template does not match expected", idx) {
+	if !m.Equalf(expected.URL, actual.URL, "set-cookie[%d] URL does not match expected", idx) {
 		failed = true
 	}
-	if !assert.Equalf(expected.Request, actual.Request, "history entry[%d] request does not match expected", idx) {
-		failed = true
-	}
-	if !assert.Equalf(expected.Response, actual.Response, "history entry[%d] response does not match expected", idx) {
-		failed = true
-	}
-	if !assert.Equalf(expected.Captures, actual.Captures, "history entry[%d] captures do not match expected", idx) {
+	if !m.Equalf(expected.Cookies, actual.Cookies, "set-cookie[%d] cookies does not match expected", idx) {
 		failed = true
 	}
 

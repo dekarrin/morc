@@ -1478,22 +1478,71 @@ type marshaledHistory struct {
 	Entries  []HistoryEntry `json:"history"`
 }
 
+type HistoryFlowInfo struct {
+	Name string
+	Prev int
+	Next int
+}
+
+type HistoryAuthInfo struct {
+	Name      string
+	Initiator AuthInitiator
+}
+
+type RequestInitiator struct {
+
+	// User is whether a caller of a morc project directly requested this
+	// template to be sent. A template called with Send or Fetch by a caller
+	// will have this set to true. It will be false if it was called
+	// automatically either by a flow executed via Exec/Fetch or by an
+	// auth method. To determine if it was the auth itself that was executed,
+	// check Auth.Initiator.
+	User bool `json:"user"`
+
+	// if Flow.Name is set, this was part of a flow either directly invoked or
+	// called as part of auth.
+	Flow HistoryFlowInfo `json:"flow,omitempty"`
+
+	// if Auth.Name is set, this was called as part of an auth method for the
+	// template described within.
+	Auth HistoryAuthInfo `json:"auth,omitempty"`
+}
+
+type AuthInitiator struct {
+	// User is whether the Auth was initiated by a direct call to execute an
+	// Auth. If this is false, the Auth was called as part of a template and
+	// Template will contain its name. If the Auth was successful and lead to
+	// the request being made, it will have its Entry here set to the index of
+	// the request in history.
+	User bool `json:"user"`
+
+	// Template is the name of the template that was called that caused this
+	// Auth to be sent. If User is true, Template will be empty.
+	Template string `json:"template"`
+
+	// Entry is the index in history of the sent request that this auth was made
+	// for. If the request ended up never being made, Entry will be set to -1.
+	Entry int `json:"entry,omitempty"`
+}
+
 type HistoryEntry struct {
-	Template string
-	ReqTime  time.Time
-	RespTime time.Time
-	Request  *http.Request
-	Response *http.Response
-	Captures map[string]string
+	Template  string
+	ReqTime   time.Time
+	RespTime  time.Time
+	Request   *http.Request
+	Response  *http.Response
+	Captures  map[string]string
+	Initiator RequestInitiator
 }
 
 type marshaledHistoryEntry struct {
-	Template string               `json:"template"`
-	ReqTime  int64                `json:"request_time"`
-	RespTime int64                `json:"response_time"`
-	Request  clientRequestRecord  `json:"request"`
-	Response clientResponseRecord `json:"response"`
-	Captures map[string]string    `json:"captures,omitempty"`
+	Template  string               `json:"template"`
+	ReqTime   int64                `json:"request_time"`
+	RespTime  int64                `json:"response_time"`
+	Request   clientRequestRecord  `json:"request"`
+	Response  clientResponseRecord `json:"response"`
+	Captures  map[string]string    `json:"captures,omitempty"`
+	Initiator RequestInitiator     `json:"initiator,omitempty"`
 }
 
 func (h HistoryEntry) MarshalJSON() ([]byte, error) {
@@ -1504,12 +1553,13 @@ func (h HistoryEntry) MarshalJSON() ([]byte, error) {
 
 	// marshal the marshaledHistoryEntry struct
 	m := marshaledHistoryEntry{
-		Template: h.Template,
-		ReqTime:  h.ReqTime.Unix(),
-		RespTime: h.RespTime.Unix(),
-		Request:  reqRec,
-		Response: respRec,
-		Captures: h.Captures,
+		Template:  h.Template,
+		ReqTime:   h.ReqTime.Unix(),
+		RespTime:  h.RespTime.Unix(),
+		Request:   reqRec,
+		Response:  respRec,
+		Captures:  h.Captures,
+		Initiator: h.Initiator,
 	}
 
 	return json.Marshal(m)
@@ -1540,6 +1590,7 @@ func (h *HistoryEntry) UnmarshalJSON(data []byte) error {
 	h.Request = req
 	h.Response = resp
 	h.Captures = m.Captures
+	h.Initiator = m.Initiator
 
 	return nil
 }

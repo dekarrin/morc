@@ -57,7 +57,7 @@ func (m *Assertions) HistoriesMatch(expected, actual []HistoryEntry) bool {
 	m.T.Helper()
 
 	if !m.Len(actual, len(expected), "history entry count does not match expected") {
-		return false
+		return m.Equal(expected, actual)
 	}
 
 	var failed bool
@@ -75,7 +75,7 @@ func (m *Assertions) SessionsMatch(expected Session, actual Session) bool {
 	m.T.Helper()
 
 	if !m.Len(actual.Cookies, len(expected.Cookies), "session set-cookie-call count does not match expected") {
-		return false
+		return m.Equal(expected, actual)
 	}
 
 	var failed bool

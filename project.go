@@ -335,6 +335,10 @@ func (p Project) PersistToDisk(all bool) error {
 // Returns the results of the sends, any auths that were updated, and any error
 // that occurred.
 func (p *Project) Exec(flowName string, initialVarOverrides map[string]string, skipVerify bool, prefixOverride string, httpClient *http.Client, oc OutputControl) ([]SendResult, error) {
+	return p.exec(flowName, initialVarOverrides, skipVerify, prefixOverride, httpClient, oc)
+}
+
+func (p *Project) exec(flowName string, initialVarOverrides map[string]string, skipVerify bool, prefixOverride string, httpClient *http.Client, oc OutputControl) ([]SendResult, error) {
 	// case doesn't matter for flow names
 	flowName = strings.ToLower(flowName)
 
@@ -382,7 +386,7 @@ func (p *Project) Exec(flowName string, initialVarOverrides map[string]string, s
 
 	var results []SendResult
 	for i, tmpl := range templates {
-		result, err := p.SendTemplate(tmpl, p.Vars.MergedSet(varOverrides), skipVerify, prefix, httpClient, oc)
+		result, err := p.sendTemplate(tmpl, p.Vars.MergedSet(varOverrides), skipVerify, prefix, httpClient, oc)
 		if err != nil {
 			return results, fmt.Errorf("step #%d: %w", i, err)
 		}
@@ -402,6 +406,10 @@ func (p *Project) Exec(flowName string, initialVarOverrides map[string]string, s
 // Send sends the given request template by name and mutates the project
 // accordingly. Returns the result of the send and any error that occurred.
 func (p *Project) Send(reqName string, varOverrides map[string]string, skipVerify bool, prefixOverride string, httpClient *http.Client, oc OutputControl) (SendResult, error) {
+	return p.send(reqName, varOverrides, skipVerify, prefixOverride, httpClient, oc)
+}
+
+func (p *Project) send(reqName string, varOverrides map[string]string, skipVerify bool, prefixOverride string, httpClient *http.Client, oc OutputControl) (SendResult, error) {
 	// case doesn't matter for request template names
 	reqName = strings.ToLower(reqName)
 
@@ -416,7 +424,7 @@ func (p *Project) Send(reqName string, varOverrides map[string]string, skipVerif
 		prefix = prefixOverride
 	}
 
-	return p.SendTemplate(tmpl, p.Vars.MergedSet(varOverrides), skipVerify, prefix, httpClient, oc)
+	return p.sendTemplate(tmpl, p.Vars.MergedSet(varOverrides), skipVerify, prefix, httpClient, oc)
 }
 
 // Fetch performs either a flow or a template send and returns the slice of
@@ -424,9 +432,13 @@ func (p *Project) Send(reqName string, varOverrides map[string]string, skipVerif
 // the returned slice will have only one element. If a flow is specified, it is
 // an error if the flow does not return at least one SendResult.
 func (p *Project) Fetch(r RequestSequence, varOverrides map[string]string, skipVerify bool, varPrefixOverride string, httpClient *http.Client, oc OutputControl) ([]SendResult, error) {
+	return p.fetch(r, varOverrides, skipVerify, varPrefixOverride, httpClient, oc)
+}
+
+func (p *Project) fetch(r RequestSequence, varOverrides map[string]string, skipVerify bool, varPrefixOverride string, httpClient *http.Client, oc OutputControl) ([]SendResult, error) {
 	var results []SendResult
 	if r.IsFlow {
-		res, err := p.Exec(r.Name, varOverrides, skipVerify, varPrefixOverride, httpClient, oc)
+		res, err := p.exec(r.Name, varOverrides, skipVerify, varPrefixOverride, httpClient, oc)
 		if err != nil {
 			return nil, fmt.Errorf("flow %q failed: %w", r.Name, err)
 		}
@@ -435,7 +447,7 @@ func (p *Project) Fetch(r RequestSequence, varOverrides map[string]string, skipV
 		}
 		results = res
 	} else {
-		res, err := p.Send(r.Name, varOverrides, skipVerify, varPrefixOverride, httpClient, oc)
+		res, err := p.send(r.Name, varOverrides, skipVerify, varPrefixOverride, httpClient, oc)
 		if err != nil {
 			return nil, fmt.Errorf("request template %q failed: %w", r.Name, err)
 		}
@@ -450,7 +462,18 @@ func (p *Project) Fetch(r RequestSequence, varOverrides map[string]string, skipV
 // is only done during testing. Returns results, any template's auths that were
 // updated (which may be more than one if an Auth chains into another Auth), and
 // any error that occurred.
+//
+// TODO: do we really need an exported version of this?
 func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, skipVerify bool, varSymbol string, httpClient *http.Client, oc OutputControl) (SendResult, error) {
+	return p.sendTemplate(tmpl, vars, skipVerify, varSymbol, httpClient, oc)
+}
+
+// sendTemplate sends the request template and mutates the project accordingly. If
+// client is set, that is used as the client for the request and generally this
+// is only done during testing. Returns results, any template's auths that were
+// updated (which may be more than one if an Auth chains into another Auth), and
+// any error that occurred.
+func (p *Project) sendTemplate(tmpl RequestTemplate, vars map[string]string, skipVerify bool, varSymbol string, httpClient *http.Client, oc OutputControl) (SendResult, error) {
 
 	if tmpl.Method == "" {
 		return SendResult{}, fmt.Errorf("request template %s has no method set", tmpl.Name)
@@ -501,7 +524,7 @@ func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 			}
 
 			var sendResults []SendResult
-			authProof, sendResults, err = p.ExecAuth(auth, skipVerify, httpClient, authOC)
+			authProof, sendResults, err = p.execAuth(auth, skipVerify, httpClient, authOC)
 			authRequested = len(sendResults) > 0
 			if err != nil {
 				return SendResult{}, err
@@ -562,6 +585,9 @@ func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 				Request:  result.Request,
 				Response: result.Response,
 				Captures: result.Captures,
+				Initiator: RequestInitiator{
+					User: true, // TODO: add other things as we are able to pass info along.
+				},
 			}
 
 			p.History = append(p.History, entry)
@@ -624,6 +650,10 @@ func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 // updated; simply put, if requests were made, the auth was updated. The results
 // indicate of those, if any sub-auths were updated.
 func (p *Project) ExecAuth(auth *Auth, skipVerify bool, httpClient *http.Client, oc OutputControl) (ap AuthProof, results []SendResult, err error) {
+	return p.execAuth(auth, skipVerify, httpClient, oc)
+}
+
+func (p *Project) execAuth(auth *Auth, skipVerify bool, httpClient *http.Client, oc OutputControl) (ap AuthProof, results []SendResult, err error) {
 	// TODO: this API does not match Exec() at all. Caller is required to
 	// persist any changes to the auth manually to the project. Update this to
 	// be more like Exec() which should be automatically handled.
@@ -637,7 +667,7 @@ func (p *Project) ExecAuth(auth *Auth, skipVerify bool, httpClient *http.Client,
 			return nil, nil, errors.New("no static credentials or fetcher configured")
 		}
 
-		results, err = p.Fetch(auth.Fetcher.Seq, nil, skipVerify, "", httpClient, oc)
+		results, err = p.fetch(auth.Fetcher.Seq, nil, skipVerify, "", httpClient, oc)
 		if err != nil {
 			return nil, nil, fmt.Errorf("fetch auth: %w", err)
 		}
@@ -1478,13 +1508,13 @@ type marshaledHistory struct {
 	Entries  []HistoryEntry `json:"history"`
 }
 
-type HistoryFlowInfo struct {
+type FlowCallMetadata struct {
 	Name string
 	Prev int
 	Next int
 }
 
-type HistoryAuthInfo struct {
+type AuthCallMetadata struct {
 	Name      string
 	Initiator AuthInitiator
 }
@@ -1501,11 +1531,11 @@ type RequestInitiator struct {
 
 	// if Flow.Name is set, this was part of a flow either directly invoked or
 	// called as part of auth.
-	Flow HistoryFlowInfo `json:"flow,omitempty"`
+	Flow FlowCallMetadata `json:"flow,omitempty"`
 
 	// if Auth.Name is set, this was called as part of an auth method for the
 	// template described within.
-	Auth HistoryAuthInfo `json:"auth,omitempty"`
+	Auth AuthCallMetadata `json:"auth,omitempty"`
 }
 
 type AuthInitiator struct {

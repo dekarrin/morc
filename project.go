@@ -414,8 +414,8 @@ func (p *Project) exec(flowName string, initialVarOverrides map[string]string, s
 // Calling this method sets initiator info for history entries and
 // chain-checking to indicate a user-initiated request.
 func (p *Project) Send(reqName string, varOverrides map[string]string, skipVerify bool, prefixOverride string, httpClient *http.Client, oc OutputControl) (SendResult, error) {
-	return p.send(reqName, varOverrides, skipVerify, prefixOverride, httpClient, oc, RequestInitiator{
-		User: true,
+	return p.send(reqName, varOverrides, skipVerify, prefixOverride, httpClient, oc, []Initiator{
+		{Cause: CauseTemplateSpecified},
 	})
 }
 
@@ -587,10 +587,8 @@ func (p *Project) sendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 				Request:  result.Request,
 				Response: result.Response,
 				Captures: result.Captures,
-				Initiator: HistoricInitiator{
-					Initiator: Initiator{
-						Specified: CauseTemplateSpecified, // TODO: add other things as we are able to pass info along.
-					},
+				Initiator: Initiator{
+					Cause: CauseTemplateSpecified, // TODO: add other things as we are able to pass info along.
 				},
 			}
 
@@ -1513,10 +1511,12 @@ type marshaledHistory struct {
 }
 
 type Initiator struct {
-	// Specified is the item that was directly requested by the user. If it is
-	// set to CauseChain, the initiator is part of a chain of requests that were
-	// made, and the chain needs to be examined to find the final root cause.
-	Specified RootRequestCause
+	// Cause is the item that was directly requested by an external caller, or
+	// CauseChain if the initiator is part of a chain of requests that were
+	// made. In that case, the final root requested item can be discovered by
+	// examining the chain of initiators during a request, or by examining the
+	// links if checking from History.
+	Cause RootRequestCause
 
 	// Parent is the name of the template that caused this initiator to
 	// be invoked. It will only be set if Specified is set to CauseChain.

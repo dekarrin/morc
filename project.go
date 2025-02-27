@@ -406,15 +406,15 @@ func (p *Project) exec(flowName string, initialVarOverrides map[string]string, s
 
 		// assuming this actually sent, we need to track the last history entry
 		// and we need to do it on the fly in case the next one fails
-		// TODO: syntax, feels odd. either make these all pointers or see if we
-		// can just do modification via index.
-		histEnd := len(p.History) - 1
-		p.History[histEnd].Initiator.Links.Flow.Prev = prevHistIdx
-		p.History[histEnd].Initiator.Links.Flow.Next = -1
-		if prevHistIdx != -1 {
-			p.History[prevHistIdx].Initiator.Links.Flow.Next = histEnd
+		if p.Config.RecordHistory {
+			histEnd := len(p.History) - 1
+			p.History[histEnd].Initiator.Links.Flow.Prev = prevHistIdx
+			p.History[histEnd].Initiator.Links.Flow.Next = -1
+			if prevHistIdx != -1 {
+				p.History[prevHistIdx].Initiator.Links.Flow.Next = histEnd
+			}
+			prevHistIdx = histEnd
 		}
-		prevHistIdx = histEnd
 	}
 
 	return results, nil
@@ -522,6 +522,8 @@ func (p *Project) sendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 		}
 	}
 
+	var authHistIndexes []int
+
 	// retry failed auth ONLY if we did not just get it.
 	var result SendResult
 	var authUpdated bool
@@ -566,10 +568,21 @@ func (p *Project) sendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 			if authRequested {
 				authUpdated = true
 
-				// TODO: modify history to add links
-
 				// persist any auth changes
 				p.Auths[strings.ToLower(tmpl.Auth)] = *auth
+
+				if p.Config.RecordHistory {
+					// collect history links to update
+					authHistInitiator := p.History[len(p.History)-1].Initiator
+					authHistIndexes = append(authHistIndexes, len(p.History)-1)
+					if authHistInitiator.Flow != "" {
+						prevIdx := authHistInitiator.Links.Flow.Prev
+						for prevIdx != -1 {
+							authHistIndexes = append(authHistIndexes, prevIdx)
+							prevIdx = p.History[prevIdx].Initiator.Links.Flow.Prev
+						}
+					}
+				}
 			}
 
 			// remove the extra initiator
@@ -635,6 +648,12 @@ func (p *Project) sendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 			}
 
 			p.History = append(p.History, entry)
+
+			// now go back and edit all the auth-related reqs to point to this
+			// one
+			for _, idx := range authHistIndexes {
+				p.History[idx].Initiator.Links.Parent = len(p.History) - 1
+			}
 		}
 
 		// persist cookies

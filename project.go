@@ -335,10 +335,15 @@ func (p Project) PersistToDisk(all bool) error {
 // Returns the results of the sends, any auths that were updated, and any error
 // that occurred.
 func (p *Project) Exec(flowName string, initialVarOverrides map[string]string, skipVerify bool, prefixOverride string, httpClient *http.Client, oc OutputControl) ([]SendResult, error) {
-	return p.exec(flowName, initialVarOverrides, skipVerify, prefixOverride, httpClient, oc)
+	return p.exec(flowName, initialVarOverrides, skipVerify, prefixOverride, httpClient, oc, RequestInitiator{
+		User: false,
+		Flow: FlowCallMetadata{
+			Name: flowName,
+		},
+	})
 }
 
-func (p *Project) exec(flowName string, initialVarOverrides map[string]string, skipVerify bool, prefixOverride string, httpClient *http.Client, oc OutputControl) ([]SendResult, error) {
+func (p *Project) exec(flowName string, initialVarOverrides map[string]string, skipVerify bool, prefixOverride string, httpClient *http.Client, oc OutputControl, initiator RequestInitiator) ([]SendResult, error) {
 	// case doesn't matter for flow names
 	flowName = strings.ToLower(flowName)
 
@@ -386,7 +391,7 @@ func (p *Project) exec(flowName string, initialVarOverrides map[string]string, s
 
 	var results []SendResult
 	for i, tmpl := range templates {
-		result, err := p.sendTemplate(tmpl, p.Vars.MergedSet(varOverrides), skipVerify, prefix, httpClient, oc)
+		result, err := p.sendTemplate(tmpl, p.Vars.MergedSet(varOverrides), skipVerify, prefix, httpClient, oc, initiator)
 		if err != nil {
 			return results, fmt.Errorf("step #%d: %w", i, err)
 		}
@@ -405,11 +410,16 @@ func (p *Project) exec(flowName string, initialVarOverrides map[string]string, s
 
 // Send sends the given request template by name and mutates the project
 // accordingly. Returns the result of the send and any error that occurred.
+//
+// Calling this method sets initiator info for history entries and
+// chain-checking to indicate a user-initiated request.
 func (p *Project) Send(reqName string, varOverrides map[string]string, skipVerify bool, prefixOverride string, httpClient *http.Client, oc OutputControl) (SendResult, error) {
-	return p.send(reqName, varOverrides, skipVerify, prefixOverride, httpClient, oc)
+	return p.send(reqName, varOverrides, skipVerify, prefixOverride, httpClient, oc, RequestInitiator{
+		User: true,
+	})
 }
 
-func (p *Project) send(reqName string, varOverrides map[string]string, skipVerify bool, prefixOverride string, httpClient *http.Client, oc OutputControl) (SendResult, error) {
+func (p *Project) send(reqName string, varOverrides map[string]string, skipVerify bool, prefixOverride string, httpClient *http.Client, oc OutputControl, initiator RequestInitiator) (SendResult, error) {
 	// case doesn't matter for request template names
 	reqName = strings.ToLower(reqName)
 
@@ -424,7 +434,7 @@ func (p *Project) send(reqName string, varOverrides map[string]string, skipVerif
 		prefix = prefixOverride
 	}
 
-	return p.sendTemplate(tmpl, p.Vars.MergedSet(varOverrides), skipVerify, prefix, httpClient, oc)
+	return p.sendTemplate(tmpl, p.Vars.MergedSet(varOverrides), skipVerify, prefix, httpClient, oc, initiator)
 }
 
 // Fetch performs either a flow or a template send and returns the slice of
@@ -432,12 +442,21 @@ func (p *Project) send(reqName string, varOverrides map[string]string, skipVerif
 // the returned slice will have only one element. If a flow is specified, it is
 // an error if the flow does not return at least one SendResult.
 func (p *Project) Fetch(r RequestSequence, varOverrides map[string]string, skipVerify bool, varPrefixOverride string, httpClient *http.Client, oc OutputControl) ([]SendResult, error) {
-	return p.fetch(r, varOverrides, skipVerify, varPrefixOverride, httpClient, oc)
+	return p.fetch(r, varOverrides, skipVerify, varPrefixOverride, httpClient, oc, nil)
 }
 
-func (p *Project) fetch(r RequestSequence, varOverrides map[string]string, skipVerify bool, varPrefixOverride string, httpClient *http.Client, oc OutputControl) ([]SendResult, error) {
+// all calls to fetch that are NOT from Fetch must set initiator to a non-nil
+// value. TODO: perhaps something in RequestInitiator can be set to
+// unambiguously mark the request as externally initiated.
+func (p *Project) fetch(r RequestSequence, varOverrides map[string]string, skipVerify bool, varPrefixOverride string, httpClient *http.Client, oc OutputControl, internalInitiator *RequestInitiator) ([]SendResult, error) {
 	var results []SendResult
 	if r.IsFlow {
+		var initiator RequestInitiator
+		if internalInitiator != nil {
+			initiator = *internalInitiator
+		} else {
+			initiator = RequestInitiator{}
+		}
 		res, err := p.exec(r.Name, varOverrides, skipVerify, varPrefixOverride, httpClient, oc)
 		if err != nil {
 			return nil, fmt.Errorf("flow %q failed: %w", r.Name, err)
@@ -457,23 +476,12 @@ func (p *Project) fetch(r RequestSequence, varOverrides map[string]string, skipV
 	return results, nil
 }
 
-// SendTemplate sends the request template and mutates the project accordingly. If
-// client is set, that is used as the client for the request and generally this
-// is only done during testing. Returns results, any template's auths that were
-// updated (which may be more than one if an Auth chains into another Auth), and
-// any error that occurred.
-//
-// TODO: do we really need an exported version of this?
-func (p *Project) SendTemplate(tmpl RequestTemplate, vars map[string]string, skipVerify bool, varSymbol string, httpClient *http.Client, oc OutputControl) (SendResult, error) {
-	return p.sendTemplate(tmpl, vars, skipVerify, varSymbol, httpClient, oc)
-}
-
 // sendTemplate sends the request template and mutates the project accordingly. If
 // client is set, that is used as the client for the request and generally this
 // is only done during testing. Returns results, any template's auths that were
 // updated (which may be more than one if an Auth chains into another Auth), and
 // any error that occurred.
-func (p *Project) sendTemplate(tmpl RequestTemplate, vars map[string]string, skipVerify bool, varSymbol string, httpClient *http.Client, oc OutputControl) (SendResult, error) {
+func (p *Project) sendTemplate(tmpl RequestTemplate, vars map[string]string, skipVerify bool, varSymbol string, httpClient *http.Client, oc OutputControl, initiator RequestInitiator) (SendResult, error) {
 
 	if tmpl.Method == "" {
 		return SendResult{}, fmt.Errorf("request template %s has no method set", tmpl.Name)
@@ -1519,6 +1527,120 @@ type AuthCallMetadata struct {
 	Initiator AuthInitiator
 }
 
+// Re-cap of the categories the initiator is supposed to capture, redoing this
+// bc it is growing way more complex than it should be, glub, consider at
+// minimum having ctors and IsX methods for each of these.
+//
+// * User called Send on template.
+// * User called Exec on a flow with the template.
+// * User called Exec on an auth, which called the template
+// * User called Exec on an auth, which called a flow, which called the template.
+//
+// Rephrase:
+// Why is this template T being called?
+// - T was specified
+// HIST:
+// - Why T? T was directly requested
+//
+// - Flow was specified, which called T
+// HIST:
+// - Why T? T was invoked by Flow F.
+// - BTW the next and prev in F in hist are n, p.
+// - Why F? F was directly requested.
+//
+// - Auth was specified, which called T
+// HIST:
+// - Why T? T was invoked by Auth A.
+// - Why A? A was directly requested.
+//
+// - Auth was specified, which called flow which called T.
+// HIST:
+// - Why T? T was invoked by Flow F.
+// - BTW the next and prev in F in hist are n, p.
+// - Why F? F was invoked by Auth A.
+// - Why A? A was directly requested.
+//
+// - ? was specified, which either lead to or was Template, which called auth, which called T.
+// HIST:
+// - Why T? T was invoked by Auth A.
+// - Why A? A was initiated for Template T2.
+// - BTW the call to T2 in hist is i.
+//
+// - ? was specified, which either lead to or was Template, which called auth, which called flow, which called T.
+// HIST:
+// - Why T? T was invoked by Flow F.
+// - BTW the next and prev in F in hist are n, p.
+// - Why F? F was invoked by Auth A.
+// - Why A? A was initiated for Template T2.
+// - BTW the call to T2 in hist is i.
+//
+// So, either we know what was specified or we do not because we are chaining.
+//
+// Feels a lot like initiator is starting to tangle up
+// with historic metadata tho 38T.
+
+type RequestInitiatorRetry struct {
+	// Specified is the item that was directly requested by the user. If it is
+	// set to CauseChain, the initiator is part of a chain of requests that were
+	// made, and the chain needs to be examined to find the final root cause.
+	Specified RootRequestCause
+
+	// Parent is the name of the template that caused this initiator to
+	// be invoked. It will only be set if Specified is set to CauseChain.
+	Parent string
+
+	// Flow is the name of the flow that the request is being made for, if any.
+	Flow string
+
+	// Auth is the name of the auth that the request is being made for, if any.
+	Auth string
+}
+
+// HistoricInititator holds both an inititor and references to entries in
+// history that are relevant, such as 'next' and 'prev' entries for a referenced
+// flow, or the index of the parent.
+type HistoricInitiator struct {
+	RequestInitiatorRetry
+
+	// ParentIndex is the index in history of the request that caused this
+	// chained initiator to be invoked. It will only be valid if Parent is set.
+	// If set to -1, the parent request was never made.
+	ParentIndex int `json:"parent_index,omitempty"`
+
+	// FlowIndex is the indexes in history of the next and previous requests in
+	// the flow that this request is part of. It will only be valid if Flow is
+	// set.
+	FlowIndex struct {
+		Next int `json:"next"`
+		Prev int `json:"prev"`
+	} `json:"flow_index,omitempty"`
+}
+
+// RootRequestCause is an enum that is used to specify the thing that was
+// directly (externally) requested in an initiator. If it is set to CauseChain,
+// the initiator is part of a chain of requests that were made, and the chain
+// needs to be examined to find the final root cause.
+type RootRequestCause int
+
+const (
+	CauseChain RootRequestCause = iota
+	CauseTemplateSpecified
+	CauseFlowSpecified
+	CauseAuthSpecified
+)
+
+type ChainMetadata struct {
+	// Template is the name of the template that was called that caused this
+	// Auth to be sent. If User is true, Template will be empty.
+	Template string `json:"template"`
+
+	// Entry is the index in history of the sent request that this auth was made
+	// for. If the request ended up never being made, Entry will be set to -1.
+	Entry int `json:"entry,omitempty"`
+}
+
+// TODO: ctor conveneince funcs for RequestInitiator based on the logical
+// kind of thing it is. Yes there will probs be lots.
 type RequestInitiator struct {
 
 	// User is whether a caller of a morc project directly requested this
@@ -1536,6 +1658,39 @@ type RequestInitiator struct {
 	// if Auth.Name is set, this was called as part of an auth method for the
 	// template described within.
 	Auth AuthCallMetadata `json:"auth,omitempty"`
+}
+
+func (ri RequestInitiator) IsExternal() bool {
+	// return whether this indicates an external call to a Project. This is
+	// considered true either for a direct user-called template, a flow not
+	// being called as part of auth, or an auth that was executed directly.
+	return ri.IsExternalTemplateSend() || ri.IsExternalAuthExec() || ri.IsExternalFlowExec()
+}
+
+func (ri RequestInitiator) IsExternalFlowExec() bool {
+	return ri.Flow.Name != "" && ri.Auth.Name == ""
+}
+
+func (ri RequestInitiator) IsExternalAuthExec() bool {
+	return ri.Flow.Name == "" && ri.Auth.Name != "" && ri.Auth.Initiator.User
+}
+
+func (ri RequestInitiator) IsExternalTemplateSend() bool {
+	return ri.User
+}
+
+func newInitiatorForExternalFlowExec(flow string) RequestInitiator {
+	return RequestInitiator{
+		Flow: FlowCallMetadata{
+			Name: flow,
+		},
+	}
+}
+
+func newInitiatorForExternalTemplateSend() RequestInitiator {
+	return RequestInitiator{
+		User: true,
+	}
 }
 
 type AuthInitiator struct {

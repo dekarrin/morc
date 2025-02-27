@@ -335,12 +335,11 @@ func (p Project) PersistToDisk(all bool) error {
 // Returns the results of the sends, any auths that were updated, and any error
 // that occurred.
 func (p *Project) Exec(flowName string, initialVarOverrides map[string]string, skipVerify bool, prefixOverride string, httpClient *http.Client, oc OutputControl) ([]SendResult, error) {
-	return p.exec(flowName, initialVarOverrides, skipVerify, prefixOverride, httpClient, oc, RequestInitiator{
-		User: false,
-		Flow: FlowCallMetadata{
-			Name: flowName,
-		},
-	})
+	initiator := Initiator{
+		Cause: CauseFlowSpecified,
+		Flow:  flowName,
+	}
+	return p.exec(flowName, initialVarOverrides, skipVerify, prefixOverride, httpClient, oc, []Initiator{initiator})
 }
 
 func (p *Project) exec(flowName string, initialVarOverrides map[string]string, skipVerify bool, prefixOverride string, httpClient *http.Client, oc OutputControl, initiators []Initiator) ([]SendResult, error) {
@@ -414,9 +413,10 @@ func (p *Project) exec(flowName string, initialVarOverrides map[string]string, s
 // Calling this method sets initiator info for history entries and
 // chain-checking to indicate a user-initiated request.
 func (p *Project) Send(reqName string, varOverrides map[string]string, skipVerify bool, prefixOverride string, httpClient *http.Client, oc OutputControl) (SendResult, error) {
-	return p.send(reqName, varOverrides, skipVerify, prefixOverride, httpClient, oc, []Initiator{
-		{Cause: CauseTemplateSpecified},
-	})
+	initiator := Initiator{
+		Cause: CauseTemplateSpecified,
+	}
+	return p.send(reqName, varOverrides, skipVerify, prefixOverride, httpClient, oc, []Initiator{initiator})
 }
 
 func (p *Project) send(reqName string, varOverrides map[string]string, skipVerify bool, prefixOverride string, httpClient *http.Client, oc OutputControl, initiators []Initiator) (SendResult, error) {
@@ -434,7 +434,7 @@ func (p *Project) send(reqName string, varOverrides map[string]string, skipVerif
 		prefix = prefixOverride
 	}
 
-	return p.sendTemplate(tmpl, p.Vars.MergedSet(varOverrides), skipVerify, prefix, httpClient, oc, initiator)
+	return p.sendTemplate(tmpl, p.Vars.MergedSet(varOverrides), skipVerify, prefix, httpClient, oc, initiators)
 }
 
 // Fetch performs either a flow or a template send and returns the slice of
@@ -442,7 +442,19 @@ func (p *Project) send(reqName string, varOverrides map[string]string, skipVerif
 // the returned slice will have only one element. If a flow is specified, it is
 // an error if the flow does not return at least one SendResult.
 func (p *Project) Fetch(r RequestSequence, varOverrides map[string]string, skipVerify bool, varPrefixOverride string, httpClient *http.Client, oc OutputControl) ([]SendResult, error) {
-	return p.fetch(r, varOverrides, skipVerify, varPrefixOverride, httpClient, oc, nil)
+	var initiator Initiator
+	if r.IsFlow {
+		initiator = Initiator{
+			Cause: CauseFlowSpecified,
+			Flow:  r.Name,
+		}
+	} else {
+		initiator = Initiator{
+			Cause: CauseTemplateSpecified,
+		}
+	}
+
+	return p.fetch(r, varOverrides, skipVerify, varPrefixOverride, httpClient, oc, []Initiator{initiator})
 }
 
 // all calls to fetch that are NOT from Fetch must set initiator to a non-nil
@@ -451,7 +463,7 @@ func (p *Project) Fetch(r RequestSequence, varOverrides map[string]string, skipV
 func (p *Project) fetch(r RequestSequence, varOverrides map[string]string, skipVerify bool, varPrefixOverride string, httpClient *http.Client, oc OutputControl, initiators []Initiator) ([]SendResult, error) {
 	var results []SendResult
 	if r.IsFlow {
-		res, err := p.exec(r.Name, varOverrides, skipVerify, varPrefixOverride, httpClient, oc)
+		res, err := p.exec(r.Name, varOverrides, skipVerify, varPrefixOverride, httpClient, oc, initiators)
 		if err != nil {
 			return nil, fmt.Errorf("flow %q failed: %w", r.Name, err)
 		}
@@ -460,7 +472,7 @@ func (p *Project) fetch(r RequestSequence, varOverrides map[string]string, skipV
 		}
 		results = res
 	} else {
-		res, err := p.send(r.Name, varOverrides, skipVerify, varPrefixOverride, httpClient, oc)
+		res, err := p.send(r.Name, varOverrides, skipVerify, varPrefixOverride, httpClient, oc, initiators)
 		if err != nil {
 			return nil, fmt.Errorf("request template %q failed: %w", r.Name, err)
 		}

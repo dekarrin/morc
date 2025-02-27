@@ -389,6 +389,7 @@ func (p *Project) exec(flowName string, initialVarOverrides map[string]string, s
 	}
 
 	var results []SendResult
+	var prevHistIdx int = -1
 	for i, tmpl := range templates {
 		result, err := p.sendTemplate(tmpl, p.Vars.MergedSet(varOverrides), skipVerify, prefix, httpClient, oc, initiators)
 		if err != nil {
@@ -402,6 +403,18 @@ func (p *Project) exec(flowName string, initialVarOverrides map[string]string, s
 		for k := range result.Captures {
 			delete(varOverrides, strings.ToUpper(k))
 		}
+
+		// assuming this actually sent, we need to track the last history entry
+		// and we need to do it on the fly in case the next one fails
+		// TODO: syntax, feels odd. either make these all pointers or see if we
+		// can just do modification via index.
+		histEnd := len(p.History) - 1
+		p.History[histEnd].Initiator.Links.Flow.Prev = prevHistIdx
+		p.History[histEnd].Initiator.Links.Flow.Next = -1
+		if prevHistIdx != -1 {
+			p.History[prevHistIdx].Initiator.Links.Flow.Next = histEnd
+		}
+		prevHistIdx = histEnd
 	}
 
 	return results, nil
@@ -458,8 +471,7 @@ func (p *Project) Fetch(r RequestSequence, varOverrides map[string]string, skipV
 }
 
 // all calls to fetch that are NOT from Fetch must set initiator to a non-nil
-// value. TODO: perhaps something in RequestInitiator can be set to
-// unambiguously mark the request as externally initiated.
+// value.
 func (p *Project) fetch(r RequestSequence, varOverrides map[string]string, skipVerify bool, varPrefixOverride string, httpClient *http.Client, oc OutputControl, initiators []Initiator) ([]SendResult, error) {
 	var results []SendResult
 	if r.IsFlow {
@@ -538,7 +550,15 @@ func (p *Project) sendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 			}
 
 			var sendResults []SendResult
-			authProof, sendResults, err = p.execAuth(auth, skipVerify, httpClient, authOC)
+
+			// create initiator in case auth requests are sent and logged.
+			authInitiator := Initiator{
+				Cause:  CauseChain,
+				Parent: tmpl.Name,
+				Auth:   auth.Name,
+			}
+			initiators = append(initiators, authInitiator)
+			authProof, sendResults, err = p.execAuth(auth, skipVerify, httpClient, authOC, initiators)
 			authRequested = len(sendResults) > 0
 			if err != nil {
 				return SendResult{}, err
@@ -546,8 +566,17 @@ func (p *Project) sendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 			if authRequested {
 				authUpdated = true
 
+				// TODO: modify history to add links
+
 				// persist any auth changes
 				p.Auths[strings.ToLower(tmpl.Auth)] = *auth
+			}
+
+			// remove the extra initiator
+			// TODO: bump up go.mod to 1.21 so we can just use stdlib slices package ffs.
+			initiators, err = sliceops.Remove(initiators, -1)
+			if err != nil {
+				panic(err)
 			}
 		}
 
@@ -591,17 +620,18 @@ func (p *Project) sendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 		}
 
 		// persist history
+
+		// record last initiator
+		lastInitiator := initiators[len(initiators)-1]
 		if p.Config.RecordHistory {
 			entry := HistoryEntry{
-				Template: tmpl.Name,
-				ReqTime:  result.SendTime,
-				RespTime: result.RecvTime,
-				Request:  result.Request,
-				Response: result.Response,
-				Captures: result.Captures,
-				Initiator: Initiator{
-					Cause: CauseTemplateSpecified, // TODO: add other things as we are able to pass info along.
-				},
+				Template:  tmpl.Name,
+				ReqTime:   result.SendTime,
+				RespTime:  result.RecvTime,
+				Request:   result.Request,
+				Response:  result.Response,
+				Captures:  result.Captures,
+				Initiator: lastInitiator,
 			}
 
 			p.History = append(p.History, entry)
@@ -664,14 +694,19 @@ func (p *Project) sendTemplate(tmpl RequestTemplate, vars map[string]string, ski
 // updated; simply put, if requests were made, the auth was updated. The results
 // indicate of those, if any sub-auths were updated.
 func (p *Project) ExecAuth(auth *Auth, skipVerify bool, httpClient *http.Client, oc OutputControl) (ap AuthProof, results []SendResult, err error) {
-	return p.execAuth(auth, skipVerify, httpClient, oc)
-}
-
-func (p *Project) execAuth(auth *Auth, skipVerify bool, httpClient *http.Client, oc OutputControl) (ap AuthProof, results []SendResult, err error) {
 	// TODO: this API does not match Exec() at all. Caller is required to
 	// persist any changes to the auth manually to the project. Update this to
 	// be more like Exec() which should be automatically handled.
 
+	initiator := Initiator{
+		Cause: CauseAuthSpecified,
+		Auth:  auth.Name,
+	}
+
+	return p.execAuth(auth, skipVerify, httpClient, oc, []Initiator{initiator})
+}
+
+func (p *Project) execAuth(auth *Auth, skipVerify bool, httpClient *http.Client, oc OutputControl, initiators []Initiator) (ap AuthProof, results []SendResult, err error) {
 	if auth.Static() {
 		return auth.Proof, nil, nil
 	}
@@ -681,7 +716,14 @@ func (p *Project) execAuth(auth *Auth, skipVerify bool, httpClient *http.Client,
 			return nil, nil, errors.New("no static credentials or fetcher configured")
 		}
 
-		results, err = p.fetch(auth.Fetcher.Seq, nil, skipVerify, "", httpClient, oc)
+		if auth.Fetcher.Seq.IsFlow {
+			// modify the initiator to indicate this will be part of a flow
+			init := initiators[len(initiators)-1]
+			init.Flow = auth.Fetcher.Seq.Name
+			initiators[len(initiators)-1] = init
+		}
+
+		results, err = p.fetch(auth.Fetcher.Seq, nil, skipVerify, "", httpClient, oc, initiators)
 		if err != nil {
 			return nil, nil, fmt.Errorf("fetch auth: %w", err)
 		}

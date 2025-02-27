@@ -119,8 +119,10 @@ func invokeFlowsDelete(io cmdio.IO, projFile, flowName string) error {
 }
 
 func invokeFlowsEdit(io cmdio.IO, projFile, flowName string, attrs flowAttrValues) error {
+	loadAllFiles := attrs.name.set
+
 	// load the project file
-	p, err := readProject(projFile, false)
+	p, err := readProject(projFile, loadAllFiles)
 	if err != nil {
 		return err
 	}
@@ -143,6 +145,13 @@ func invokeFlowsEdit(io cmdio.IO, projFile, flowName string, attrs flowAttrValue
 			}
 			if _, exists := p.Flows[newNameLower]; exists {
 				return fmt.Errorf("flow named %s already exists", newNameLower)
+			}
+
+			// update the name in the history
+			for idx, h := range p.History {
+				if strings.ToLower(h.Initiator.Auth) == flowLower {
+					p.History[idx].Initiator.Parent = newNameLower
+				}
 			}
 
 			flow.Name = newNameLower
@@ -266,7 +275,7 @@ func invokeFlowsEdit(io cmdio.IO, projFile, flowName string, attrs flowAttrValue
 
 	// flow name might have been modified so take the currently set .Name and lowercase it.
 	p.Flows[strings.ToLower(flow.Name)] = flow
-	err = writeProject(p, false)
+	err = writeProject(p, loadAllFiles)
 	if err != nil {
 		return err
 	}

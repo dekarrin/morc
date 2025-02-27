@@ -153,6 +153,9 @@ func invokeReqsEdit(io cmdio.IO, projFile, reqName string, attrs reqAttrValues) 
 				if strings.ToLower(h.Template) == reqLower {
 					p.History[idx].Template = newName
 				}
+				if strings.ToLower(h.Initiator.Parent) == reqLower {
+					p.History[idx].Initiator.Parent = newName
+				}
 			}
 
 			// update the name in the flows

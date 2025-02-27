@@ -467,8 +467,10 @@ func invokeAuthsGet(io cmdio.IO, projFile, authName string, item authKey, unmask
 }
 
 func invokeAuthsEdit(io cmdio.IO, projFile, authName string, attrs authAttrValues, unmaskSecrets bool) error {
+	loadAllFiles := attrs.name.set
+
 	// load the project file
-	p, err := readProject(projFile, false)
+	p, err := readProject(projFile, loadAllFiles)
 	if err != nil {
 		return err
 	}
@@ -506,6 +508,13 @@ func invokeAuthsEdit(io cmdio.IO, projFile, authName string, attrs authAttrValue
 				tmpl.Auth = newNameLower
 				delete(p.Templates, tmplName)
 				p.Templates[tmpl.Name] = tmpl
+			}
+
+			// update the name in the history
+			for idx, h := range p.History {
+				if strings.ToLower(h.Initiator.Auth) == authLower {
+					p.History[idx].Initiator.Auth = newNameLower
+				}
 			}
 
 			auth.Name = newNameLower
@@ -682,7 +691,7 @@ func invokeAuthsEdit(io cmdio.IO, projFile, authName string, attrs authAttrValue
 
 	// auth name might have been modified so take the currently set .Name and lowercase it.
 	p.Auths[strings.ToLower(auth.Name)] = auth
-	err = writeProject(p, false)
+	err = writeProject(p, loadAllFiles)
 	if err != nil {
 		return err
 	}

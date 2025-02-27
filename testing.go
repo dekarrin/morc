@@ -110,6 +110,9 @@ func (m *Assertions) HistEntryMatches(expectedHist []HistoryEntry, actualHist []
 	if !m.Equalf(expected.Captures, actual.Captures, "history entry[%d] captures do not match expected", idx) {
 		failed = true
 	}
+	if !m.Equalf(expected.Initiator, actual.Initiator, "history entry[%d] initiator does not match expected", idx) {
+		failed = true
+	}
 
 	return !failed
 }

@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dekarrin/morc"
 	"github.com/dekarrin/morc/cmd/morc/cmdio"
@@ -73,7 +74,7 @@ func Test_Send(t *testing.T) {
 		_, _ = w.Write([]byte(`{"name":{"first":"VRISKA","last":"SERKET"}}`))
 	}
 
-	//cookieExpTime := mustParseTime(time.RFC3339, time.Now().Add(1*time.Hour).UTC().Format(time.RFC3339))
+	cookieExpTime := mustParseTime(time.RFC3339, time.Now().Add(1*time.Hour).UTC().Format(time.RFC3339))
 
 	testCases := []struct {
 		name               string
@@ -89,61 +90,81 @@ func Test_Send(t *testing.T) {
 		expectStderrOutput string // set with expected output to stderr
 		expectStdoutOutput string // set with expected output to stdout
 	}{
-		// 		{
-		// 			name: "request requires cookie-based auth - history saved - no output for auth req",
-		// 			args: []string{"send", "resource", "--hide-auth"},
-		// 			respFn: serverHandler_withProtectedResource_session(
-		// 				Creds{User: "test", Pass: "TEsT123!"},
-		// 				&http.Cookie{Name: "session", Value: "ABCDEFG", Expires: cookieExpTime},
-		// 				testResource{Name: "VRISKA", Number: 8, Title: "Thief of Light"},
-		// 			),
-		// 			p: morc.Project{
-		// 				Templates: testRequests_withProtectedResource_session(Creds{"test", "TEsT123!"}, "testauth"),
-		// 				Auths:     testAuths(testAuth_session("testauth", seqTemplate, "login", "session", enableExpiration, nil)),
-		// 				Config: morc.Settings{
-		// 					HistFile:      "::PROJ_DIR::/history.json",
-		// 					RecordHistory: true,
-		// 				},
-		// 			},
-		// 			expectP: morc.Project{
-		// 				Templates: testRequests_withProtectedResource_session(Creds{"test", "TEsT123!"}, "testauth"),
-		// 				Auths:     testAuths(testAuth_session("testauth", seqTemplate, "login", "session", enableExpiration, testProof_session("session", "ABCDEFG", cookieExpTime))),
-		// 				History: []morc.HistoryEntry{
-		// 					{
-		// 						Template: "testreq",
-		// 						Request: &http.Request{
-		// 							Method:     "GET",
-		// 							URL:        mustParseURL("/"),
-		// 							Proto:      "HTTP/1.1",
-		// 							ProtoMajor: 1,
-		// 							ProtoMinor: 1,
-		// 							Body:       http.NoBody,
-		// 						},
-		// 						Response: &http.Response{
-		// 							Status:     fmt.Sprintf("%d %s", http.StatusOK, http.StatusText(http.StatusOK)),
-		// 							StatusCode: http.StatusOK,
-		// 							Proto:      "HTTP/1.1",
-		// 							ProtoMajor: 1,
-		// 							ProtoMinor: 1,
-		// 							Header: http.Header{
-		// 								"Content-Length": []string{"0"},
-		// 							},
-		// 							Body: http.NoBody,
-		// 						},
-		// 					},
-		// 				},
-		// 				Config: morc.Settings{
-		// 					HistFile:      "::PROJ_DIR::/history.json",
-		// 					RecordHistory: true,
-		// 				},
-		// 			},
-		// 			expectStdoutOutput: `HTTP/1.1 200 OK
-		// {"name":"VRISKA","number":8,"title":"Thief of Light"}
-		// `,
-		// 			expectProjectSaved: true,
-		// 			expectHistorySaved: true,
-		// 			expectSessionSaved: false,
-		// 		},
+		{
+			name: "request requires cookie-based auth - history saved - no output for auth req",
+			args: []string{"send", "resource", "--hide-auth"},
+			respFn: serverHandler_withProtectedResource_session(
+				Creds{User: "test", Pass: "TEsT123!"},
+				&http.Cookie{Name: "session", Value: "ABCDEFG", Expires: cookieExpTime},
+				testResource{Name: "VRISKA", Number: 8, Title: "Thief of Light"},
+			),
+			p: morc.Project{
+				Templates: testRequests_withProtectedResource_session(Creds{"test", "TEsT123!"}, "testauth"),
+				Auths:     testAuths(testAuth_session("testauth", seqTemplate, "login", "session", enableExpiration, nil)),
+				Config: morc.Settings{
+					HistFile:      "::PROJ_DIR::/history.json",
+					RecordHistory: true,
+				},
+			},
+			expectP: morc.Project{
+				Templates: testRequests_withProtectedResource_session(Creds{"test", "TEsT123!"}, "testauth"),
+				Auths:     testAuths(testAuth_session("testauth", seqTemplate, "login", "session", enableExpiration, testProof_session("session", "ABCDEFG", cookieExpTime))),
+				History: []morc.HistoryEntry{
+					{
+						Template: "login",
+						Request: &http.Request{
+							Method:     "POST",
+							URL:        mustParseURL("/login"),
+							Proto:      "HTTP/1.1",
+							ProtoMajor: 1,
+							ProtoMinor: 1,
+							Header: http.Header{
+								"Content-Type": []string{"application/json"},
+							},
+						},
+						Response: &http.Response{
+							Status:     fmt.Sprintf("%d %s", http.StatusOK, http.StatusText(http.StatusOK)),
+							StatusCode: http.StatusOK,
+							Proto:      "HTTP/1.1",
+							ProtoMajor: 1,
+							ProtoMinor: 1,
+						},
+					},
+					{
+						Template: "testreq",
+						Request: &http.Request{
+							Method:     "GET",
+							URL:        mustParseURL("/"),
+							Proto:      "HTTP/1.1",
+							ProtoMajor: 1,
+							ProtoMinor: 1,
+							Body:       http.NoBody,
+						},
+						Response: &http.Response{
+							Status:     fmt.Sprintf("%d %s", http.StatusOK, http.StatusText(http.StatusOK)),
+							StatusCode: http.StatusOK,
+							Proto:      "HTTP/1.1",
+							ProtoMajor: 1,
+							ProtoMinor: 1,
+							Header: http.Header{
+								"Content-Length": []string{"0"},
+							},
+							Body: http.NoBody,
+						},
+					},
+				},
+				Config: morc.Settings{
+					HistFile:      "::PROJ_DIR::/history.json",
+					RecordHistory: true,
+				},
+			},
+			expectStdoutOutput: `HTTP/1.1 200 OK
+{"name":"VRISKA","number":8,"title":"Thief of Light"}
+`,
+			expectProjectSaved: true,
+			expectHistorySaved: true,
+			expectSessionSaved: false,
+		},
 		{
 			name:   "send saves history",
 			args:   []string{"send", "testreq"},

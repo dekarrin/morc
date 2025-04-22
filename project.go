@@ -1628,13 +1628,13 @@ type HistoryLinks struct {
 // directly (externally) requested in an initiator. If it is set to CauseChain,
 // the initiator is part of a chain of requests that were made, and the chain
 // needs to be examined to find the final root cause.
-type RootRequestCause int
+type RootRequestCause string
 
 const (
-	CauseChain RootRequestCause = iota
-	CauseTemplateSpecified
-	CauseFlowSpecified
-	CauseAuthSpecified
+	CauseChain             RootRequestCause = "chain"
+	CauseTemplateSpecified RootRequestCause = "template-specified"
+	CauseFlowSpecified     RootRequestCause = "flow-specified"
+	CauseAuthSpecified     RootRequestCause = "auth-specified"
 )
 
 type HistoryEntry struct {

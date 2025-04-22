@@ -1,6 +1,9 @@
 package morc
 
 import (
+	"bytes"
+	"io"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -89,7 +92,8 @@ func (m *Assertions) SessionsMatch(expected Session, actual Session) bool {
 	return !failed
 }
 
-// note: does not check time.
+// note: does not check time. body contents are extracted and placed into
+// equivalent Readers.
 func (m *Assertions) HistEntryMatches(expectedHist []HistoryEntry, actualHist []HistoryEntry, idx int) bool {
 	m.T.Helper()
 
@@ -101,6 +105,56 @@ func (m *Assertions) HistEntryMatches(expectedHist []HistoryEntry, actualHist []
 	if !m.Equalf(expected.Template, actual.Template, "history entry[%d] template does not match expected", idx) {
 		failed = true
 	}
+
+	// extract response/request bodies so we can mess with them
+	oldExpReqBody := expected.Request.Body
+	oldExpRespBody := expected.Response.Body
+	oldActReqBody := actual.Request.Body
+	oldActRespBody := actual.Response.Body
+	defer func() {
+		expected.Request.Body = oldExpReqBody
+		expected.Response.Body = oldExpRespBody
+		actual.Request.Body = oldActReqBody
+		actual.Response.Body = oldActRespBody
+	}()
+
+	if expected.Request.Body == nil {
+		expected.Request.Body = http.NoBody
+	}
+	if expected.Response.Body == nil {
+		expected.Response.Body = http.NoBody
+	}
+	if actual.Request.Body == nil {
+		actual.Request.Body = http.NoBody
+	}
+	if actual.Response.Body == nil {
+		actual.Response.Body = http.NoBody
+	}
+
+	expReqBytes, err := io.ReadAll(expected.Request.Body)
+	if err != nil {
+		m.T.Fatalf("error reading expected request body: %v", err)
+	}
+	expected.Request.Body = io.NopCloser(bytes.NewReader(expReqBytes))
+
+	expRespBytes, err := io.ReadAll(expected.Response.Body)
+	if err != nil {
+		m.T.Fatalf("error reading expected response body: %v", err)
+	}
+	expected.Response.Body = io.NopCloser(bytes.NewReader(expRespBytes))
+
+	actReqBytes, err := io.ReadAll(actual.Request.Body)
+	if err != nil {
+		m.T.Fatalf("error reading actual request body: %v", err)
+	}
+	actual.Request.Body = io.NopCloser(bytes.NewReader(actReqBytes))
+
+	actRespBytes, err := io.ReadAll(actual.Response.Body)
+	if err != nil {
+		m.T.Fatalf("error reading actual response body: %v", err)
+	}
+	actual.Response.Body = io.NopCloser(bytes.NewReader(actRespBytes))
+
 	if !m.Equalf(expected.Request, actual.Request, "history entry[%d] request does not match expected", idx) {
 		failed = true
 	}

@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -48,6 +49,7 @@ type testResource struct {
 	Title  string `json:"title"`
 }
 
+// TODO: split these tests up, there's way too many for a single function.
 func Test_Send(t *testing.T) {
 	respFnNoBodyOK := func(w http.ResponseWriter, r *http.Request) {
 		// suppress date header
@@ -121,24 +123,41 @@ func Test_Send(t *testing.T) {
 							Header: http.Header{
 								"Content-Type": []string{"application/json"},
 							},
+							Body:          io.NopCloser(strings.NewReader(`{"user":"test","pass":"TEsT123!"}`)),
+							ContentLength: 33,
 						},
 						Response: &http.Response{
-							Status:     fmt.Sprintf("%d %s", http.StatusOK, http.StatusText(http.StatusOK)),
-							StatusCode: http.StatusOK,
+							Status:     fmt.Sprintf("%d %s", http.StatusNoContent, http.StatusText(http.StatusNoContent)),
+							StatusCode: http.StatusNoContent,
 							Proto:      "HTTP/1.1",
 							ProtoMajor: 1,
 							ProtoMinor: 1,
+							Header: http.Header{
+								"Set-Cookie": []string{"session=ABCDEFG; Expires=" + cookieExpTime.Format(http.TimeFormat)},
+							},
+						},
+						Initiator: morc.Initiator{
+							Cause:  morc.CauseChain,
+							Parent: "resource",
+							Auth:   "testauth",
+							Links: morc.HistoryLinks{
+								Parent: 1,
+							},
 						},
 					},
 					{
-						Template: "testreq",
+						Template: "resource",
 						Request: &http.Request{
 							Method:     "GET",
-							URL:        mustParseURL("/"),
+							URL:        mustParseURL("/protected"),
 							Proto:      "HTTP/1.1",
 							ProtoMajor: 1,
 							ProtoMinor: 1,
 							Body:       http.NoBody,
+							Header: http.Header{
+								"Content-Type": []string{"application/json"},
+								"Cookie":       []string{"session=ABCDEFG"},
+							},
 						},
 						Response: &http.Response{
 							Status:     fmt.Sprintf("%d %s", http.StatusOK, http.StatusText(http.StatusOK)),

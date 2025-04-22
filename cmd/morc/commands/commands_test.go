@@ -667,6 +667,8 @@ func serverHandler_withProtectedResource_session(validCredentials Creds, cookie 
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 
+		w.Header()["Date"] = nil
+
 		switch path {
 		case "/login":
 			switch r.Method {

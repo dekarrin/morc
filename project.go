@@ -99,6 +99,7 @@ func (s Settings) SessionFSPath() string {
 type Project struct {
 	Name      string
 	Templates map[string]RequestTemplate // note: Names must be manually synched across Templates, Flows, and History
+	AuthMethods map[string]AuthMethod    `json:"auth_methods,omitempty"`
 	Flows     map[string]Flow
 	Vars      VarStore
 	History   []HistoryEntry
@@ -642,7 +643,7 @@ type RequestTemplate struct {
 	URL      string
 	Method   string
 	Headers  http.Header
-	AuthFlow string
+	AuthFlow string `json:"auth_flow,omitempty"`
 }
 
 func (r RequestTemplate) Sendable() bool {

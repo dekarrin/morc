@@ -1,13 +1,10 @@
 package morc
 
 import (
-	"bytes"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"time"
 )
 
@@ -50,6 +47,10 @@ type AuthProofConfig struct {
 	BodyPath   string `json:"body_path,omitempty"` // JSON path for body insertion
 }
 
+
+
+
+
 // AuthProof represents a piece of authentication proof
 type AuthProof struct {
 	Value    string    `json:"value"`
@@ -61,6 +62,7 @@ type AuthProof struct {
 type ProjectWithAuth struct {
 	Project
 	AuthMethods map[string]AuthMethod `json:"auth_methods,omitempty"`
+	Flows      map[string]*Flow       `json:"flows,omitempty"`
 }
 
 // GetAuthProof retrieves an authentication proof for the given auth method
@@ -89,8 +91,7 @@ func (p *ProjectWithAuth) executeAuthFlow(auth *AuthMethod) (*AuthProof, error) 
 	}
 
 	// Execute the flow to get the auth proof
-	flow, ok := p.Flows[auth.Flow]
-	if !ok {
+	if _, ok := p.Flows[auth.Flow]; !ok {
 		return nil, fmt.Errorf("flow %s not found", auth.Flow)
 	}
 
@@ -135,10 +136,8 @@ func (p *ProjectWithAuth) IsAuthValid(proof *AuthProof, response *http.Response)
 	}
 
 	// Check if response indicates invalid auth
-	for _, code := range proof.InvalidCodes {
-		if response.StatusCode == code {
-			return false
-		}
+	if response.StatusCode >= 400 {
+		return false
 	}
 
 	return true

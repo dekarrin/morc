@@ -166,9 +166,11 @@ func Test_Send(t *testing.T) {
 							ProtoMajor: 1,
 							ProtoMinor: 1,
 							Header: http.Header{
-								"Content-Length": []string{"0"},
+								"Content-Length": []string{"53"},
+								"Content-Type":   []string{"application/json"},
 							},
-							Body: http.NoBody,
+							Body:          io.NopCloser(strings.NewReader(`{"name":"VRISKA","number":8,"title":"Thief of Light"}`)),
+							ContentLength: 53,
 						},
 					},
 				},

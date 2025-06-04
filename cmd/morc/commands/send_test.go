@@ -172,6 +172,9 @@ func Test_Send(t *testing.T) {
 							Body:          io.NopCloser(strings.NewReader(`{"name":"VRISKA","number":8,"title":"Thief of Light"}`)),
 							ContentLength: 53,
 						},
+						Initiator: morc.Initiator{
+							Cause: morc.CauseTemplateSpecified,
+						},
 					},
 				},
 				Config: morc.Settings{

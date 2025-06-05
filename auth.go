@@ -470,7 +470,7 @@ func NewJWTExpirationTransformer() TimeTransformerFunc {
 			return time.Time{}, nil
 		}
 
-		return time.Unix(claims.Exp, 0), nil
+		return time.Unix(claims.Exp, 0).UTC(), nil
 	}
 }
 

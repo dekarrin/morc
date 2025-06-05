@@ -1561,7 +1561,9 @@ HTTP/1.1 200 OK
 
 func Test_Send_WithAuth(t *testing.T) {
 	authExpTime := mustParseTime(time.RFC3339, time.Now().Add(1*time.Hour).UTC().Format(time.RFC3339))
+
 	signingKey := "testkey"
+	testToken := testJWTData{Expiration: authExpTime}
 
 	testCases := []struct {
 		name               string
@@ -1679,7 +1681,7 @@ func Test_Send_WithAuth(t *testing.T) {
 			args: []string{"send", "resource", "--hide-auth"},
 			respFn: serverHandler_withProtectedResource_jwt(
 				Creds{User: "test", Pass: "TEsT123!"},
-				testJWTData{Expiration: authExpTime},
+				testToken,
 				testResource{Name: "VRISKA", Number: 8, Title: "Thief of Light"},
 				signingKey,
 			),
@@ -1696,7 +1698,7 @@ func Test_Send_WithAuth(t *testing.T) {
 			expectP: morc.Project{
 				Templates: testRequests_withProtectedResource_jwt(Creds{"test", "TEsT123!"}, "testauth"),
 				Auths: map[string]morc.Auth{
-					"testauth": testAuth_jwt("testauth", "login", "token", testProof_jwt(testJWTData{Expiration: authExpTime}, signingKey)),
+					"testauth": testAuth_jwt("testauth", "login", "token", testProof_jwt(testToken, signingKey)),
 				},
 				History: []morc.HistoryEntry{
 					{
@@ -1721,10 +1723,10 @@ func Test_Send_WithAuth(t *testing.T) {
 							ProtoMinor: 1,
 							Header: http.Header{
 								"Content-Type":   []string{"application/json"},
-								"Content-Length": []string{"75"},
+								"Content-Length": []string{"130"},
 							},
-							Body:          io.NopCloser(strings.NewReader(`{"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MDk4NTI4MDB9.X"}`)),
-							ContentLength: 75,
+							Body:          io.NopCloser(strings.NewReader(`{"token":"` + testToken.Token(signingKey) + `"}`)),
+							ContentLength: 130,
 						},
 						Initiator: morc.Initiator{
 							Cause:  morc.CauseChain,
@@ -1746,7 +1748,7 @@ func Test_Send_WithAuth(t *testing.T) {
 							Body:       http.NoBody,
 							Header: http.Header{
 								"Content-Type":  []string{"application/json"},
-								"Authorization": []string{"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MDk4NTI4MDB9.X"},
+								"Authorization": []string{"Bearer " + testToken.Token(signingKey)},
 							},
 						},
 						Response: &http.Response{

@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -47,6 +49,150 @@ type testResource struct {
 	Name   string `json:"name"`
 	Number int    `json:"number"`
 	Title  string `json:"title"`
+}
+
+func serverHandler_withProtectedResource_jwt(creds Creds, token string, resource testResource) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// suppress date header
+		w.Header()["Date"] = nil
+
+		if r.URL.Path == "/login" {
+			if r.Method != "POST" {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+
+			// check credentials
+			var reqCreds Creds
+			if err := json.NewDecoder(r.Body).Decode(&reqCreds); err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			if reqCreds != creds {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
+			// send token
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(fmt.Sprintf(`{"token":%q}`, token)))
+			return
+		}
+
+		if r.URL.Path == "/protected" {
+			if r.Method != "GET" {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+
+			// check auth header
+			authHeader := r.Header.Get("Authorization")
+			if authHeader == "" {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
+			// check token
+			parts := strings.Split(authHeader, " ")
+			if len(parts) != 2 || parts[0] != "Bearer" || parts[1] != token {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
+			// send resource
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			data, _ := json.Marshal(resource)
+			w.Write(data)
+			return
+		}
+
+		w.WriteHeader(http.StatusNotFound)
+	}
+}
+
+func testRequests_withProtectedResource_jwt(creds Creds, authName string) map[string]morc.RequestTemplate {
+	return map[string]morc.RequestTemplate{
+		"login": {
+			Name:   "login",
+			Method: "POST",
+			URL:    "/login",
+			Body:   []byte(fmt.Sprintf(`{"user":%q,"pass":%q}`, creds.User, creds.Pass)),
+			Headers: http.Header{
+				"Content-Type": []string{"application/json"},
+			},
+		},
+		"resource": {
+			Name:   "resource",
+			Method: "GET",
+			URL:    "/protected",
+			Headers: http.Header{
+				"Content-Type": []string{"application/json"},
+			},
+			Auth: authName,
+		},
+	}
+}
+
+func testAuth_jwt(name, seqName, loginName, tokenVar string, proof ...morc.AuthProof) morc.Auth {
+	var p morc.AuthProof
+	if len(proof) > 0 {
+		p = proof[0]
+	}
+
+	return morc.Auth{
+		Name:  name,
+		Type:  morc.AuthTypeJWT,
+		Proof: p,
+		Fetcher: morc.NewJWTFetcher(
+			morc.RequestSequence{
+				Name:   loginName,
+				IsFlow: false,
+			},
+			morc.Scraper{
+				Name: tokenVar,
+				Type: morc.SpecBodyJSON,
+				Steps: []morc.TraversalStep{
+					{Key: "token"},
+				},
+			},
+		),
+	}
+}
+
+func testProof_jwt(name, token string) morc.AuthProof {
+	// Parse the JWT token to extract expiration
+	parts := strings.Split(token, ".")
+	if len(parts) >= 2 {
+		var claims struct {
+			Exp int64 `json:"exp"`
+		}
+		if payload, err := base64.RawURLEncoding.DecodeString(parts[1]); err == nil {
+			if err := json.Unmarshal(payload, &claims); err == nil && claims.Exp > 0 {
+				return morc.DynamicProof{
+					Dest: morc.ProofDestination{
+						Location: morc.ProofLocationHeader,
+						Key:      "Authorization",
+						Format:   "bearer",
+					},
+					Value:     token,
+					ExpiresAt: time.Unix(claims.Exp, 0),
+				}
+			}
+		}
+	}
+
+	return morc.DynamicProof{
+		Dest: morc.ProofDestination{
+			Location: morc.ProofLocationHeader,
+			Key:      "Authorization",
+			Format:   "bearer",
+		},
+		Value:     token,
+		ExpiresAt: time.Time{},
+	}
 }
 
 func Test_Send(t *testing.T) {
@@ -1255,6 +1401,110 @@ func Test_Send_WithAuth(t *testing.T) {
 							Header: http.Header{
 								"Content-Type": []string{"application/json"},
 								"Cookie":       []string{"session=ABCDEFG"},
+							},
+						},
+						Response: &http.Response{
+							Status:     fmt.Sprintf("%d %s", http.StatusOK, http.StatusText(http.StatusOK)),
+							StatusCode: http.StatusOK,
+							Proto:      "HTTP/1.1",
+							ProtoMajor: 1,
+							ProtoMinor: 1,
+							Header: http.Header{
+								"Content-Length": []string{"53"},
+								"Content-Type":   []string{"application/json"},
+							},
+							Body:          io.NopCloser(strings.NewReader(`{"name":"VRISKA","number":8,"title":"Thief of Light"}`)),
+							ContentLength: 53,
+						},
+						Initiator: morc.Initiator{
+							Cause: morc.CauseTemplateSpecified,
+						},
+					},
+				},
+				Config: morc.Settings{
+					HistFile:      "::PROJ_DIR::/history.json",
+					RecordHistory: true,
+				},
+			},
+			expectStdoutOutput: `HTTP/1.1 200 OK
+{"name":"VRISKA","number":8,"title":"Thief of Light"}
+`,
+			expectProjectSaved: true,
+			expectHistorySaved: true,
+			expectSessionSaved: false,
+		},
+		{
+			name: "request requires JWT auth - token extracted and used",
+			args: []string{"send", "resource", "--hide-auth"},
+			respFn: serverHandler_withProtectedResource_jwt(
+				Creds{User: "test", Pass: "TEsT123!"},
+				"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MDk4NTI4MDB9.X", // JWT with expiration
+				testResource{Name: "VRISKA", Number: 8, Title: "Thief of Light"},
+			),
+			p: morc.Project{
+				Templates: testRequests_withProtectedResource_jwt(Creds{"test", "TEsT123!"}, "testauth"),
+				Auths: map[string]morc.Auth{
+					"testauth": testAuth_jwt("testauth", "login", "login", "token"),
+				},
+				Config: morc.Settings{
+					HistFile:      "::PROJ_DIR::/history.json",
+					RecordHistory: true,
+				},
+			},
+			expectP: morc.Project{
+				Templates: testRequests_withProtectedResource_jwt(Creds{"test", "TEsT123!"}, "testauth"),
+				Auths: map[string]morc.Auth{
+					"testauth": testAuth_jwt("testauth", "login", "login", "token", testProof_jwt("token", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MDk4NTI4MDB9.X")),
+				},
+				History: []morc.HistoryEntry{
+					{
+						Template: "login",
+						Request: &http.Request{
+							Method:     "POST",
+							URL:        mustParseURL("/login"),
+							Proto:      "HTTP/1.1",
+							ProtoMajor: 1,
+							ProtoMinor: 1,
+							Header: http.Header{
+								"Content-Type": []string{"application/json"},
+							},
+							Body:          io.NopCloser(strings.NewReader(`{"user":"test","pass":"TEsT123!"}`)),
+							ContentLength: 33,
+						},
+						Response: &http.Response{
+							Status:     fmt.Sprintf("%d %s", http.StatusOK, http.StatusText(http.StatusOK)),
+							StatusCode: http.StatusOK,
+							Proto:      "HTTP/1.1",
+							ProtoMajor: 1,
+							ProtoMinor: 1,
+							Header: http.Header{
+								"Content-Type":   []string{"application/json"},
+								"Content-Length": []string{"75"},
+							},
+							Body:          io.NopCloser(strings.NewReader(`{"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MDk4NTI4MDB9.X"}`)),
+							ContentLength: 75,
+						},
+						Initiator: morc.Initiator{
+							Cause:  morc.CauseChain,
+							Parent: "resource",
+							Auth:   "testauth",
+							Links: morc.HistoryLinks{
+								Parent: 1,
+							},
+						},
+					},
+					{
+						Template: "resource",
+						Request: &http.Request{
+							Method:     "GET",
+							URL:        mustParseURL("/protected"),
+							Proto:      "HTTP/1.1",
+							ProtoMajor: 1,
+							ProtoMinor: 1,
+							Body:       http.NoBody,
+							Header: http.Header{
+								"Content-Type":  []string{"application/json"},
+								"Authorization": []string{"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MDk4NTI4MDB9.X"},
 							},
 						},
 						Response: &http.Response{

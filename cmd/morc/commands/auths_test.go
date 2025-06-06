@@ -87,7 +87,7 @@ func Test_Auths_Delete(t *testing.T) {
 			resetReqsFlags()
 
 			// set up the root command and run
-			output, outputErr, err := runTestCommand(reqsCmd, assert.ProjFilePath, tc.args)
+			output, outputErr, err := runTestCommand(authsCmd, assert.ProjFilePath, tc.args)
 
 			// assert and check stdout and stderr
 			if err != nil {
@@ -176,7 +176,7 @@ func Test_Auths_List(t *testing.T) {
 			resetReqsFlags()
 
 			// set up the root command and run
-			output, outputErr, err := runTestCommand(reqsCmd, assert.ProjFilePath, tc.args)
+			output, outputErr, err := runTestCommand(authsCmd, assert.ProjFilePath, tc.args)
 
 			// assert and check stdout and stderr
 			if err != nil {

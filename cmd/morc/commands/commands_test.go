@@ -338,6 +338,7 @@ func (m *MorcIOAssertions) ProjectFilesInBuffersMatch(expected morc.Project) boo
 	updatedProj.Config.ProjFile = ""
 	updatedProj.Config.HistFile = ""
 	updatedProj.Config.SeshFile = ""
+
 	return m.Equal(expected, updatedProj, "project in file does not match expected")
 }
 
@@ -468,6 +469,14 @@ func testProject_singleReqWillAllPropertiesSet() morc.Project {
 	}
 }
 
+func testProject_singleAuth() morc.Project {
+	return morc.Project{
+		Auths: map[string]morc.Auth{
+			"auth1": testAuth_basic("auth1", "user", "pass"),
+		},
+	}
+}
+
 func testProject_withRequests(reqs ...morc.RequestTemplate) morc.Project {
 	tmpls := make(map[string]morc.RequestTemplate, len(reqs))
 	for _, r := range reqs {
@@ -491,14 +500,14 @@ func testRequest_withAllPropertiesSet() morc.RequestTemplate {
 		Body: []byte("{\n    \"username\": \"grimAuxiliatrix\"\n}"),
 		Auth: "auth1",
 		Captures: map[string]morc.Scraper{
-			"var1": {
-				Name:        "var1",
+			"VAR1": {
+				Name:        "VAR1",
 				Type:        morc.SpecBodyOffset,
 				OffsetStart: 1,
 				OffsetEnd:   3,
 			},
-			"var2": {
-				Name: "var2",
+			"VAR2": {
+				Name: "VAR2",
 				Type: morc.SpecBodyJSON,
 				Steps: []morc.TraversalStep{
 					{Key: "key1"},

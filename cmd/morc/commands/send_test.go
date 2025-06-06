@@ -1566,8 +1566,8 @@ HTTP/1.1 200 OK
 
 func Test_Send_WithAuth(t *testing.T) {
 	authExpTime := mustParseTime(time.RFC3339, time.Now().Add(1*time.Hour).UTC().Format(time.RFC3339))
-	signingKey := "testkey"
-	testToken := testJWTData{Expiration: authExpTime}
+	jwtKey := "testkey"
+	testJWTClaims := testJWTData{Expiration: authExpTime}
 	testTokenValue := "abc123xyz"
 
 	testCases := []struct {
@@ -1691,7 +1691,7 @@ func Test_Send_WithAuth(t *testing.T) {
 					Subject:    "",
 				},
 				testResource{Name: "VRISKA", Number: 8, Title: "Thief of Light"},
-				signingKey,
+				jwtKey,
 			),
 			p: morc.Project{
 				Templates: testRequests_withProtectedResource_jwt(Creds{"test", "TEsT123!"}, "testauth"),
@@ -1706,7 +1706,7 @@ func Test_Send_WithAuth(t *testing.T) {
 			expectP: morc.Project{
 				Templates: testRequests_withProtectedResource_jwt(Creds{"test", "TEsT123!"}, "testauth"),
 				Auths: map[string]morc.Auth{
-					"testauth": testAuth_jwt("testauth", "login", "token", testProof_jwt(testToken, signingKey)),
+					"testauth": testAuth_jwt("testauth", "login", "token", testProof_jwt(testJWTClaims, jwtKey)),
 				},
 				History: []morc.HistoryEntry{
 					{
@@ -1733,7 +1733,7 @@ func Test_Send_WithAuth(t *testing.T) {
 								"Content-Type":   []string{"application/json"},
 								"Content-Length": []string{"130"},
 							},
-							Body:          io.NopCloser(strings.NewReader(`{"token":"` + testToken.Token(signingKey) + `"}`)),
+							Body:          io.NopCloser(strings.NewReader(`{"token":"` + testJWTClaims.Token(jwtKey) + `"}`)),
 							ContentLength: 130,
 						},
 						Initiator: morc.Initiator{
@@ -1756,7 +1756,7 @@ func Test_Send_WithAuth(t *testing.T) {
 							Body:       http.NoBody,
 							Header: http.Header{
 								"Content-Type":  []string{"application/json"},
-								"Authorization": []string{"Bearer " + testToken.Token(signingKey)},
+								"Authorization": []string{"Bearer " + testJWTClaims.Token(jwtKey)},
 							},
 						},
 						Response: &http.Response{
@@ -1800,7 +1800,7 @@ func Test_Send_WithAuth(t *testing.T) {
 			p: morc.Project{
 				Templates: testRequests_withProtectedResource_token(Creds{"test", "TEsT123!"}, "testauth"),
 				Auths: map[string]morc.Auth{
-					"testauth": testAuth_token("testauth", "login", "access_token", testProof_token(testTokenValue, authExpTime)),
+					"testauth": testAuth_token("testauth", "login", "access_token"),
 				},
 				Config: morc.Settings{
 					HistFile:      "::PROJ_DIR::/history.json",
@@ -1835,10 +1835,10 @@ func Test_Send_WithAuth(t *testing.T) {
 							ProtoMinor: 1,
 							Header: http.Header{
 								"Content-Type":   []string{"application/json"},
-								"Content-Length": []string{"28"},
+								"Content-Length": []string{"73"},
 							},
-							Body:          io.NopCloser(strings.NewReader(`{"access_token":"` + testTokenValue + `"}`)),
-							ContentLength: 28,
+							Body:          io.NopCloser(strings.NewReader(`{"access_token":"` + testTokenValue + `","expiration":"` + authExpTime.Format(time.RFC1123) + `"}`)),
+							ContentLength: 73,
 						},
 						Initiator: morc.Initiator{
 							Cause:  morc.CauseChain,
@@ -1971,7 +1971,7 @@ func Test_Send_WithAuth(t *testing.T) {
 								"Content-Type":   []string{"application/json"},
 								"Content-Length": []string{"77"},
 							},
-							Body:          io.NopCloser(strings.NewReader(fmt.Sprintf(`{"access_token":"correct_token","expiration":%q}`, authExpTime.Format(time.RFC1123)))),
+							Body:          io.NopCloser(strings.NewReader(`{"access_token":"correct_token","expiration":"` + authExpTime.Format(time.RFC1123) + `"}`)),
 							ContentLength: 77,
 						},
 						Initiator: morc.Initiator{
@@ -2025,6 +2025,110 @@ func Test_Send_WithAuth(t *testing.T) {
 Auth testauth failed for request resource
 Retrying with newly-retrieved auth...
 HTTP/1.1 200 OK
+{"name":"VRISKA","number":8,"title":"Thief of Light"}
+`,
+			expectProjectSaved: true,
+			expectHistorySaved: true,
+			expectSessionSaved: false,
+		},
+		{
+			name: "request requires token auth - expired token triggers refresh",
+			args: []string{"send", "resource", "--hide-auth"},
+			respFn: serverHandler_withProtectedResource_token(
+				Creds{User: "test", Pass: "TEsT123!"},
+				"new_token", authExpTime,
+				testResource{Name: "VRISKA", Number: 8, Title: "Thief of Light"},
+			),
+			p: morc.Project{
+				Templates: testRequests_withProtectedResource_token(Creds{"test", "TEsT123!"}, "testauth"),
+				Auths: map[string]morc.Auth{
+					"testauth": testAuth_token("testauth", "login", "access_token", testProof_token("expired_token", time.Now().Add(-1*time.Hour))),
+				},
+				Config: morc.Settings{
+					HistFile:      "::PROJ_DIR::/history.json",
+					RecordHistory: true,
+				},
+			},
+			expectP: morc.Project{
+				Templates: testRequests_withProtectedResource_token(Creds{"test", "TEsT123!"}, "testauth"),
+				Auths: map[string]morc.Auth{
+					"testauth": testAuth_token("testauth", "login", "access_token", testProof_token("new_token", authExpTime)),
+				},
+				History: []morc.HistoryEntry{
+					{
+						Template: "login",
+						Request: &http.Request{
+							Method:     "POST",
+							URL:        mustParseURL("/login"),
+							Proto:      "HTTP/1.1",
+							ProtoMajor: 1,
+							ProtoMinor: 1,
+							Header: http.Header{
+								"Content-Type": []string{"application/json"},
+							},
+							Body:          io.NopCloser(strings.NewReader(`{"user":"test","pass":"TEsT123!"}`)),
+							ContentLength: 33,
+						},
+						Response: &http.Response{
+							Status:     fmt.Sprintf("%d %s", http.StatusOK, http.StatusText(http.StatusOK)),
+							StatusCode: http.StatusOK,
+							Proto:      "HTTP/1.1",
+							ProtoMajor: 1,
+							ProtoMinor: 1,
+							Header: http.Header{
+								"Content-Type":   []string{"application/json"},
+								"Content-Length": []string{"73"},
+							},
+							Body:          io.NopCloser(strings.NewReader(fmt.Sprintf(`{"access_token":"new_token","expiration":%q}`, authExpTime.Format(time.RFC1123)))),
+							ContentLength: 73,
+						},
+						Initiator: morc.Initiator{
+							Cause:  morc.CauseChain,
+							Parent: "resource",
+							Auth:   "testauth",
+							Links: morc.HistoryLinks{
+								Parent: 1,
+							},
+						},
+					},
+					{
+						Template: "resource",
+						Request: &http.Request{
+							Method:     "GET",
+							URL:        mustParseURL("/protected"),
+							Proto:      "HTTP/1.1",
+							ProtoMajor: 1,
+							ProtoMinor: 1,
+							Body:       http.NoBody,
+							Header: http.Header{
+								"Content-Type":  []string{"application/json"},
+								"Authorization": []string{"Bearer new_token"},
+							},
+						},
+						Response: &http.Response{
+							Status:     fmt.Sprintf("%d %s", http.StatusOK, http.StatusText(http.StatusOK)),
+							StatusCode: http.StatusOK,
+							Proto:      "HTTP/1.1",
+							ProtoMajor: 1,
+							ProtoMinor: 1,
+							Header: http.Header{
+								"Content-Length": []string{"53"},
+								"Content-Type":   []string{"application/json"},
+							},
+							Body:          io.NopCloser(strings.NewReader(`{"name":"VRISKA","number":8,"title":"Thief of Light"}`)),
+							ContentLength: 53,
+						},
+						Initiator: morc.Initiator{
+							Cause: morc.CauseTemplateSpecified,
+						},
+					},
+				},
+				Config: morc.Settings{
+					HistFile:      "::PROJ_DIR::/history.json",
+					RecordHistory: true,
+				},
+			},
+			expectStdoutOutput: `HTTP/1.1 200 OK
 {"name":"VRISKA","number":8,"title":"Thief of Light"}
 `,
 			expectProjectSaved: true,

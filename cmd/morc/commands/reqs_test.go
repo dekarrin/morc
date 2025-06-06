@@ -758,6 +758,12 @@ func Test_Reqs_List(t *testing.T) {
 			expectStdoutOutput: "GET req1\n",
 		},
 		{
+			name:               "one req present, quiet mode",
+			args:               []string{"reqs", "-q"},
+			p:                  testProject_nRequests(1),
+			expectStdoutOutput: "GET req1\n",
+		},
+		{
 			name: "two reqs present - one has no method",
 			args: []string{"reqs"},
 			p: morc.Project{Templates: map[string]morc.RequestTemplate{

@@ -679,6 +679,17 @@ func testAuth_token(name, seqName, tokenVar string, proof ...morc.AuthProof) mor
 	}
 }
 
+func testProof_session(key, value string, exp time.Time) morc.AuthProof {
+	return morc.DynamicProof{
+		Value:     value,
+		ExpiresAt: exp,
+		Dest: morc.ProofDestination{
+			Location: morc.ProofLocationCookie,
+			Key:      key,
+		},
+	}
+}
+
 func testProof_jwt(claims testJWTData, secretKey string) morc.AuthProof {
 	token := claims.Token(secretKey)
 	return morc.DynamicProof{

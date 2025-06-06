@@ -20,18 +20,7 @@ func mustParseTime(layout, s string) time.Time {
 	return t
 }
 
-func testProof_session(key, value string, exp time.Time) morc.AuthProof {
-	return morc.DynamicProof{
-		Value:     value,
-		ExpiresAt: exp,
-		Dest: morc.ProofDestination{
-			Location: morc.ProofLocationCookie,
-			Key:      key,
-		},
-	}
-}
-
-func Test_Exec_Auth(t *testing.T) {
+func Test_Exec_WithAuth(t *testing.T) {
 
 	// make sure we use same clock as a parsed version for everything.
 	// guh, time is annoying.

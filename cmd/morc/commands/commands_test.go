@@ -2,12 +2,17 @@ package commands
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dekarrin/morc"
 	"github.com/spf13/cobra"
@@ -586,6 +591,17 @@ func testAuths(auths ...morc.Auth) map[string]morc.Auth {
 	return m
 }
 
+func testAuth_basic(name, user, pass string) morc.Auth {
+	return morc.Auth{
+		Name: name,
+		Type: morc.AuthTypeHTTPBasic,
+		Proof: morc.HTTPBasicCredentials{
+			Username: user,
+			Password: pass,
+		},
+	}
+}
+
 func testAuth_session(name string, seqType seqType, seqName, cookie string, expDetect expDetect, proof morc.AuthProof) morc.Auth {
 	return morc.Auth{
 		Name: name,
@@ -599,20 +615,112 @@ func testAuth_session(name string, seqType seqType, seqName, cookie string, expD
 	}
 }
 
-func testAuth_basic(name, user, pass string) morc.Auth {
+func testAuth_jwt(name, seqName, tokenVar string, proof ...morc.AuthProof) morc.Auth {
+	var p morc.AuthProof
+	if len(proof) > 0 {
+		p = proof[0]
+	}
+
 	return morc.Auth{
-		Name: name,
-		Type: morc.AuthTypeHTTPBasic,
-		Proof: morc.HTTPBasicCredentials{
-			Username: user,
-			Password: pass,
+		Name:  name,
+		Type:  morc.AuthTypeJWT,
+		Proof: p,
+		Fetcher: morc.NewJWTFetcher(
+			morc.RequestSequence{
+				Name:   seqName,
+				IsFlow: false,
+			},
+			morc.Scraper{
+				Name: tokenVar,
+				Type: morc.SpecBodyJSON,
+				Steps: []morc.TraversalStep{
+					{Key: "token"},
+				},
+			},
+		),
+	}
+}
+
+func testAuth_token(name, seqName, tokenVar string, proof ...morc.AuthProof) morc.Auth {
+	var p morc.AuthProof
+	if len(proof) > 0 {
+		p = proof[0]
+	}
+
+	return morc.Auth{
+		Name:  name,
+		Type:  morc.AuthTypeToken,
+		Proof: p,
+		Fetcher: morc.NewTokenFetcher(
+			morc.RequestSequence{
+				Name:   seqName,
+				IsFlow: false,
+			},
+			morc.Scraper{
+				Name: tokenVar,
+				Type: morc.SpecBodyJSON,
+				Steps: []morc.TraversalStep{
+					{Key: "access_token"},
+				},
+			},
+			morc.ProofDestination{
+				Location: morc.ProofLocationHeader,
+				Key:      "Authorization",
+				Format:   "bearer",
+			},
+			&morc.Scraper{
+				Type: morc.SpecBodyJSON,
+				Steps: []morc.TraversalStep{
+					{Key: "expiration"},
+				},
+			},
+			time.RFC1123,
+		),
+	}
+}
+
+func testProof_jwt(claims testJWTData, secretKey string) morc.AuthProof {
+	token := claims.Token(secretKey)
+	return morc.DynamicProof{
+		Dest: morc.ProofDestination{
+			Location: morc.ProofLocationHeader,
+			Key:      "Authorization",
+			Format:   morc.ProofFormatTypeBearer,
 		},
+		Value:     token,
+		ExpiresAt: claims.Expiration,
+	}
+}
+
+func testProof_token(name string, tokenExp time.Time) morc.AuthProof {
+	return morc.DynamicProof{
+		Dest: morc.ProofDestination{
+			Location: morc.ProofLocationHeader,
+			Key:      "Authorization",
+			Format:   "bearer",
+		},
+		Value:     name,
+		ExpiresAt: tokenExp,
 	}
 }
 
 type Creds struct {
 	User string `json:"user"`
 	Pass string `json:"pass"`
+}
+
+func testRequests_withProtectedResource_basic(authName string) map[string]morc.RequestTemplate {
+	return map[string]morc.RequestTemplate{
+		"resource": {
+			Name:   "resource",
+			Method: "GET",
+			URL:    "/protected",
+			Headers: http.Header{
+				"Content-Type": []string{"application/json"},
+			},
+			Auth: authName,
+		},
+	}
 }
 
 // testRequests_withProtectedResource_session returns a set of request
@@ -643,6 +751,83 @@ func testRequests_withProtectedResource_session(creds Creds, auth string) map[st
 		},
 	}
 	return reqs
+}
+
+func testRequests_withProtectedResource_jwt(creds Creds, authName string) map[string]morc.RequestTemplate {
+	return map[string]morc.RequestTemplate{
+		"login": {
+			Name:   "login",
+			Method: "POST",
+			URL:    "/login",
+			Body:   []byte(fmt.Sprintf(`{"user":%q,"pass":%q}`, creds.User, creds.Pass)),
+			Headers: http.Header{
+				"Content-Type": []string{"application/json"},
+			},
+		},
+		"resource": {
+			Name:   "resource",
+			Method: "GET",
+			URL:    "/protected",
+			Headers: http.Header{
+				"Content-Type": []string{"application/json"},
+			},
+			Auth: authName,
+		},
+	}
+}
+
+func testRequests_withProtectedResource_token(creds Creds, authName string) map[string]morc.RequestTemplate {
+	return map[string]morc.RequestTemplate{
+		"login": {
+			Name:   "login",
+			Method: "POST",
+			URL:    "/login",
+			Body:   []byte(fmt.Sprintf(`{"user":%q,"pass":%q}`, creds.User, creds.Pass)),
+			Headers: http.Header{
+				"Content-Type": []string{"application/json"},
+			},
+		},
+		"resource": {
+			Name:   "resource",
+			Method: "GET",
+			URL:    "/protected",
+			Headers: http.Header{
+				"Content-Type": []string{"application/json"},
+			},
+			Auth: authName,
+		},
+	}
+}
+
+func serverHandler_withProtectedResource_basic(creds Creds, resource testResource) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// suppress date header
+		w.Header()["Date"] = nil
+
+		if r.URL.Path == "/protected" {
+			if r.Method != "GET" {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+
+			// check basic auth
+			u, p, ok := r.BasicAuth()
+			if !ok || u != creds.User || p != creds.Pass {
+				w.Header().Set("WWW-Authenticate", `Basic realm="test"`)
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
+			// send resource
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			data, _ := json.Marshal(resource)
+			w.Write(data)
+			return
+		}
+
+		w.WriteHeader(http.StatusNotFound)
+	}
 }
 
 // serverHandler_withProtectedResource_session returns a handler that can be
@@ -722,5 +907,216 @@ func serverHandler_withProtectedResource_session(validCredentials Creds, cookie 
 			return
 		}
 
+	}
+}
+
+func serverHandler_withProtectedResource_jwt(creds Creds, token testJWTData, resource testResource, secretKey string) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		expSubject := token.Subject
+
+		// suppress date header
+		w.Header()["Date"] = nil
+
+		if r.URL.Path == "/login" {
+			if r.Method != "POST" {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+
+			// check credentials
+			var reqCreds Creds
+			if err := json.NewDecoder(r.Body).Decode(&reqCreds); err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			if reqCreds != creds {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
+			// send token
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(fmt.Sprintf(`{"token":%q}`, token.Token(secretKey))))
+			return
+		}
+
+		if r.URL.Path == "/protected" {
+			if r.Method != "GET" {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+
+			// check auth header
+			authHeader := r.Header.Get("Authorization")
+			if authHeader == "" {
+				log.Printf("no auth header")
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
+			// check token
+			parts := strings.Split(authHeader, " ")
+			if len(parts) != 2 || parts[0] != "Bearer" {
+				log.Printf("not a bearer token")
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
+			jwtPart := parts[1]
+			parts = strings.Split(jwtPart, ".")
+			if len(parts) != 3 {
+				log.Printf("not a valid JWT")
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
+			encodedHeader := parts[0]
+			encodedClaims := parts[1]
+			encodedSignature := parts[2]
+
+			signatureBytes, err := base64.StdEncoding.DecodeString(encodedSignature)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			// verify signature
+			h := hmac.New(sha256.New, []byte(secretKey))
+			h.Write([]byte(encodedHeader + "." + encodedClaims))
+			if !hmac.Equal(signatureBytes, h.Sum(nil)) {
+				log.Printf("invalid signature")
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
+			// decode header and validate it is typ=JWT and alg=HS256
+			headerBytes, err := base64.StdEncoding.DecodeString(encodedHeader)
+			if err != nil {
+				log.Printf("cant read header: %s", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			var header map[string]string
+			if err := json.Unmarshal(headerBytes, &header); err != nil {
+				log.Printf("cant unmarshal header %s", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			if header["typ"] != "JWT" || header["alg"] != "HS256" {
+				log.Printf("typ!=JWT || alg!=HS256")
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
+			// finally, read claims and verify expiration
+			claimsBytes, err := base64.StdEncoding.DecodeString(encodedClaims)
+			if err != nil {
+				log.Printf("cant read claims: %s", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			var claims testJWTData
+			var claimsMap map[string]any
+			if err := json.Unmarshal(claimsBytes, &claimsMap); err != nil {
+				log.Printf("cant unmarshal claims: %s", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			claims.Expiration = time.Unix(int64(claimsMap["exp"].(float64)), 0).UTC()
+			claims.Subject = claimsMap["sub"].(string)
+
+			if claims.Expiration.Before(time.Now()) {
+				log.Printf("expired")
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
+			if claims.Subject != expSubject {
+				log.Printf("subject mismatch")
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
+			// send resource
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			data, _ := json.Marshal(resource)
+			w.Write(data)
+			return
+		}
+
+		w.WriteHeader(http.StatusNotFound)
+	}
+}
+
+func serverHandler_withProtectedResource_token(creds Creds, token string, tokenExp time.Time, resource testResource) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// suppress date header
+		w.Header()["Date"] = nil
+
+		if r.URL.Path == "/login" {
+			if r.Method != "POST" {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+
+			// check credentials
+			var reqCreds Creds
+			if err := json.NewDecoder(r.Body).Decode(&reqCreds); err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			if reqCreds != creds {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
+			// send token
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(fmt.Sprintf(`{"access_token":%q,"expiration":%q}`, token, tokenExp.Format(time.RFC1123))))
+			return
+		}
+
+		if r.URL.Path == "/protected" {
+			if r.Method != "GET" {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+
+			// check auth header
+			authHeader := r.Header.Get("Authorization")
+			if authHeader == "" {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
+			// check token
+			parts := strings.Split(authHeader, " ")
+			if len(parts) != 2 || parts[0] != "Bearer" || parts[1] != token {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
+			// verify token is not expired
+			if time.Now().After(tokenExp) {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
+			// send resource
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			data, _ := json.Marshal(resource)
+			w.Write(data)
+			return
+		}
+
+		w.WriteHeader(http.StatusNotFound)
 	}
 }

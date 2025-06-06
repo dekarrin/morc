@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -91,353 +90,6 @@ func (jwt testJWTData) Token(secretKey string) string {
 
 	// combine all parts
 	return headerB64 + "." + claimsB64 + "." + sigB64
-}
-
-func serverHandler_withProtectedResource_jwt(creds Creds, token testJWTData, resource testResource, secretKey string) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		expSubject := token.Subject
-
-		// suppress date header
-		w.Header()["Date"] = nil
-
-		if r.URL.Path == "/login" {
-			if r.Method != "POST" {
-				w.WriteHeader(http.StatusMethodNotAllowed)
-				return
-			}
-
-			// check credentials
-			var reqCreds Creds
-			if err := json.NewDecoder(r.Body).Decode(&reqCreds); err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			if reqCreds != creds {
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-
-			// send token
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(fmt.Sprintf(`{"token":%q}`, token.Token(secretKey))))
-			return
-		}
-
-		if r.URL.Path == "/protected" {
-			if r.Method != "GET" {
-				w.WriteHeader(http.StatusMethodNotAllowed)
-				return
-			}
-
-			// check auth header
-			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" {
-				log.Printf("no auth header")
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-
-			// check token
-			parts := strings.Split(authHeader, " ")
-			if len(parts) != 2 || parts[0] != "Bearer" {
-				log.Printf("not a bearer token")
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-
-			jwtPart := parts[1]
-			parts = strings.Split(jwtPart, ".")
-			if len(parts) != 3 {
-				log.Printf("not a valid JWT")
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-
-			encodedHeader := parts[0]
-			encodedClaims := parts[1]
-			encodedSignature := parts[2]
-
-			signatureBytes, err := base64.StdEncoding.DecodeString(encodedSignature)
-			if err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			// verify signature
-			h := hmac.New(sha256.New, []byte(secretKey))
-			h.Write([]byte(encodedHeader + "." + encodedClaims))
-			if !hmac.Equal(signatureBytes, h.Sum(nil)) {
-				log.Printf("invalid signature")
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-
-			// decode header and validate it is typ=JWT and alg=HS256
-			headerBytes, err := base64.StdEncoding.DecodeString(encodedHeader)
-			if err != nil {
-				log.Printf("cant read header: %s", err)
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			var header map[string]string
-			if err := json.Unmarshal(headerBytes, &header); err != nil {
-				log.Printf("cant unmarshal header %s", err)
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			if header["typ"] != "JWT" || header["alg"] != "HS256" {
-				log.Printf("typ!=JWT || alg!=HS256")
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-
-			// finally, read claims and verify expiration
-			claimsBytes, err := base64.StdEncoding.DecodeString(encodedClaims)
-			if err != nil {
-				log.Printf("cant read claims: %s", err)
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			var claims testJWTData
-			var claimsMap map[string]any
-			if err := json.Unmarshal(claimsBytes, &claimsMap); err != nil {
-				log.Printf("cant unmarshal claims: %s", err)
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			claims.Expiration = time.Unix(int64(claimsMap["exp"].(float64)), 0).UTC()
-			claims.Subject = claimsMap["sub"].(string)
-
-			if claims.Expiration.Before(time.Now()) {
-				log.Printf("expired")
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-
-			if claims.Subject != expSubject {
-				log.Printf("subject mismatch")
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-
-			// send resource
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			data, _ := json.Marshal(resource)
-			w.Write(data)
-			return
-		}
-
-		w.WriteHeader(http.StatusNotFound)
-	}
-}
-
-func testRequests_withProtectedResource_jwt(creds Creds, authName string) map[string]morc.RequestTemplate {
-	return map[string]morc.RequestTemplate{
-		"login": {
-			Name:   "login",
-			Method: "POST",
-			URL:    "/login",
-			Body:   []byte(fmt.Sprintf(`{"user":%q,"pass":%q}`, creds.User, creds.Pass)),
-			Headers: http.Header{
-				"Content-Type": []string{"application/json"},
-			},
-		},
-		"resource": {
-			Name:   "resource",
-			Method: "GET",
-			URL:    "/protected",
-			Headers: http.Header{
-				"Content-Type": []string{"application/json"},
-			},
-			Auth: authName,
-		},
-	}
-}
-
-func testAuth_jwt(name, seqName, tokenVar string, proof ...morc.AuthProof) morc.Auth {
-	var p morc.AuthProof
-	if len(proof) > 0 {
-		p = proof[0]
-	}
-
-	return morc.Auth{
-		Name:  name,
-		Type:  morc.AuthTypeJWT,
-		Proof: p,
-		Fetcher: morc.NewJWTFetcher(
-			morc.RequestSequence{
-				Name:   seqName,
-				IsFlow: false,
-			},
-			morc.Scraper{
-				Name: tokenVar,
-				Type: morc.SpecBodyJSON,
-				Steps: []morc.TraversalStep{
-					{Key: "token"},
-				},
-			},
-		),
-	}
-}
-
-// TODO: move these to commands_test.go
-func testProof_jwt(claims testJWTData, secretKey string) morc.AuthProof {
-	token := claims.Token(secretKey)
-	return morc.DynamicProof{
-		Dest: morc.ProofDestination{
-			Location: morc.ProofLocationHeader,
-			Key:      "Authorization",
-			Format:   morc.ProofFormatTypeBearer,
-		},
-		Value:     token,
-		ExpiresAt: claims.Expiration,
-	}
-}
-
-func serverHandler_withProtectedResource_token(creds Creds, token string, tokenExp time.Time, resource testResource) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// suppress date header
-		w.Header()["Date"] = nil
-
-		if r.URL.Path == "/login" {
-			if r.Method != "POST" {
-				w.WriteHeader(http.StatusMethodNotAllowed)
-				return
-			}
-
-			// check credentials
-			var reqCreds Creds
-			if err := json.NewDecoder(r.Body).Decode(&reqCreds); err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			if reqCreds != creds {
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-
-			// send token
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(fmt.Sprintf(`{"access_token":%q,"expiration":%q}`, token, tokenExp.Format(time.RFC1123))))
-			return
-		}
-
-		if r.URL.Path == "/protected" {
-			if r.Method != "GET" {
-				w.WriteHeader(http.StatusMethodNotAllowed)
-				return
-			}
-
-			// check auth header
-			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" {
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-
-			// check token
-			parts := strings.Split(authHeader, " ")
-			if len(parts) != 2 || parts[0] != "Bearer" || parts[1] != token {
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-
-			// verify token is not expired
-			if time.Now().After(tokenExp) {
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-
-			// send resource
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			data, _ := json.Marshal(resource)
-			w.Write(data)
-			return
-		}
-
-		w.WriteHeader(http.StatusNotFound)
-	}
-}
-
-func testRequests_withProtectedResource_token(creds Creds, authName string) map[string]morc.RequestTemplate {
-	return map[string]morc.RequestTemplate{
-		"login": {
-			Name:   "login",
-			Method: "POST",
-			URL:    "/login",
-			Body:   []byte(fmt.Sprintf(`{"user":%q,"pass":%q}`, creds.User, creds.Pass)),
-			Headers: http.Header{
-				"Content-Type": []string{"application/json"},
-			},
-		},
-		"resource": {
-			Name:   "resource",
-			Method: "GET",
-			URL:    "/protected",
-			Headers: http.Header{
-				"Content-Type": []string{"application/json"},
-			},
-			Auth: authName,
-		},
-	}
-}
-
-func testAuth_token(name, seqName, tokenVar string, proof ...morc.AuthProof) morc.Auth {
-	var p morc.AuthProof
-	if len(proof) > 0 {
-		p = proof[0]
-	}
-
-	return morc.Auth{
-		Name:  name,
-		Type:  morc.AuthTypeToken,
-		Proof: p,
-		Fetcher: morc.NewTokenFetcher(
-			morc.RequestSequence{
-				Name:   seqName,
-				IsFlow: false,
-			},
-			morc.Scraper{
-				Name: tokenVar,
-				Type: morc.SpecBodyJSON,
-				Steps: []morc.TraversalStep{
-					{Key: "access_token"},
-				},
-			},
-			morc.ProofDestination{
-				Location: morc.ProofLocationHeader,
-				Key:      "Authorization",
-				Format:   "bearer",
-			},
-			&morc.Scraper{
-				Type: morc.SpecBodyJSON,
-				Steps: []morc.TraversalStep{
-					{Key: "expiration"},
-				},
-			},
-			time.RFC1123,
-		),
-	}
-}
-
-func testProof_token(name string, tokenExp time.Time) morc.AuthProof {
-	return morc.DynamicProof{
-		Dest: morc.ProofDestination{
-			Location: morc.ProofLocationHeader,
-			Key:      "Authorization",
-			Format:   "bearer",
-		},
-		Value:     name,
-		ExpiresAt: tokenExp,
-	}
 }
 
 func Test_Send(t *testing.T) {
@@ -2132,6 +1784,134 @@ HTTP/1.1 200 OK
 {"name":"VRISKA","number":8,"title":"Thief of Light"}
 `,
 			expectProjectSaved: true,
+			expectHistorySaved: true,
+			expectSessionSaved: false,
+		},
+		{
+			name: "request with valid HTTP Basic auth succeeds",
+			args: []string{"send", "resource"},
+			respFn: serverHandler_withProtectedResource_basic(
+				Creds{User: "ectoBiologist", Pass: "letmein"},
+				testResource{Name: "VRISKA", Number: 8, Title: "Thief of Light"},
+			),
+			p: morc.Project{
+				Templates: testRequests_withProtectedResource_basic("testauth"),
+				Auths:     testAuths(testAuth_basic("testauth", "ectoBiologist", "letmein")),
+				Config: morc.Settings{
+					HistFile:      "::PROJ_DIR::/history.json",
+					RecordHistory: true,
+				},
+			},
+			expectP: morc.Project{
+				Templates: testRequests_withProtectedResource_basic("testauth"),
+				Auths:     testAuths(testAuth_basic("testauth", "ectoBiologist", "letmein")),
+				History: []morc.HistoryEntry{
+					{
+						Template: "resource",
+						Request: &http.Request{
+							Method:     "GET",
+							URL:        mustParseURL("/protected"),
+							Proto:      "HTTP/1.1",
+							ProtoMajor: 1,
+							ProtoMinor: 1,
+							Body:       http.NoBody,
+							Header: http.Header{
+								"Content-Type":  []string{"application/json"},
+								"Authorization": []string{"Basic " + base64.StdEncoding.EncodeToString([]byte("ectoBiologist:letmein"))},
+							},
+						},
+						Response: &http.Response{
+							Status:     fmt.Sprintf("%d %s", http.StatusOK, http.StatusText(http.StatusOK)),
+							StatusCode: http.StatusOK,
+							Proto:      "HTTP/1.1",
+							ProtoMajor: 1,
+							ProtoMinor: 1,
+							Header: http.Header{
+								"Content-Length": []string{"53"},
+								"Content-Type":   []string{"application/json"},
+							},
+							Body:          io.NopCloser(strings.NewReader(`{"name":"VRISKA","number":8,"title":"Thief of Light"}`)),
+							ContentLength: 53,
+						},
+						Initiator: morc.Initiator{
+							Cause: morc.CauseTemplateSpecified,
+						},
+					},
+				},
+				Config: morc.Settings{
+					HistFile:      "::PROJ_DIR::/history.json",
+					RecordHistory: true,
+				},
+			},
+			expectStdoutOutput: `HTTP/1.1 200 OK
+{"name":"VRISKA","number":8,"title":"Thief of Light"}
+`,
+			expectProjectSaved: false,
+			expectHistorySaved: true,
+			expectSessionSaved: false,
+		},
+		{
+			name: "request with invalid HTTP Basic auth fails",
+			args: []string{"send", "resource"},
+			respFn: serverHandler_withProtectedResource_basic(
+				Creds{User: "ectoBiologist", Pass: "letmein"},
+				testResource{Name: "VRISKA", Number: 8, Title: "Thief of Light"},
+			),
+			p: morc.Project{
+				Templates: testRequests_withProtectedResource_basic("testauth"),
+				Auths:     testAuths(testAuth_basic("testauth", "ectoBiologist", "wrongpass")),
+				Config: morc.Settings{
+					HistFile:      "::PROJ_DIR::/history.json",
+					RecordHistory: true,
+				},
+			},
+			expectP: morc.Project{
+				Templates: testRequests_withProtectedResource_basic("testauth"),
+				Auths:     testAuths(testAuth_basic("testauth", "ectoBiologist", "wrongpass")),
+				History: []morc.HistoryEntry{
+					{
+						Template: "resource",
+						Request: &http.Request{
+							Method:     "GET",
+							URL:        mustParseURL("/protected"),
+							Proto:      "HTTP/1.1",
+							ProtoMajor: 1,
+							ProtoMinor: 1,
+							Body:       http.NoBody,
+							Header: http.Header{
+								"Content-Type":  []string{"application/json"},
+								"Authorization": []string{"Basic " + base64.StdEncoding.EncodeToString([]byte("ectoBiologist:wrongpass"))},
+							},
+						},
+						Response: &http.Response{
+							Status:     fmt.Sprintf("%d %s", http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized)),
+							StatusCode: http.StatusUnauthorized,
+							Proto:      "HTTP/1.1",
+							ProtoMajor: 1,
+							ProtoMinor: 1,
+							Header: http.Header{
+								"Content-Length":   []string{"0"},
+								"Www-Authenticate": []string{`Basic realm="test"`},
+							},
+							Body:          http.NoBody,
+							ContentLength: 0,
+						},
+						Initiator: morc.Initiator{
+							Cause: morc.CauseTemplateSpecified,
+						},
+					},
+				},
+				Config: morc.Settings{
+					HistFile:      "::PROJ_DIR::/history.json",
+					RecordHistory: true,
+				},
+			},
+			expectStdoutOutput: `HTTP/1.1 401 Unauthorized
+(no response body)
+Auth testauth failed for request resource
+Auth is static and cannot be refreshed; not retrying
+`,
+			expectProjectSaved: false,
 			expectHistorySaved: true,
 			expectSessionSaved: false,
 		},

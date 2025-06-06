@@ -17,10 +17,10 @@ var authsCmd = &cobra.Command{
 		annotationKeyHelpUsages: "" +
 			"auths\n" +
 			"auths --delete AUTH [-f]\n" +
-			"auths --new AUTH \n" + // TODO: actual auth parameters
-			"auths AUTH\n" +
-			"auths AUTH --get ATTR\n" +
-			"auths AUTH \n" + // TODO: actual auth parameters.
+			"auths --new AUTH [-TupcrtdxL]... [--format FORMAT] [--no-exp | --exp]\n" +
+			"auths AUTH [--unmask]\n" +
+			"auths AUTH --get ATTR [--unmask]\n" +
+			"auths AUTH [-nTupcrtdxL]... [--unmask] [--format FORMAT] [--no-exp | --exp]\n" +
 			"auths --clear AUTH",
 	},
 	GroupID: "project",
@@ -987,6 +987,8 @@ func parseAuthsArgs(cmd *cobra.Command, posArgs []string, args *authsArgs) error
 	case authsActionEdit:
 		// use arg 1 as the auth name
 		args.auth = posArgs[0]
+
+		args.unmask = flags.BUnmask
 
 		if err := parseAuthsSetFlags(cmd, &args.sets); err != nil {
 			return err

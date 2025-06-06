@@ -20,7 +20,7 @@ func mustParseTime(layout, s string) time.Time {
 	return t
 }
 
-func Test_Exec_WithAuth(t *testing.T) {
+func Test_Exec_Auth(t *testing.T) {
 
 	// make sure we use same clock as a parsed version for everything.
 	// guh, time is annoying.

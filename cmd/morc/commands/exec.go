@@ -20,7 +20,7 @@ var execCmd = &cobra.Command{
 	Long: "Execute a sequence of requests defined in a flow stored in the project. Initial variable values can be set " +
 		"with -V and will override any in the store before the first request is executed.\n" +
 		"\n" +
-		"If -A is given, EXECABLE is interpreted as the name of a dynamic auth method rather than a flow. The auth " +
+		"If -a is given, EXECABLE is interpreted as the name of a dynamic auth method rather than a flow. The auth " +
 		"method will be checked for a currently valid auth proof, and if one is not present, it will execute its " +
 		"configured request sequence to obtain one using the provided output flags (-p and -V options are ignored " +
 		"for auth sending) and will save it to its cache. After execution, the resulting proof is displayed.",

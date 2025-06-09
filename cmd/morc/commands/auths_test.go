@@ -278,6 +278,89 @@ func Test_Auths_Edit(t *testing.T) {
 	}
 }
 
+func Test_Auths_Get(t *testing.T) {
+	testCases := []struct {
+		name               string
+		args               []string // DO NOT INCLUDE -F; it is automatically set to a project file
+		p                  morc.Project
+		expectErr          string // set if command.Execute expected to fail, with a string that would be in the error message
+		expectStderrOutput string // set with expected output to stderr
+		expectStdoutOutput string // set with expected output to stdout
+	}{
+		{
+			name:               "get username from basic auth",
+			args:               []string{"auths", "auth1", "-G", "user"},
+			p:                  testProject_singleAuth(),
+			expectStdoutOutput: "user\n",
+		},
+		{
+			name:               "get password from basic auth, masked",
+			args:               []string{"auths", "auth1", "-G", "pass"},
+			p:                  testProject_singleAuth(),
+			expectStdoutOutput: "****\n",
+		},
+		{
+			name:               "get password from basic auth, unmasked",
+			args:               []string{"auths", "auth1", "-G", "pass", "--unmask"},
+			p:                  testProject_singleAuth(),
+			expectStdoutOutput: "pass\n",
+		},
+		{
+			name:               "get type from basic auth",
+			args:               []string{"auths", "auth1", "-G", "type"},
+			p:                  testProject_singleAuth(),
+			expectStdoutOutput: "basic\n",
+		},
+		{
+			name:      "get property not valid for auth type",
+			args:      []string{"auths", "auth1", "-G", "cookie"},
+			p:         testProject_singleAuth(),
+			expectErr: `attribute "cookie" is not valid for auth of type basic`,
+		},
+		{
+			name:      "get non-existent property",
+			args:      []string{"auths", "auth1", "-G", "foobar"},
+			p:         testProject_singleAuth(),
+			expectErr: `invalid auth attribute key: "foobar"`,
+		},
+		{
+			name:      "get property from non-existent auth",
+			args:      []string{"auths", "non-existent", "-G", "user"},
+			p:         testProject_singleAuth(),
+			expectErr: "no auth method named non-existent exists in project",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := NewAssertionsForInMemoryProject(t, tc.p, &fileRWs)
+			resetAuthsFlags()
+
+			// set up the root command and run
+			output, outputErr, err := runTestCommand(authsCmd, assert.ProjFilePath, tc.args)
+
+			// assert and check stdout and stderr
+			if err != nil {
+				if tc.expectErr == "" {
+					t.Fatalf("unexpected returned error: %v", err)
+					return
+				}
+				if !strings.Contains(err.Error(), tc.expectErr) {
+					t.Fatalf("expected returned error to contain %q, got %q", tc.expectErr, err)
+				}
+				return
+			}
+
+			// assertions
+
+			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
+			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
+
+			assert.NoProjectMutations()
+		})
+	}
+}
+
 func Test_Auths_List(t *testing.T) {
 	testCases := []struct {
 		name               string

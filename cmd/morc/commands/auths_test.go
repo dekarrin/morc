@@ -3,6 +3,7 @@ package commands
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dekarrin/morc"
 	"github.com/spf13/pflag"
@@ -410,6 +411,120 @@ func Test_Auths_Get(t *testing.T) {
 			expectStdoutOutput: ".token\n",
 		},
 		// JWT can't have expiration detection disabled, so skipping that test case
+		{
+			name:               "get expLayout from basic auth",
+			args:               []string{"auths", "auth1", "-G", "exp-layout"},
+			p:                  testProject_withAuths(testAuth_basic("auth1", "user", "pass")),
+			expectStdoutOutput: "(n/a)\n",
+		},
+		{
+			name:               "get expLayout from session auth",
+			args:               []string{"auths", "auth1", "-G", "exp-layout"},
+			p:                  testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", enableExpiration, nil)),
+			expectStdoutOutput: "(none)\n",
+		},
+		{
+			name:               "get expLayout from token auth",
+			args:               []string{"auths", "auth1", "-G", "exp-layout"},
+			p:                  testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", enableExpiration)),
+			expectStdoutOutput: time.RFC1123 + "\n",
+		},
+		{
+			name:               "get expLayout from jwt auth",
+			args:               []string{"auths", "auth1", "-G", "exp-layout"},
+			p:                  testProject_withAuths(testAuth_jwt("auth1", "get-sess", "SESSID")),
+			expectStdoutOutput: "(none)\n",
+		},
+		{
+			name:               "get expLayout from jwt auth, quiet mode",
+			args:               []string{"auths", "auth1", "-qG", "exp-layout"},
+			p:                  testProject_withAuths(testAuth_jwt("auth1", "get-sess", "SESSID")),
+			expectStdoutOutput: "",
+		},
+		{
+			name:               "get format from basic auth",
+			args:               []string{"auths", "auth1", "-G", "format"},
+			p:                  testProject_withAuths(testAuth_basic("auth1", "user", "pass")),
+			expectStdoutOutput: "basic\n",
+		},
+		{
+			name:               "get format from session auth",
+			args:               []string{"auths", "auth1", "-G", "format"},
+			p:                  testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", enableExpiration, nil)),
+			expectStdoutOutput: "(none)\n",
+		},
+		{
+			name:               "get format from token auth",
+			args:               []string{"auths", "auth1", "-G", "format"},
+			p:                  testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", enableExpiration)),
+			expectStdoutOutput: "bearer\n",
+		},
+		{
+			name:               "get format from jwt auth",
+			args:               []string{"auths", "auth1", "-G", "format"},
+			p:                  testProject_withAuths(testAuth_jwt("auth1", "get-sess", "SESSID")),
+			expectStdoutOutput: "bearer\n",
+		},
+		{
+			name:               "get format from auth with no format, quiet mode",
+			args:               []string{"auths", "auth1", "-qG", "format"},
+			p:                  testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", enableExpiration, nil)),
+			expectStdoutOutput: "",
+		},
+		{
+			name:               "get retrieval from basic auth",
+			args:               []string{"auths", "auth1", "-G", "retrieval"},
+			p:                  testProject_withAuths(testAuth_basic("auth1", "user", "pass")),
+			expectStdoutOutput: "(n/a)\n",
+		},
+		{
+			name:               "get retrieval from session auth",
+			args:               []string{"auths", "auth1", "-G", "retrieval"},
+			p:                  testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", enableExpiration, nil)),
+			expectStdoutOutput: "F:get-sess\n",
+		},
+		{
+			name:               "get retrieval from session auth, quiet mode",
+			args:               []string{"auths", "auth1", "-qG", "retrieval"},
+			p:                  testProject_withAuths(testAuth_session("auth1", seqTemplate, "get-sess", "SESSID", enableExpiration, nil)),
+			expectStdoutOutput: "R:get-sess\n",
+		},
+		{
+			name:               "get retrieval from token auth",
+			args:               []string{"auths", "auth1", "-G", "retrieval"},
+			p:                  testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", enableExpiration)),
+			expectStdoutOutput: "R:get-sess\n",
+		},
+		{
+			name:               "get retrieval from jwt auth",
+			args:               []string{"auths", "auth1", "-G", "retrieval"},
+			p:                  testProject_withAuths(testAuth_jwt("auth1", "get-sess", "SESSID")),
+			expectStdoutOutput: "R:get-sess\n",
+		},
+		{
+			name:               "get token scraper from basic auth",
+			args:               []string{"auths", "auth1", "-G", "token-scraper"},
+			p:                  testProject_withAuths(testAuth_basic("auth1", "user", "pass")),
+			expectStdoutOutput: "(n/a)\n",
+		},
+		{
+			name:               "get token scraper from session auth",
+			args:               []string{"auths", "auth1", "-G", "token-scraper"},
+			p:                  testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", enableExpiration, nil)),
+			expectStdoutOutput: "(n/a)\n",
+		},
+		{
+			name:               "get token scraper from token auth",
+			args:               []string{"auths", "auth1", "-G", "token-scraper"},
+			p:                  testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", enableExpiration)),
+			expectStdoutOutput: ".access_token\n",
+		},
+		{
+			name:               "get token scraper from jwt auth",
+			args:               []string{"auths", "auth1", "-G", "token-scraper"},
+			p:                  testProject_withAuths(testAuth_jwt("auth1", "get-sess", "SESSID")),
+			expectStdoutOutput: ".token\n",
+		},
 		{
 			name:               "get property not valid for auth type",
 			args:               []string{"auths", "auth1", "-G", "cookie"},

@@ -434,9 +434,7 @@ func invokeAuthsGet(io cmdio.IO, projFile, authName string, item authKey, unmask
 			io.Printf("%s\n", auth.ExpirationLayout())
 		}
 	case authKeyFormat:
-		if auth.Static() {
-			io.PrintLoudf("(n/a)\n")
-		} else if auth.Destination().Format == morc.ProofFormatTypeNone {
+		if auth.Destination().Format == morc.ProofFormatTypeNone {
 			io.PrintLoudf("(none)\n")
 		} else {
 			io.Printf("%s\n", auth.Destination().Format)

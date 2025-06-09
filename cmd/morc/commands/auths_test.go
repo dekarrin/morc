@@ -324,6 +324,30 @@ func Test_Auths_Get(t *testing.T) {
 			expectStdoutOutput: "SESSID\n",
 		},
 		{
+			name:               "get dest from basic auth",
+			args:               []string{"auths", "auth1", "-G", "dest"},
+			p:                  testProject_withAuths(testAuth_basic("auth1", "user", "pass")),
+			expectStdoutOutput: "header:Authorization\n",
+		},
+		{
+			name:               "get dest from session auth",
+			args:               []string{"auths", "auth1", "-G", "dest"},
+			p:                  testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", disableExpiration, nil)),
+			expectStdoutOutput: "cookie:SESSID\n",
+		},
+		{
+			name:               "get dest from token auth",
+			args:               []string{"auths", "auth1", "-G", "dest"},
+			p:                  testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", disableExpiration, nil)),
+			expectStdoutOutput: "header:Authorization\n",
+		},
+		{
+			name:               "get dest from jwt auth",
+			args:               []string{"auths", "auth1", "-G", "dest"},
+			p:                  testProject_withAuths(testAuth_jwt("auth1", "get-sess", "SESSID")),
+			expectStdoutOutput: "header:Authorization\n",
+		},
+		{
 			name:               "get expDetection from session auth, on",
 			args:               []string{"auths", "auth1", "-G", "exp-detection"},
 			p:                  testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", enableExpiration, nil)),

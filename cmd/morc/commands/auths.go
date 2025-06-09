@@ -409,12 +409,8 @@ func invokeAuthsGet(io cmdio.IO, projFile, authName string, item authKey, unmask
 			io.Printf("%s\n", auth.CookieName())
 		}
 	case authKeyDest:
-		if auth.Static() {
-			io.PrintLoudf("(n/a)\n")
-		} else {
-			dest := auth.Destination()
-			io.Printf("%s:%s\n", dest.Location.String(), dest.Key)
-		}
+		dest := auth.Destination()
+		io.Printf("%s:%s\n", dest.Location.String(), dest.Key)
 	case authKeyExpDetection:
 		if auth.Static() {
 			io.PrintLoudf("(n/a)\n")

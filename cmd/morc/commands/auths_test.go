@@ -324,6 +324,69 @@ func Test_Auths_Get(t *testing.T) {
 			expectStdoutOutput: "SESSID\n",
 		},
 		{
+			name:               "get expDetection from session auth, on",
+			args:               []string{"auths", "auth1", "-G", "exp-detection"},
+			p:                  testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", enableExpiration, nil)),
+			expectStdoutOutput: "ON\n",
+		},
+		{
+			name:               "get expDetection from session auth, off",
+			args:               []string{"auths", "auth1", "-G", "exp-detection"},
+			p:                  testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", disableExpiration, nil)),
+			expectStdoutOutput: "OFF\n",
+		},
+		{
+			name:               "get expDetection from token auth, on",
+			args:               []string{"auths", "auth1", "-G", "exp-detection"},
+			p:                  testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", enableExpiration)),
+			expectStdoutOutput: "ON\n",
+		},
+		{
+			name:               "get expDetection from token auth, off",
+			args:               []string{"auths", "auth1", "-G", "exp-detection"},
+			p:                  testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", disableExpiration)),
+			expectStdoutOutput: "OFF\n",
+		},
+		{
+			name:               "get expDetection from jwt auth, on",
+			args:               []string{"auths", "auth1", "-G", "exp-detection"},
+			p:                  testProject_withAuths(testAuth_jwt("auth1", "get-sess", "SESSID")),
+			expectStdoutOutput: "ON\n",
+		},
+		// JWT can't have expiration detection disabled, so skipping that test case
+
+		{
+			name:               "get expScraper from session auth, expiration on",
+			args:               []string{"auths", "auth1", "-G", "exp-scraper"},
+			p:                  testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", enableExpiration, nil)),
+			expectStdoutOutput: "cookie SESSID (with expiration)\n",
+		},
+		{
+			name:               "get expScraper from session auth, expiration off",
+			args:               []string{"auths", "auth1", "-G", "exp-scraper"},
+			p:                  testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", disableExpiration, nil)),
+			expectStdoutOutput: "(none)\n",
+		},
+		{
+			name:               "get expScraper from token auth, expiration on",
+			args:               []string{"auths", "auth1", "-G", "exp-scraper"},
+			p:                  testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", enableExpiration)),
+			expectStdoutOutput: ".expiration\n",
+		},
+		{
+			name:               "get expScraper from token auth, expiration off",
+			args:               []string{"auths", "auth1", "-G", "exp-scraper"},
+			p:                  testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", disableExpiration)),
+			expectStdoutOutput: "(none)\n",
+		},
+		{
+			name:               "get expScraper from jwt auth, expiration on",
+			args:               []string{"auths", "auth1", "-G", "exp-scraper"},
+			p:                  testProject_withAuths(testAuth_jwt("auth1", "get-sess", "SESSID")),
+			expectStdoutOutput: ".token\n",
+		},
+		// JWT can't have expiration detection disabled, so skipping that test case
+		{
 			name:               "get property not valid for auth type",
 			args:               []string{"auths", "auth1", "-G", "cookie"},
 			p:                  testProject_singleAuth(),

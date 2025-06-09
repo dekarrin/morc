@@ -105,7 +105,9 @@ func (sc Scraper) EqualSpec(other Scraper) bool {
 func (sc Scraper) Spec() string {
 	s := ""
 
-	if sc.Type == SpecBodyJSON {
+	if sc.Type == SpecNone {
+		return ""
+	} else if sc.Type == SpecBodyJSON {
 		for _, step := range sc.Steps {
 			s += step.String()
 		}

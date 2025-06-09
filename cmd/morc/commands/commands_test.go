@@ -658,10 +658,21 @@ func testAuth_jwt(name, seqName, tokenVar string, proof ...morc.AuthProof) morc.
 	}
 }
 
-func testAuth_token(name, seqName, tokenVar string, proof ...morc.AuthProof) morc.Auth {
+// TODO: testAuth_session should use the variadic proof
+func testAuth_token(name, seqName, tokenVar string, expDetect expDetect, proof ...morc.AuthProof) morc.Auth {
 	var p morc.AuthProof
 	if len(proof) > 0 {
 		p = proof[0]
+	}
+
+	var expScraper *morc.Scraper
+	if expDetect == enableExpiration {
+		expScraper = &morc.Scraper{
+			Type: morc.SpecBodyJSON,
+			Steps: []morc.TraversalStep{
+				{Key: "expiration"},
+			},
+		}
 	}
 
 	return morc.Auth{
@@ -685,12 +696,7 @@ func testAuth_token(name, seqName, tokenVar string, proof ...morc.AuthProof) mor
 				Key:      "Authorization",
 				Format:   "bearer",
 			},
-			&morc.Scraper{
-				Type: morc.SpecBodyJSON,
-				Steps: []morc.TraversalStep{
-					{Key: "expiration"},
-				},
-			},
+			expScraper,
 			time.RFC1123,
 		),
 	}

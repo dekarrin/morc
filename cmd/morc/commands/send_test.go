@@ -1452,7 +1452,7 @@ func Test_Send_WithAuth(t *testing.T) {
 			p: morc.Project{
 				Templates: testRequests_withProtectedResource_token(Creds{"test", "TEsT123!"}, "testauth"),
 				Auths: map[string]morc.Auth{
-					"testauth": testAuth_token("testauth", "login", "access_token"),
+					"testauth": testAuth_token("testauth", "login", "access_token", enableExpiration),
 				},
 				Config: morc.Settings{
 					HistFile:      "::PROJ_DIR::/history.json",
@@ -1462,7 +1462,7 @@ func Test_Send_WithAuth(t *testing.T) {
 			expectP: morc.Project{
 				Templates: testRequests_withProtectedResource_token(Creds{"test", "TEsT123!"}, "testauth"),
 				Auths: map[string]morc.Auth{
-					"testauth": testAuth_token("testauth", "login", "access_token", testProof_token(testTokenValue, authExpTime)),
+					"testauth": testAuth_token("testauth", "login", "access_token", enableExpiration, testProof_token(testTokenValue, authExpTime)),
 				},
 				History: []morc.HistoryEntry{
 					{
@@ -1556,7 +1556,7 @@ func Test_Send_WithAuth(t *testing.T) {
 			p: morc.Project{
 				Templates: testRequests_withProtectedResource_token(Creds{"test", "TEsT123!"}, "testauth"),
 				Auths: map[string]morc.Auth{
-					"testauth": testAuth_token("testauth", "login", "access_token", testProof_token("incorrect_token", authExpTime)),
+					"testauth": testAuth_token("testauth", "login", "access_token", enableExpiration, testProof_token("incorrect_token", authExpTime)),
 				},
 				Config: morc.Settings{
 					HistFile:      "::PROJ_DIR::/history.json",
@@ -1566,7 +1566,7 @@ func Test_Send_WithAuth(t *testing.T) {
 			expectP: morc.Project{
 				Templates: testRequests_withProtectedResource_token(Creds{"test", "TEsT123!"}, "testauth"),
 				Auths: map[string]morc.Auth{
-					"testauth": testAuth_token("testauth", "login", "access_token", testProof_token("correct_token", authExpTime)),
+					"testauth": testAuth_token("testauth", "login", "access_token", enableExpiration, testProof_token("correct_token", authExpTime)),
 				},
 				History: []morc.HistoryEntry{
 					{
@@ -1694,7 +1694,7 @@ HTTP/1.1 200 OK
 			p: morc.Project{
 				Templates: testRequests_withProtectedResource_token(Creds{"test", "TEsT123!"}, "testauth"),
 				Auths: map[string]morc.Auth{
-					"testauth": testAuth_token("testauth", "login", "access_token", testProof_token("expired_token", time.Now().Add(-1*time.Hour))),
+					"testauth": testAuth_token("testauth", "login", "access_token", enableExpiration, testProof_token("expired_token", time.Now().Add(-1*time.Hour))),
 				},
 				Config: morc.Settings{
 					HistFile:      "::PROJ_DIR::/history.json",
@@ -1704,7 +1704,7 @@ HTTP/1.1 200 OK
 			expectP: morc.Project{
 				Templates: testRequests_withProtectedResource_token(Creds{"test", "TEsT123!"}, "testauth"),
 				Auths: map[string]morc.Auth{
-					"testauth": testAuth_token("testauth", "login", "access_token", testProof_token("new_token", authExpTime)),
+					"testauth": testAuth_token("testauth", "login", "access_token", enableExpiration, testProof_token("new_token", authExpTime)),
 				},
 				History: []morc.HistoryEntry{
 					{

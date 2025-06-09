@@ -113,6 +113,7 @@ func Test_Auths_Delete(t *testing.T) {
 	}
 }
 
+// TODO: these are totally incomplete, we need to add cases to match the get tests.
 func Test_Auths_Edit(t *testing.T) {
 	testCases := []struct {
 		name               string

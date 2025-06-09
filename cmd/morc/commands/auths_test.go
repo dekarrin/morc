@@ -288,22 +288,10 @@ func Test_Auths_Get(t *testing.T) {
 		expectStdoutOutput string // set with expected output to stdout
 	}{
 		{
-			name:               "get username from basic auth",
-			args:               []string{"auths", "auth1", "-G", "user"},
+			name:               "get name from basic auth",
+			args:               []string{"auths", "auth1", "-G", "name"},
 			p:                  testProject_singleAuth(),
-			expectStdoutOutput: "user\n",
-		},
-		{
-			name:               "get password from basic auth, masked",
-			args:               []string{"auths", "auth1", "-G", "pass"},
-			p:                  testProject_singleAuth(),
-			expectStdoutOutput: "****\n",
-		},
-		{
-			name:               "get password from basic auth, unmasked",
-			args:               []string{"auths", "auth1", "-G", "pass", "--unmask"},
-			p:                  testProject_singleAuth(),
-			expectStdoutOutput: "pass\n",
+			expectStdoutOutput: "auth1\n",
 		},
 		{
 			name:               "get type from basic auth",
@@ -312,20 +300,50 @@ func Test_Auths_Get(t *testing.T) {
 			expectStdoutOutput: "basic\n",
 		},
 		{
-			name:      "get property not valid for auth type",
-			args:      []string{"auths", "auth1", "-G", "cookie"},
-			p:         testProject_singleAuth(),
-			expectErr: `attribute "cookie" is not valid for auth of type basic`,
+			name:               "get username from basic auth",
+			args:               []string{"auths", "auth1", "-G", "username"},
+			p:                  testProject_singleAuth(),
+			expectStdoutOutput: "user\n",
+		},
+		{
+			name:               "get password from basic auth, masked",
+			args:               []string{"auths", "auth1", "-G", "password"},
+			p:                  testProject_singleAuth(),
+			expectStdoutOutput: "****\n",
+		},
+		{
+			name:               "get password from basic auth, unmasked",
+			args:               []string{"auths", "auth1", "-G", "password", "--unmask"},
+			p:                  testProject_singleAuth(),
+			expectStdoutOutput: "pass\n",
+		},
+		{
+			name:               "get cookie from session auth",
+			args:               []string{"auths", "auth1", "-G", "cookie"},
+			p:                  testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", enableExpiration, nil)),
+			expectStdoutOutput: "SESSID\n",
+		},
+		{
+			name:               "get property not valid for auth type",
+			args:               []string{"auths", "auth1", "-G", "cookie"},
+			p:                  testProject_singleAuth(),
+			expectStdoutOutput: "(n/a)\n",
+		},
+		{
+			name:               "get property not valid for auth type, quiet mode",
+			args:               []string{"auths", "auth1", "-G", "cookie", "-q"},
+			p:                  testProject_singleAuth(),
+			expectStdoutOutput: "",
 		},
 		{
 			name:      "get non-existent property",
 			args:      []string{"auths", "auth1", "-G", "foobar"},
 			p:         testProject_singleAuth(),
-			expectErr: `invalid auth attribute key: "foobar"`,
+			expectErr: `invalid attribute "foobar"`,
 		},
 		{
 			name:      "get property from non-existent auth",
-			args:      []string{"auths", "non-existent", "-G", "user"},
+			args:      []string{"auths", "non-existent", "-G", "name"},
 			p:         testProject_singleAuth(),
 			expectErr: "no auth method named non-existent exists in project",
 		},

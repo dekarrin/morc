@@ -470,11 +470,19 @@ func testProject_singleReqWillAllPropertiesSet() morc.Project {
 }
 
 func testProject_singleAuth() morc.Project {
-	return morc.Project{
-		Auths: map[string]morc.Auth{
-			"auth1": testAuth_basic("auth1", "user", "pass"),
-		},
+	return testProject_withAuths(testAuth_basic("auth1", "user", "pass"))
+}
+
+func testProject_withAuths(auths ...morc.Auth) morc.Project {
+	p := morc.Project{
+		Auths: map[string]morc.Auth{},
 	}
+
+	for _, a := range auths {
+		p.Auths[strings.ToLower(a.Name)] = a
+	}
+
+	return p
 }
 
 func testProject_withRequests(reqs ...morc.RequestTemplate) morc.Project {

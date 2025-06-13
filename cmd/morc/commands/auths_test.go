@@ -216,6 +216,31 @@ func Test_Auths_Edit(t *testing.T) {
 			p:         testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", enableExpiration)),
 			expectErr: "--password/-p is not a valid option for auth type \"token\"",
 		},
+		{
+			name:      "set basic auth cookie fails",
+			args:      []string{"auths", "auth1", "-c", "LOGIN_SESSION"},
+			p:         testProject_withAuths(testAuth_basic("auth1", "user", "pass")),
+			expectErr: `--cookie/-c is not a valid option for auth type "basic"`,
+		},
+		{
+			name:               "set session auth cookie",
+			args:               []string{"auths", "auth1", "-c", "LOGIN_SESSION"},
+			p:                  testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", enableExpiration, nil)),
+			expectP:            testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "LOGIN_SESSION", enableExpiration, nil)),
+			expectStdoutOutput: "Set session cookie to LOGIN_SESSION\n",
+		},
+		{
+			name:      "set jwt auth cookie fails",
+			args:      []string{"auths", "auth1", "-c", "LOGIN_SESSION"},
+			p:         testProject_withAuths(testAuth_jwt("auth1", "get-sess", "SESSID")),
+			expectErr: `--cookie/-c is not a valid option for auth type "jwt"`,
+		},
+		{
+			name:      "set token auth cookie fails",
+			args:      []string{"auths", "auth1", "-c", "LOGIN_SESSION"},
+			p:         testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", enableExpiration)),
+			expectErr: `--cookie/-c is not a valid option for auth type "token"`,
+		},
 	}
 
 	for _, tc := range testCases {

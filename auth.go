@@ -997,6 +997,7 @@ func (a *Auth) SetCookieName(name string) error {
 
 	s := a.Fetcher.Caps[matchedIdx]
 	s.CookieName = name
+	a.Fetcher.Dest.Key = name
 	a.Fetcher.Caps[matchedIdx] = s
 
 	return nil

@@ -532,6 +532,8 @@ func invokeAuthsEdit(io cmdio.IO, projFile, authName string, attrs authAttrValue
 			auth.Proof = nil
 			auth.Fetcher = nil // other sets will automagically refill this
 
+			// TODO: carry over anything we can
+
 			modifiedVals[authKeyType] = attrs.authType.v
 		} else {
 			noChangeVals[authKeyType] = auth.Type

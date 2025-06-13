@@ -131,122 +131,90 @@ func Test_Auths_Edit(t *testing.T) {
 			expectErr: "no auth method named non-existent exists in project",
 		},
 		{
-			name: "edit basic auth username",
-			args: []string{"auths", "auth1", "-u", "new-user"},
-			p:    testProject_singleAuth(),
-			expectP: morc.Project{
-				Auths: map[string]morc.Auth{
-					"auth1": testAuth_basic("auth1", "new-user", "pass"),
-				},
-			},
-			expectStdoutOutput: "Set basic auth username to new-user\n",
+			name:               "set basic auth name",
+			args:               []string{"auths", "auth1", "-n", "auth2"},
+			p:                  testProject_withAuths(testAuth_basic("auth1", "user", "pass")),
+			expectP:            testProject_withAuths(testAuth_basic("auth2", "user", "pass")),
+			expectStdoutOutput: "Set auth method name to auth2\n",
 		},
 		{
-			name: "edit basic auth password",
-			args: []string{"auths", "auth1", "-p", "new-pass"},
-			p:    testProject_singleAuth(),
-			expectP: morc.Project{
-				Auths: map[string]morc.Auth{
-					"auth1": testAuth_basic("auth1", "user", "new-pass"),
-				},
-			},
-			expectStdoutOutput: "Set basic auth password to ********\n",
+			name:               "set session auth name",
+			args:               []string{"auths", "auth1", "-n", "auth2"},
+			p:                  testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", enableExpiration, nil)),
+			expectP:            testProject_withAuths(testAuth_session("auth2", seqFlow, "get-sess", "SESSID", enableExpiration, nil)),
+			expectStdoutOutput: "Set auth method name to auth2\n",
 		},
 		{
-			name: "edit basic auth password and show with --unmask",
-			args: []string{"auths", "auth1", "-p", "new-pass", "--unmask"},
-			p:    testProject_singleAuth(),
-			expectP: morc.Project{
-				Auths: map[string]morc.Auth{
-					"auth1": testAuth_basic("auth1", "user", "new-pass"),
-				},
-			},
-			expectStdoutOutput: "Set basic auth password to new-pass\n",
+			name:               "set jwt auth name",
+			args:               []string{"auths", "auth1", "-n", "auth2"},
+			p:                  testProject_withAuths(testAuth_jwt("auth1", "get-sess", "SESSID")),
+			expectP:            testProject_withAuths(testAuth_jwt("auth2", "get-sess", "SESSID")),
+			expectStdoutOutput: "Set auth method name to auth2\n",
 		},
 		{
-			name: "edit basic auth username and password",
-			args: []string{"auths", "auth1", "-u", "new-user", "-p", "new-pass"},
-			p:    testProject_singleAuth(),
-			expectP: morc.Project{
-				Auths: map[string]morc.Auth{
-					"auth1": testAuth_basic("auth1", "new-user", "new-pass"),
-				},
-			},
-			expectStdoutOutput: "Set basic auth username to new-user and basic auth password to ********\n",
+			name:               "set token auth name",
+			args:               []string{"auths", "auth1", "-n", "auth2"},
+			p:                  testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", enableExpiration)),
+			expectP:            testProject_withAuths(testAuth_token("auth2", "get-sess", "SESSID", enableExpiration)),
+			expectStdoutOutput: "Set auth method name to auth2\n",
+		},
+		// TODO: add tests for setting auth types.
+		{
+			name:               "set basic auth username",
+			args:               []string{"auths", "auth1", "-u", "ectoBiologist"},
+			p:                  testProject_withAuths(testAuth_basic("auth1", "user", "pass")),
+			expectP:            testProject_withAuths(testAuth_basic("auth1", "ectoBiologist", "pass")),
+			expectStdoutOutput: "Set basic auth username to ectoBiologist\n",
 		},
 		{
-			name: "rename auth",
-			args: []string{"auths", "auth1", "-n", "renamed_auth"},
-			p:    testProject_singleAuth(),
-			expectP: morc.Project{
-				Auths: map[string]morc.Auth{
-					"renamed_auth": testAuth_basic("renamed_auth", "user", "pass"),
-				},
-			},
-			expectStdoutOutput: "Set auth method name to renamed_auth\n",
+			name:      "set session auth username fails",
+			args:      []string{"auths", "auth1", "-u", "ectoBiologist"},
+			p:         testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", enableExpiration, nil)),
+			expectErr: "--username/-u is not a valid option for auth type \"session\"",
 		},
 		{
-			name: "rename auth that is used in a request",
-			args: []string{"auths", "auth1", "-n", "renamed_auth"},
-			p: morc.Project{
-				Templates: map[string]morc.RequestTemplate{
-					"req1": {Name: "req1", Method: "GET", URL: "http://example.com", Auth: "auth1"},
-				},
-				Auths: map[string]morc.Auth{
-					"auth1": testAuth_basic("auth1", "user", "pass"),
-				},
-			},
-			expectP: morc.Project{
-				Templates: map[string]morc.RequestTemplate{
-					"req1": {Name: "req1", Method: "GET", URL: "http://example.com", Auth: "renamed_auth"},
-				},
-				Auths: map[string]morc.Auth{
-					"renamed_auth": testAuth_basic("renamed_auth", "user", "pass"),
-				},
-			},
-			expectStdoutOutput: "Set auth method name to renamed_auth\n",
+			name:      "set jwt auth username fails",
+			args:      []string{"auths", "auth1", "-u", "ectoBiologist"},
+			p:         testProject_withAuths(testAuth_jwt("auth1", "get-sess", "SESSID")),
+			expectErr: "--username/-u is not a valid option for auth type \"jwt\"",
 		},
 		{
-			name: "rename to existing name",
-			args: []string{"auths", "auth1", "-n", "auth2"},
-			p: morc.Project{
-				Auths: map[string]morc.Auth{
-					"auth1": testAuth_basic("auth1", "user", "pass"),
-					"auth2": testAuth_basic("auth2", "user2", "pass2"),
-				},
-			},
-			expectErr: "auth method named auth2 already exists",
+			name:      "set token auth username fails",
+			args:      []string{"auths", "auth1", "-u", "ectoBiologist"},
+			p:         testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", enableExpiration)),
+			expectErr: "--username/-u is not a valid option for auth type \"token\"",
 		},
 		{
-			name: "change type of auth - basic to session",
-			args: []string{"auths", "auth1", "-T", "session", "-c", "SESSID", "-r", "flow:get-sess"},
-			p: morc.Project{
-				Auths: map[string]morc.Auth{
-					"auth1": testAuth_basic("auth1", "user", "pass"),
-				},
-				Flows: map[string]morc.Flow{"get-sess": {Name: "get-sess"}},
-			},
-			expectP: morc.Project{
-				Flows: map[string]morc.Flow{"get-sess": {Name: "get-sess"}},
-				Auths: map[string]morc.Auth{
-					"auth1": {
-						Name: "auth1",
-						Type: morc.AuthTypeSession,
-						Fetcher: morc.NewSessionCookieFetcher(
-							morc.RequestSequence{Name: "flow:get-sess", IsFlow: true},
-							"SESSID",
-							false,
-						),
-					},
-				},
-			},
-			expectStdoutOutput: "Set auth method type to session, auth proof retrieval sequence to F:flow:get-sess, and session cookie to SESSID\n",
+			name:               "set basic auth password",
+			args:               []string{"auths", "auth1", "-p", "vriskaa"},
+			p:                  testProject_withAuths(testAuth_basic("auth1", "user", "pass")),
+			expectP:            testProject_withAuths(testAuth_basic("auth1", "user", "vriskaa")),
+			expectStdoutOutput: "Set basic auth password to *******\n",
 		},
 		{
-			name:      "invalid flag for type",
-			args:      []string{"auths", "auth1", "-c", "SESSID"},
-			p:         testProject_singleAuth(),
-			expectErr: "--cookie/-c is not a valid option for auth type \"basic\"",
+			name:               "set basic auth password unmasked",
+			args:               []string{"auths", "auth1", "-p", "vriskaa", "--unmask"},
+			p:                  testProject_withAuths(testAuth_basic("auth1", "user", "pass")),
+			expectP:            testProject_withAuths(testAuth_basic("auth1", "user", "vriskaa")),
+			expectStdoutOutput: "Set basic auth password to vriskaa\n",
+		},
+		{
+			name:      "set session auth password fails",
+			args:      []string{"auths", "auth1", "-p", "vriskaa"},
+			p:         testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", enableExpiration, nil)),
+			expectErr: "--password/-p is not a valid option for auth type \"session\"",
+		},
+		{
+			name:      "set jwt auth password fails",
+			args:      []string{"auths", "auth1", "-p", "vriskaa"},
+			p:         testProject_withAuths(testAuth_jwt("auth1", "get-sess", "SESSID")),
+			expectErr: "--password/-p is not a valid option for auth type \"jwt\"",
+		},
+		{
+			name:      "set token auth password fails",
+			args:      []string{"auths", "auth1", "-p", "vriskaa"},
+			p:         testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", enableExpiration)),
+			expectErr: "--password/-p is not a valid option for auth type \"token\"",
 		},
 	}
 

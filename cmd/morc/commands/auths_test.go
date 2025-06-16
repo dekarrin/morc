@@ -320,6 +320,53 @@ func Test_Auths_Edit(t *testing.T) {
 			expectStdoutOutput: "Set auth proof retrieval sequence to R:req1\n",
 		},
 		{
+			name:      "set basic auth token scraper fails",
+			args:      []string{"auths", "auth1", "-t", ".token"},
+			p:         testProject_withAuths(testAuth_basic("auth1", "user", "pass")),
+			expectErr: `--token-scraper/-t is not a valid option for auth type "basic"`,
+		},
+		{
+			name:      "set session auth token scraper fails",
+			args:      []string{"auths", "auth1", "-t", ".token"},
+			p:         testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", enableExpiration, nil)),
+			expectErr: `--token-scraper/-t is not a valid option for auth type "session"`,
+		},
+		{
+			name: "set jwt auth token scraper to JSON path",
+			args: []string{"auths", "auth1", "-t", ".other.token"},
+			p:    testProject_withAuths(testAuth_jwt("auth1", "get-sess", "TOKEN")),
+			expectP: testProject_withAuths(testAuth_jwt_withTokenScraper("auth1", "get-sess", morc.Scraper{
+				Name:  "TOKEN",
+				Type:  morc.SpecBodyJSON,
+				Steps: []morc.TraversalStep{{Key: "other"}, {Key: "token"}},
+			})),
+			expectStdoutOutput: "Set token scraper spec to .other.token\n",
+		},
+		{
+			name: "set jwt auth token scraper to offset",
+			args: []string{"auths", "auth1", "-t", ":25,35"},
+			p:    testProject_withAuths(testAuth_jwt("auth1", "get-sess", "TOKEN")),
+			expectP: testProject_withAuths(testAuth_jwt_withTokenScraper("auth1", "get-sess", morc.Scraper{
+				Name:        "TOKEN",
+				Type:        morc.SpecBodyOffset,
+				OffsetStart: 25,
+				OffsetEnd:   35,
+			})),
+			expectStdoutOutput: "Set token scraper spec to offset 25,35\n",
+		},
+		{
+			name: "set jwt auth token scraper to cookie",
+			args: []string{"auths", "auth1", "-t", "cookie:TOKEN_NAME"},
+			p:    testProject_withAuths(testAuth_jwt("auth1", "get-sess", "TOKEN")),
+			expectP: testProject_withAuths(testAuth_jwt_withTokenScraper("auth1", "get-sess", morc.Scraper{
+				Name:             "TOKEN",
+				Type:             morc.SpecCookie,
+				CookieName:       "TOKEN_NAME",
+				CookieExpiration: true,
+			})),
+			expectStdoutOutput: "Set token scraper spec to cookie:TOKEN_NAME\n",
+		},
+		{
 			name:      "set basic auth dest fails",
 			args:      []string{"auths", "auth1", "-d", "header:X-API-KEY"},
 			p:         testProject_withAuths(testAuth_basic("auth1", "user", "pass")),

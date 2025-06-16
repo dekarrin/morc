@@ -633,6 +633,16 @@ func testAuth_session(name string, seqType seqType, seqName, cookie string, expD
 }
 
 func testAuth_jwt(name, seqName, tokenVar string, proof ...morc.AuthProof) morc.Auth {
+	return testAuth_jwt_withTokenScraper(name, seqName, morc.Scraper{
+		Name: tokenVar,
+		Type: morc.SpecBodyJSON,
+		Steps: []morc.TraversalStep{
+			{Key: "token"},
+		},
+	}, proof...)
+}
+
+func testAuth_jwt_withTokenScraper(name, seqName string, tokenScraper morc.Scraper, proof ...morc.AuthProof) morc.Auth {
 	var p morc.AuthProof
 	if len(proof) > 0 {
 		p = proof[0]
@@ -647,13 +657,7 @@ func testAuth_jwt(name, seqName, tokenVar string, proof ...morc.AuthProof) morc.
 				Name:   seqName,
 				IsFlow: false,
 			},
-			morc.Scraper{
-				Name: tokenVar,
-				Type: morc.SpecBodyJSON,
-				Steps: []morc.TraversalStep{
-					{Key: "token"},
-				},
-			},
+			tokenScraper,
 		),
 	}
 }

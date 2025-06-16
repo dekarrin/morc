@@ -289,6 +289,27 @@ func (sc Scraper) Scrape(resp *http.Response, preReadBody []byte) (string, error
 	}
 }
 
+// New spec format:
+// [TYPE:]ARGS
+//
+// If TYPE: is omitted, and ARGS is not a shorthand name, the spec is assumed to
+// be a JSON traversal. Disambiguate from a shorthand name by prefixing with a
+// period character.
+//
+// JSON:.key1.key2[index]...
+// BYTES:START,END
+// HEADER:KEY
+// HEADER:KEY[INDEX]
+// TRAILER:KEY
+// TRAILER:KEY[INDEX]
+// COOKIE:NAME
+// COOKIE:NAME:EXP
+// :RAW
+//
+// - INCOMPAT UPDATE: we are altering offset to always require BYTES: prefix.
+// - INCOMPAT UPDATE: bare : is now header for shorthand name.
+
+// If TYPE: is omitted, it is assumed to be a
 func ParseVarScraperSpec(name, spec string) (Scraper, error) {
 	// TODO: support for anything besides body-based scrapers
 	// okay, are we looking at a byte offset or a JSON traversal?

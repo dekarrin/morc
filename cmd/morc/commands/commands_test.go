@@ -702,6 +702,13 @@ func testAuth_token(name, seqName, tokenVar string, expDetect expDetect, proof .
 	}
 }
 
+// TODO: testAuth_session should use the variadic proof
+func testAuth_token_withDest(name, seqName, tokenVar string, expDetect expDetect, dest morc.ProofDestination, proof ...morc.AuthProof) morc.Auth {
+	a := testAuth_token(name, seqName, tokenVar, expDetect, proof...)
+	a.Fetcher.Dest = dest
+	return a
+}
+
 func testProof_session(key, value string, exp time.Time) morc.AuthProof {
 	return morc.DynamicProof{
 		Value:     value,

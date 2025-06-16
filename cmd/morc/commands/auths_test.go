@@ -292,6 +292,58 @@ func Test_Auths_Edit(t *testing.T) {
 			p:         testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", disableExpiration)),
 			expectErr: `--exp is not a valid option for auth type "token"`,
 		},
+		{
+			name:      "set basic auth retrieval fails",
+			args:      []string{"auths", "auth1", "-r", "F:flow1"},
+			p:         testProject_withAuths(testAuth_basic("auth1", "user", "pass")),
+			expectErr: `--retrieval/-r is not a valid option for auth type "basic"`,
+		},
+		{
+			name:               "set session auth retrieval",
+			args:               []string{"auths", "auth1", "-r", "F:flow1"},
+			p:                  testProject_withAuths(testAuth_session("auth1", seqTemplate, "get-sess", "SESSID", enableExpiration, nil)),
+			expectP:            testProject_withAuths(testAuth_session("auth1", seqFlow, "flow1", "SESSID", enableExpiration, nil)),
+			expectStdoutOutput: "Set auth proof retrieval sequence to F:flow1\n",
+		},
+		{
+			name:               "set jwt auth retrieval",
+			args:               []string{"auths", "auth1", "-r", "R:req1"},
+			p:                  testProject_withAuths(testAuth_jwt("auth1", "get-sess", "SESSID")),
+			expectP:            testProject_withAuths(testAuth_jwt("auth1", "req1", "SESSID")),
+			expectStdoutOutput: "Set auth proof retrieval sequence to R:req1\n",
+		},
+		{
+			name:               "set token auth retrieval",
+			args:               []string{"auths", "auth1", "-r", "R:req1"},
+			p:                  testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", enableExpiration)),
+			expectP:            testProject_withAuths(testAuth_token("auth1", "req1", "SESSID", enableExpiration)),
+			expectStdoutOutput: "Set auth proof retrieval sequence to R:req1\n",
+		},
+		{
+			name:      "set basic auth dest fails",
+			args:      []string{"auths", "auth1", "-d", "header:X-API-KEY"},
+			p:         testProject_withAuths(testAuth_basic("auth1", "user", "pass")),
+			expectErr: `--dest/-d is not a valid option for auth type "basic"`,
+		},
+		{
+			name:      "set session auth dest fails",
+			args:      []string{"auths", "auth1", "-d", "header:X-API-KEY"},
+			p:         testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", enableExpiration, nil)),
+			expectErr: `--dest/-d is not a valid option for auth type "session"`,
+		},
+		{
+			name:      "set jwt auth dest fails",
+			args:      []string{"auths", "auth1", "-d", "header:X-API-KEY"},
+			p:         testProject_withAuths(testAuth_jwt("auth1", "get-sess", "SESSID")),
+			expectErr: `--dest/-d is not a valid option for auth type "jwt"`,
+		},
+		{
+			name:               "set token auth dest",
+			args:               []string{"auths", "auth1", "-d", "header:X-API-KEY"},
+			p:                  testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", enableExpiration)),
+			expectP:            testProject_withAuths(testAuth_token_withDest("auth1", "get-sess", "SESSID", enableExpiration, morc.ProofDestination{Location: morc.ProofLocationHeader, Key: "X-API-KEY", Format: morc.ProofFormatTypeBearer})),
+			expectStdoutOutput: "Set auth proof destination to header:X-API-KEY\n",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -311,6 +363,9 @@ func Test_Auths_Edit(t *testing.T) {
 				if !strings.Contains(err.Error(), tc.expectErr) {
 					t.Fatalf("expected returned error to contain %q, got %q", tc.expectErr, err)
 				}
+				return
+			} else if tc.expectErr != "" {
+				t.Fatalf("expected error containing %q, but got none", tc.expectErr)
 				return
 			}
 

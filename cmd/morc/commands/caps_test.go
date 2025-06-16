@@ -416,7 +416,7 @@ func Test_Caps_New(t *testing.T) {
 		},
 		{
 			name: "happy path - offset missing end",
-			args: []string{"caps", "req1", "-N", "troll", "-s", ":28,"},
+			args: []string{"caps", "req1", "-N", "troll", "-s", "bytes:28,"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
@@ -440,7 +440,7 @@ func Test_Caps_New(t *testing.T) {
 		},
 		{
 			name: "happy path - negative end offset",
-			args: []string{"caps", "req1", "-N", "troll", "-s", ":,-32"},
+			args: []string{"caps", "req1", "-N", "troll", "-s", "bytes:,-32"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
@@ -464,7 +464,7 @@ func Test_Caps_New(t *testing.T) {
 		},
 		{
 			name: "happy path - offset missing start",
-			args: []string{"caps", "req1", "-N", "troll", "-s", ":,32"},
+			args: []string{"caps", "req1", "-N", "troll", "-s", "bytes:,32"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
@@ -488,7 +488,7 @@ func Test_Caps_New(t *testing.T) {
 		},
 		{
 			name: "happy path - offset missing both",
-			args: []string{"caps", "req1", "-N", "troll", "-s", ":,"},
+			args: []string{"caps", "req1", "-N", "troll", "-s", "bytes:,"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
@@ -510,7 +510,7 @@ func Test_Caps_New(t *testing.T) {
 		},
 		{
 			name: "happy path - raw",
-			args: []string{"caps", "req1", "-N", "troll", "-s", "raw"},
+			args: []string{"caps", "req1", "-N", "troll", "-s", ":raw"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
@@ -532,7 +532,7 @@ func Test_Caps_New(t *testing.T) {
 		},
 		{
 			name: "happy path - offset",
-			args: []string{"caps", "req1", "-N", "troll", "-s", ":28,32"},
+			args: []string{"caps", "req1", "-N", "troll", "-s", "bytes:28,32"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
@@ -556,7 +556,7 @@ func Test_Caps_New(t *testing.T) {
 		},
 		{
 			name: "happy path - offset, quiet mode",
-			args: []string{"caps", "req1", "-N", "troll", "-s", ":28,32", "-q"},
+			args: []string{"caps", "req1", "-N", "troll", "-s", "bytes:28,32", "-q"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
@@ -773,7 +773,7 @@ func Test_Caps_Edit(t *testing.T) {
 	}{
 		{
 			name: "req does not exist",
-			args: []string{"caps", "req1", "troll", "-s", ":28,32"},
+			args: []string{"caps", "req1", "troll", "-s", "bytes:28,32"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req2",
@@ -784,7 +784,7 @@ func Test_Caps_Edit(t *testing.T) {
 		},
 		{
 			name: "req does not exist, quiet still errors",
-			args: []string{"caps", "req1", "troll", "-s", ":28,32", "-q"},
+			args: []string{"caps", "req1", "troll", "-s", "bytes:28,32", "-q"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req2",
@@ -795,7 +795,7 @@ func Test_Caps_Edit(t *testing.T) {
 		},
 		{
 			name: "var does not exist",
-			args: []string{"caps", "req1", "troll", "-s", ":28,32"},
+			args: []string{"caps", "req1", "troll", "-s", "bytes:28,32"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
@@ -806,7 +806,7 @@ func Test_Caps_Edit(t *testing.T) {
 		},
 		{
 			name: "var does not exist, quiet still errors",
-			args: []string{"caps", "req1", "troll", "-s", ":28,32", "-q"},
+			args: []string{"caps", "req1", "troll", "-s", "bytes:28,32", "-q"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name:     "req1",
@@ -817,7 +817,7 @@ func Test_Caps_Edit(t *testing.T) {
 		},
 		{
 			name: "alter spec",
-			args: []string{"caps", "req1", "troll", "-s", ":28,32"},
+			args: []string{"caps", "req1", "troll", "-s", "bytes:28,32"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
@@ -853,7 +853,7 @@ func Test_Caps_Edit(t *testing.T) {
 		},
 		{
 			name: "alter spec, quiet",
-			args: []string{"caps", "req1", "troll", "-s", ":28,32", "-q"},
+			args: []string{"caps", "req1", "troll", "-s", "bytes:28,32", "-q"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
@@ -971,7 +971,7 @@ func Test_Caps_Edit(t *testing.T) {
 		},
 		{
 			name: "alter var and spec",
-			args: []string{"caps", "req1", "troll", "-V", "troll_name", "-s", ":28,32"},
+			args: []string{"caps", "req1", "troll", "-V", "troll_name", "-s", "bytes:28,32"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",
@@ -1007,7 +1007,7 @@ func Test_Caps_Edit(t *testing.T) {
 		},
 		{
 			name: "alter var and spec, quiet",
-			args: []string{"caps", "req1", "troll", "-V", "troll_name", "-s", ":28,32", "-q"},
+			args: []string{"caps", "req1", "troll", "-V", "troll_name", "-s", "bytes:28,32", "-q"},
 			p: testProject_withRequests(
 				morc.RequestTemplate{
 					Name: "req1",

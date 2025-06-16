@@ -344,7 +344,7 @@ func Test_Auths_Edit(t *testing.T) {
 		},
 		{
 			name: "set jwt auth token scraper to offset",
-			args: []string{"auths", "auth1", "-t", ":25,35"},
+			args: []string{"auths", "auth1", "-t", "bytes:25,35"},
 			p:    testProject_withAuths(testAuth_jwt("auth1", "get-sess", "TOKEN")),
 			expectP: testProject_withAuths(testAuth_jwt_withTokenScraper("auth1", "get-sess", morc.Scraper{
 				Name:        "TOKEN",

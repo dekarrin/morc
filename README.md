@@ -547,12 +547,12 @@ Output:
 To add a new capture, use the `--new` flag with the name of the variable to save
 the data to and give the flag `-s` with a *capture spec*. The capture spec gives
 where in the response to retrieve the value from, and supports byte offsets in
-format `:START,END` where START and END are byte offsets, or in format of a JSON
-path specified by giving keys and array slices needed to navigate from the top
-level of a JSON body in the response to the desired value, such as
+format `bytes:START,END` where START and END are byte offsets, or in format of a
+JSON path specified by giving keys and array slices needed to navigate from the
+top level of a JSON body in the response to the desired value, such as
 `.top-level-key.next-level-key.some_array[3].item`. Alternatively, to capture
 the entire request, you can give an offset with START and END omitted, like
-`:,`, or by using the keyword `raw` as the spec.
+`bytes:,`, or by using the shorthand `:raw` as the spec.
 
 In this example, we will add a new cap that gets its value from the 'id' field
 of the JSON object in the response:
@@ -627,7 +627,7 @@ And if you want to update one without deleting it, you can specify the property
 to update and the new value with flags:
 
 ```shell
-morc caps create-user USER_ID --spec :3,8       # capture data from the 3rd to 8th byte instead of the JSON path
+morc caps create-user USER_ID --spec bytes:3,8       # capture data from the 3rd to 8th byte instead of the JSON path
 morc caps create-user USER_ID --var USER_UUID   # save it to USER_UUID instead
 ```
 

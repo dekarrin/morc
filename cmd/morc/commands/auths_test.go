@@ -254,6 +254,44 @@ func Test_Auths_Edit(t *testing.T) {
 			expectP:            testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", disableExpiration, nil)),
 			expectStdoutOutput: "Set auth proof expiration detection to OFF\n",
 		},
+		{
+			name:      "disable jwt auth expiration detection fails",
+			args:      []string{"auths", "auth1", "--no-exp"},
+			p:         testProject_withAuths(testAuth_jwt("auth1", "get-sess", "SESSID")),
+			expectErr: `--no-exp is not a valid option for auth type "jwt"`,
+		},
+		{
+			name:               "disable token auth expiration detection",
+			args:               []string{"auths", "auth1", "--no-exp"},
+			p:                  testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", enableExpiration)),
+			expectP:            testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", disableExpiration)),
+			expectStdoutOutput: "Set auth proof expiration detection to OFF\n",
+		},
+		{
+			name:      "enable basic auth expiration detection fails",
+			args:      []string{"auths", "auth1", "--exp"},
+			p:         testProject_withAuths(testAuth_basic("auth1", "user", "pass")),
+			expectErr: `--exp is not a valid option for auth type "basic"`,
+		},
+		{
+			name:               "enable session auth expiration detection",
+			args:               []string{"auths", "auth1", "--exp"},
+			p:                  testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", disableExpiration, nil)),
+			expectP:            testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", enableExpiration, nil)),
+			expectStdoutOutput: "Set auth proof expiration detection to ON\n",
+		},
+		{
+			name:      "enable jwt auth expiration detection fails",
+			args:      []string{"auths", "auth1", "--exp"},
+			p:         testProject_withAuths(testAuth_jwt("auth1", "get-sess", "SESSID")),
+			expectErr: `--exp is not a valid option for auth type "jwt"`,
+		},
+		{
+			name:      "enable token auth expiration detection fails with auto-conf --exp flag",
+			args:      []string{"auths", "auth1", "--exp"},
+			p:         testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", disableExpiration)),
+			expectErr: `--exp is not a valid option for auth type "token"`,
+		},
 	}
 
 	for _, tc := range testCases {

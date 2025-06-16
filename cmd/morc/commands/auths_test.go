@@ -364,8 +364,20 @@ func Test_Auths_Edit(t *testing.T) {
 				CookieName:       "TOKEN_NAME",
 				CookieExpiration: true,
 			})),
-			expectStdoutOutput: "Set token scraper spec to cookie:TOKEN_NAME\n",
+			expectStdoutOutput: "Set token scraper spec to cookie TOKEN_NAME (with expiration)\n",
 		},
+		{
+			name: "set jwt auth token scraper to header",
+			args: []string{"auths", "auth1", "-t", "header:X-API-KEY"},
+			p:    testProject_withAuths(testAuth_jwt("auth1", "get-sess", "TOKEN")),
+			expectP: testProject_withAuths(testAuth_jwt_withTokenScraper("auth1", "get-sess", morc.Scraper{
+				Name: "TOKEN",
+				Type: morc.SpecHeader,
+				Key:  "X-API-KEY",
+			})),
+			expectStdoutOutput: "Set token scraper spec to header X-API-KEY[0]\n",
+		},
+		// TODO: set token auth token scraper
 		{
 			name:      "set basic auth dest fails",
 			args:      []string{"auths", "auth1", "-d", "header:X-API-KEY"},

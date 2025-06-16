@@ -241,6 +241,19 @@ func Test_Auths_Edit(t *testing.T) {
 			p:         testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", enableExpiration)),
 			expectErr: `--cookie/-c is not a valid option for auth type "token"`,
 		},
+		{
+			name:      "disable basic auth expiration detection fails",
+			args:      []string{"auths", "auth1", "--no-exp"},
+			p:         testProject_withAuths(testAuth_basic("auth1", "user", "pass")),
+			expectErr: `--no-exp is not a valid option for auth type "basic"`,
+		},
+		{
+			name:               "disable session auth expiration detection",
+			args:               []string{"auths", "auth1", "--no-exp"},
+			p:                  testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", enableExpiration, nil)),
+			expectP:            testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", disableExpiration, nil)),
+			expectStdoutOutput: "Set auth proof expiration detection to OFF\n",
+		},
 	}
 
 	for _, tc := range testCases {

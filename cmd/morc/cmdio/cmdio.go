@@ -154,7 +154,12 @@ func OutputLoudEditAttrsResult[K CAttrKey](io IO, modifiedVals map[K]interface{}
 				v = `""`
 			}
 
-			setMessages = append(setMessages, fmt.Sprintf("%s to %s", k.Human(), v))
+			// if it's a bool, do on or off
+			if b, ok := v.(bool); ok {
+				v = io.OnOrOff(b)
+			}
+
+			setMessages = append(setMessages, fmt.Sprintf("%s to %v", k.Human(), v))
 		}
 
 		io.PrintLoudf("%s\n", io.OxfordCommaJoin(setMessages, "and", false))

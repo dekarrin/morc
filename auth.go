@@ -767,9 +767,29 @@ func (a Auth) ExpirationScraper() Scraper {
 	panic(fmt.Sprintf("scraper for expiration var %q not found; should never happen", expVarName))
 }
 
+func (a *Auth) DisableExpirationDetection() error {
+	if a.Fetcher == nil {
+		return nil
+	}
+
+	err := a.RemoveExpirationScraper()
+	if err != nil {
+		return err
+	}
+
+	// if this is a session cookie auth, we need to update transforms
+	if a.Type == AuthTypeSession {
+		a.Fetcher.Value.Transform.FuncName = TransformerFuncIdentity
+		a.Fetcher.Expires.Transform.FuncName = ""
+	}
+
+	return nil
+}
+
 // RemoveExpirationScraper removes the expiration scraper from the Auth. Note
-// that this will still persist any formatting settings for expiration value
-// extraction.
+// that this will still persist any transforms and formatting settings for
+// expiration value extraction; to ensure that these are also removed, call
+// DisableExpirationDetection() instead.
 func (a *Auth) RemoveExpirationScraper() error {
 	if a.Type == AuthTypeNone {
 		return fmt.Errorf("cannot remove expiration scraper from auth with no type set")
@@ -789,9 +809,20 @@ func (a *Auth) RemoveExpirationScraper() error {
 	}
 
 	// find the scraper for the expiration var and exclude it in a copied list
+	// unless it also is the value var, in which case we simply ensure any
+	// expiration marking is removed.
+
 	newCaps := make([]Scraper, 0, len(a.Fetcher.Caps))
 	for _, sc := range a.Fetcher.Caps {
-		if sc.Name != expVarName {
+		if expVarName == a.Fetcher.Value.VarName {
+			// if the expiration var is the same as the value var, we don't
+			// remove it, but we do ensure that any possible expiration enabling
+			// markers are removed
+
+			sc.CookieExpiration = false
+
+			newCaps = append(newCaps, sc)
+		} else if sc.Name != expVarName {
 			newCaps = append(newCaps, sc)
 		}
 	}

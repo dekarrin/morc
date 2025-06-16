@@ -674,7 +674,7 @@ func invokeAuthsEdit(io cmdio.IO, projFile, authName string, attrs authAttrValue
 				}
 			} else {
 				// remove expiration scraper
-				if err := auth.RemoveExpirationScraper(); err != nil {
+				if err := auth.DisableExpirationDetection(); err != nil {
 					return fmt.Errorf("disable expiration detection: %w", err)
 				}
 			}

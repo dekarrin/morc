@@ -289,7 +289,7 @@ func (sc Scraper) Scrape(resp *http.Response, preReadBody []byte) (string, error
 	}
 }
 
-// New spec format:
+// Spec format:
 // [TYPE:]ARGS
 //
 // If TYPE: is omitted, and ARGS is not a shorthand name, the spec is assumed to
@@ -303,206 +303,40 @@ func (sc Scraper) Scrape(resp *http.Response, preReadBody []byte) (string, error
 // TRAILER:KEY
 // TRAILER:KEY[INDEX]
 // COOKIE:NAME
-// COOKIE:NAME:EXP
+// COOKIE:NAME,NO-EXP
 // :RAW
-//
-// - INCOMPAT UPDATE: we are altering offset to always require BYTES: prefix.
-// - INCOMPAT UPDATE: bare : is now header for shorthand name.
+func ParseVarScraperSpec(name, s string) (Scraper, error) {
+	specType, rest := stripSpecType(strings.TrimSpace(s))
 
-// If TYPE: is omitted, it is assumed to be a
-func ParseVarScraperSpec(name, spec string) (Scraper, error) {
-	// TODO: support for anything besides body-based scrapers
-	// okay, are we looking at a byte offset or a JSON traversal?
-	if strings.HasPrefix(spec, ":") {
-		// it is a byte offset of the form ":START,END"
-		offsets := strings.SplitN(spec[1:], ",", 2)
-		if len(offsets) != 2 {
-			return Scraper{}, fmt.Errorf("%q is not in :START,END format", spec)
-		}
+	rest = strings.TrimSpace(rest)
 
-		var start, end int
-		var err error
-
-		if len(offsets[0]) > 0 {
-			start, err = strconv.Atoi(offsets[0])
-			if err != nil {
-				return Scraper{}, fmt.Errorf("%q: start offset: %w", spec, err)
-			}
-
-			if start < 0 {
-				return Scraper{}, fmt.Errorf("%q: start offset cannot be negative", spec)
-			}
-		}
-
-		if len(offsets[1]) > 0 {
-			end, err = strconv.Atoi(offsets[1])
-			if err != nil {
-				return Scraper{}, fmt.Errorf("%q: end offset: %w", spec, err)
-			}
-		}
-
-		// only matters if end is greater than 0; 0 means "to the end", -1 means 1 from the end, etc.
-		if end <= start && end > 0 {
-			return Scraper{}, fmt.Errorf("end offset %d is less than or equal to start offset %d", end, start)
-		}
-
-		return Scraper{
-			Name:        name,
-			Type:        SpecBodyOffset,
-			OffsetStart: start,
-			OffsetEnd:   end,
-		}, nil
+	// if we don't have a type, might still be okay, just check for shorthand
+	if specType == SpecNone && strings.HasPrefix(s, ":") {
+		return specFromShorthand(name, rest)
 	}
 
-	// otherwise, . indicates a JSON traversal. Use . as the path separator, and
-	// [index] to for array indexes. Space chars and dots in keys are only
-	// allowed if key is quoted with double-quotes. Unquoted keys can contain
-	// any other character. Indexes must be integers. Quoted keys may contain a
-	// backslash to escape a quote or backslash.
-
-	// to make it easier, ensure that spec starts with a dot.
-	if strings.HasPrefix(spec, ".") {
-
-		steps := []TraversalStep{}
-		var currentStep TraversalStep
-
-		type mode int64
-
-		const (
-			none mode = iota
-			inKey
-			inQuotedKey
-			inIndex
-		)
-
-		var curMode mode
-
-		var curSymbol strings.Builder
-
-		specR := []rune(spec)
-		for i := 0; i < len(specR); i++ {
-			ch := specR[i]
-
-			switch curMode {
-			case none:
-				if ch == '.' {
-					// lookahead to see if in quote
-					if i+1 < len(specR) && specR[i+1] == '"' {
-						curMode = inQuotedKey
-						i++
-					} else {
-						curMode = inKey
-					}
-				} else if ch == '[' {
-					curMode = inIndex
-				} else {
-					return Scraper{}, fmt.Errorf("invalid character %q at position %d; should be either '.' to specify a key or '[' to specify an index", ch, i)
-				}
-			case inKey:
-				if ch == '.' || ch == '[' {
-					// at end of the key, add it to the steps, reset mode, and continue
-					// parsing at this index
-					symStr := curSymbol.String()
-					if symStr == "" {
-						return Scraper{}, fmt.Errorf("missing key at position %d", i)
-					}
-					currentStep.Key = symStr
-					steps = append(steps, currentStep)
-					currentStep = TraversalStep{}
-					curSymbol.Reset()
-					curMode = none
-					i--
-				} else if ch == '\\' {
-					// escape character; consume next character
-					i++
-					if i >= len(specR) {
-						return Scraper{}, fmt.Errorf("escape character at end of string")
-					}
-					curSymbol.WriteRune(specR[i])
-				} else if unicode.IsSpace(ch) {
-					return Scraper{}, fmt.Errorf("unescaped whitespace character in key at position %d; quote key name or escape whitespace with '\\'", i)
-				} else {
-					curSymbol.WriteRune(ch)
-				}
-			case inQuotedKey:
-				if ch == '"' {
-					// end of quoted key
-					symStr := curSymbol.String()
-					if symStr == "" {
-						return Scraper{}, fmt.Errorf("missing key at position %d", i)
-					}
-					currentStep.Key = symStr
-					steps = append(steps, currentStep)
-					currentStep = TraversalStep{}
-					curSymbol.Reset()
-					curMode = none
-				} else if ch == '\\' {
-					// escape character; consume next character
-					i++
-					if i >= len(specR) {
-						return Scraper{}, fmt.Errorf("escape character at end of string")
-					}
-					curSymbol.WriteRune(specR[i])
-				} else {
-					curSymbol.WriteRune(ch)
-				}
-			case inIndex:
-				if ch == ']' {
-					// end of index
-					symStr := curSymbol.String()
-					if symStr == "" {
-						return Scraper{}, fmt.Errorf("missing index at position %d", i)
-					}
-					index, err := strconv.Atoi(symStr)
-					if err != nil {
-						return Scraper{}, fmt.Errorf("invalid index %q: %w", symStr, err)
-					}
-					currentStep.Index = index
-					steps = append(steps, currentStep)
-					currentStep = TraversalStep{}
-					curSymbol.Reset()
-					curMode = none
-				} else {
-					curSymbol.WriteRune(ch)
-				}
-			default:
-				// should never happen
-				return Scraper{}, fmt.Errorf("invalid mode %d", curMode)
-			}
-		}
-
-		// we should be in mode none at the end, but it is valid to be in mode inKey
-		// as well
-		if curMode == inKey {
-			symStr := curSymbol.String()
-			if symStr == "" {
-				return Scraper{}, fmt.Errorf("missing key at end of string")
-			}
-			currentStep.Key = symStr
-			steps = append(steps, currentStep)
-		} else if curMode == inQuotedKey {
-			return Scraper{}, fmt.Errorf("unterminated quoted key at end of string")
-		} else if curMode == inIndex {
-			return Scraper{}, fmt.Errorf("unterminated index at end of string")
-		}
-
-		return Scraper{
-			Type:  SpecBodyJSON,
-			Name:  name,
-			Steps: steps,
-		}, nil
-	}
-
-	// else, check shorthand names for captures
-	switch strings.ToLower(spec) {
-	case "raw":
-		return Scraper{
-			Type: SpecBodyOffset,
-			Name: name,
-		}, nil
+	var vs, err = Scraper{}, error(nil)
+	switch specType {
+	case SpecBodyJSON:
+		vs, err = parseJSONScraperSpec(name, rest)
+	case SpecBodyOffset:
+		vs, err = parseOffsetScraperSpec(name, rest)
+	case SpecHeader:
+		vs, err = parseMarginalsScraperSpec(name, rest, true)
+	case SpecTrailer:
+		vs, err = parseMarginalsScraperSpec(name, rest, false)
+	case SpecCookie:
+		vs, err = parseCookieScraperSpec(name, rest)
+	case SpecNone:
+		err = fmt.Errorf("spec type not specified")
 	default:
-		return Scraper{}, fmt.Errorf("invalid var scraper spec %q", spec)
+		err = fmt.Errorf("unknown spec type %q", specType)
 	}
+
+	if err != nil {
+		return Scraper{}, fmt.Errorf("%q: %w", s, err)
+	}
+	return vs, nil
 }
 
 func ParseVarName(name string) (string, error) {
@@ -537,4 +371,276 @@ func ParseVarScraper(s string) (Scraper, error) {
 	spec := parts[1]
 
 	return ParseVarScraperSpec(name, spec)
+}
+
+func parseMarginalsScraperSpec(name, spec string, header bool) (Scraper, error) {
+	// it is a header/trailer key, optionally with an index
+	// KEY[INDEX]
+	key := spec
+	var index int
+
+	marginal := SpecHeader
+	if !header {
+		marginal = SpecTrailer
+	}
+
+	// split on any [
+	parts := strings.SplitN(spec, "[", 2)
+	if len(parts) == 2 {
+		key = strings.TrimSpace(parts[0])
+
+		unparsedIndex := strings.TrimSpace(parts[1])
+		if !strings.HasSuffix(unparsedIndex, "]") {
+			return Scraper{}, fmt.Errorf("missing closing ] for index")
+		}
+		unparsedIndex = unparsedIndex[:len(unparsedIndex)-1]
+		if unparsedIndex == "" {
+			return Scraper{}, fmt.Errorf("missing index")
+		}
+		var err error
+		index, err = strconv.Atoi(unparsedIndex)
+		if err != nil {
+			return Scraper{}, fmt.Errorf("invalid index: %w", err)
+		}
+	}
+
+	if key == "" {
+		return Scraper{}, fmt.Errorf("%v key is empty", marginal)
+	}
+
+	return Scraper{
+		Name:  name,
+		Type:  marginal,
+		Key:   key,
+		Index: index,
+	}, nil
+}
+
+func parseCookieScraperSpec(name, spec string) (Scraper, error) {
+	// it is a cookie name, optionally with :NO-EXP to indicate that expiration
+	// should not be included
+	parts := strings.SplitN(spec, ",", 2)
+	cookieName := strings.TrimSpace(parts[0])
+	if cookieName == "" {
+		return Scraper{}, fmt.Errorf("cookie name is empty")
+	}
+	cookieExpiration := true
+	if len(parts) == 2 {
+		if strings.EqualFold(strings.TrimSpace(parts[1]), "NO-EXP") {
+			cookieExpiration = false
+		} else {
+			return Scraper{}, fmt.Errorf("invalid cookie expiration spec %q", parts[1])
+		}
+	}
+	return Scraper{
+		Name:             name,
+		Type:             SpecCookie,
+		CookieName:       cookieName,
+		CookieExpiration: cookieExpiration,
+	}, nil
+}
+
+func parseOffsetScraperSpec(name, spec string) (Scraper, error) {
+	// it is a byte offset of the form "START,END"
+	offsets := strings.SplitN(spec, ",", 2)
+	if len(offsets) != 2 {
+		return Scraper{}, fmt.Errorf("not in START,END format")
+	}
+
+	var start, end int
+	var err error
+
+	if len(offsets[0]) > 0 {
+		start, err = strconv.Atoi(offsets[0])
+		if err != nil {
+			return Scraper{}, fmt.Errorf("start offset: %w", err)
+		}
+
+		if start < 0 {
+			return Scraper{}, fmt.Errorf("start offset cannot be negative")
+		}
+	}
+
+	if len(offsets[1]) > 0 {
+		end, err = strconv.Atoi(offsets[1])
+		if err != nil {
+			return Scraper{}, fmt.Errorf("end offset: %w", err)
+		}
+	}
+
+	// only matters if end is greater than 0; 0 means "to the end", -1 means 1 from the end, etc.
+	if end <= start && end > 0 {
+		return Scraper{}, fmt.Errorf("end offset %d is less than or equal to start offset %d", end, start)
+	}
+
+	return Scraper{
+		Name:        name,
+		Type:        SpecBodyOffset,
+		OffsetStart: start,
+		OffsetEnd:   end,
+	}, nil
+}
+
+func parseJSONScraperSpec(name, spec string) (Scraper, error) {
+	steps := []TraversalStep{}
+	var currentStep TraversalStep
+
+	type mode int64
+
+	const (
+		none mode = iota
+		inKey
+		inQuotedKey
+		inIndex
+	)
+
+	var curMode mode
+
+	var curSymbol strings.Builder
+
+	specR := []rune(spec)
+	for i := 0; i < len(specR); i++ {
+		ch := specR[i]
+
+		switch curMode {
+		case none:
+			if ch == '.' {
+				// lookahead to see if in quote
+				if i+1 < len(specR) && specR[i+1] == '"' {
+					curMode = inQuotedKey
+					i++
+				} else {
+					curMode = inKey
+				}
+			} else if ch == '[' {
+				curMode = inIndex
+			} else {
+				return Scraper{}, fmt.Errorf("invalid character %q at position %d; should be either '.' to specify a key or '[' to specify an index", ch, i)
+			}
+		case inKey:
+			if ch == '.' || ch == '[' {
+				// at end of the key, add it to the steps, reset mode, and continue
+				// parsing at this index
+				symStr := curSymbol.String()
+				if symStr == "" {
+					return Scraper{}, fmt.Errorf("missing key at position %d", i)
+				}
+				currentStep.Key = symStr
+				steps = append(steps, currentStep)
+				currentStep = TraversalStep{}
+				curSymbol.Reset()
+				curMode = none
+				i--
+			} else if ch == '\\' {
+				// escape character; consume next character
+				i++
+				if i >= len(specR) {
+					return Scraper{}, fmt.Errorf("escape character at end of string")
+				}
+				curSymbol.WriteRune(specR[i])
+			} else if unicode.IsSpace(ch) {
+				return Scraper{}, fmt.Errorf("unescaped whitespace character in key at position %d; quote key name or escape whitespace with '\\'", i)
+			} else {
+				curSymbol.WriteRune(ch)
+			}
+		case inQuotedKey:
+			if ch == '"' {
+				// end of quoted key
+				symStr := curSymbol.String()
+				if symStr == "" {
+					return Scraper{}, fmt.Errorf("missing key at position %d", i)
+				}
+				currentStep.Key = symStr
+				steps = append(steps, currentStep)
+				currentStep = TraversalStep{}
+				curSymbol.Reset()
+				curMode = none
+			} else if ch == '\\' {
+				// escape character; consume next character
+				i++
+				if i >= len(specR) {
+					return Scraper{}, fmt.Errorf("escape character at end of string")
+				}
+				curSymbol.WriteRune(specR[i])
+			} else {
+				curSymbol.WriteRune(ch)
+			}
+		case inIndex:
+			if ch == ']' {
+				// end of index
+				symStr := curSymbol.String()
+				if symStr == "" {
+					return Scraper{}, fmt.Errorf("missing index at position %d", i)
+				}
+				index, err := strconv.Atoi(symStr)
+				if err != nil {
+					return Scraper{}, fmt.Errorf("invalid index %q: %w", symStr, err)
+				}
+				currentStep.Index = index
+				steps = append(steps, currentStep)
+				currentStep = TraversalStep{}
+				curSymbol.Reset()
+				curMode = none
+			} else {
+				curSymbol.WriteRune(ch)
+			}
+		default:
+			// should never happen
+			return Scraper{}, fmt.Errorf("invalid mode %d", curMode)
+		}
+	}
+
+	// we should be in mode none at the end, but it is valid to be in mode inKey
+	// as well
+	if curMode == inKey {
+		symStr := curSymbol.String()
+		if symStr == "" {
+			return Scraper{}, fmt.Errorf("missing key at end of string")
+		}
+		currentStep.Key = symStr
+		steps = append(steps, currentStep)
+	} else if curMode == inQuotedKey {
+		return Scraper{}, fmt.Errorf("unterminated quoted key at end of string")
+	} else if curMode == inIndex {
+		return Scraper{}, fmt.Errorf("unterminated index at end of string")
+	}
+
+	return Scraper{
+		Type:  SpecBodyJSON,
+		Name:  name,
+		Steps: steps,
+	}, nil
+}
+
+func specFromShorthand(name, s string) (Scraper, error) {
+	switch strings.ToLower(s) {
+	case "raw":
+		return Scraper{
+			Type: SpecBodyOffset,
+			Name: name,
+		}, nil
+	default:
+		return Scraper{}, fmt.Errorf("invalid var scraper spec %q", s)
+	}
+}
+
+func stripSpecType(s string) (st SpecType, rest string) {
+	sUpper := strings.ToUpper(s)
+	if sUpper == "" {
+		return SpecNone, ""
+	} else if strings.HasPrefix(sUpper, ":") {
+		return SpecNone, s[len(":"):]
+	} else if strings.HasPrefix(sUpper, "JSON:") {
+		return SpecBodyJSON, s[len("JSON:"):]
+	} else if strings.HasPrefix(sUpper, "BYTES:") {
+		return SpecBodyOffset, s[len("BYTES:"):]
+	} else if strings.HasPrefix(sUpper, "HEADER:") {
+		return SpecHeader, s[len("HEADER:"):]
+	} else if strings.HasPrefix(sUpper, "TRAILER:") {
+		return SpecTrailer, s[len("TRAILER:"):]
+	} else if strings.HasPrefix(sUpper, "COOKIE:") {
+		return SpecCookie, s[len("COOKIE:"):]
+	} else {
+		return SpecBodyJSON, s
+	}
 }

@@ -968,6 +968,209 @@ func Test_Auths_List(t *testing.T) {
 	}
 }
 
+// TODO: AI-generated below, make sure it works
+func Test_Auths_New(t *testing.T) {
+	testCases := []struct {
+		name               string
+		args               []string // DO NOT INCLUDE -F; it is automatically set to a project file
+		p                  morc.Project
+		expectP            morc.Project
+		expectErr          string // set if command.Execute expected to fail, with a string that would be in the error message
+		expectStderrOutput string // set with expected output to stderr
+		expectStdoutOutput string // set with expected output to stdout
+	}{
+		{
+			name:      "new needs value",
+			args:      []string{"auths", "-N"},
+			p:         morc.Project{},
+			expectErr: "flag needs an argument: 'N'",
+		},
+		{
+			name: "create new basic auth - typeless",
+			args: []string{"auths", "-N", "auth1"},
+			p:    morc.Project{},
+			expectP: morc.Project{
+				Auths: map[string]morc.Auth{
+					"auth1": {Name: "auth1"},
+				},
+			},
+			expectStdoutOutput: "Created new auth method auth1\n",
+		},
+		{
+			name: "create new basic auth - with username and password",
+			args: []string{"auths", "-N", "auth1", "-T", "basic", "-u", "testuser", "-p", "testpass"},
+			p:    morc.Project{},
+			expectP: morc.Project{
+				Auths: map[string]morc.Auth{
+					"auth1": testAuth_basic("auth1", "testuser", "testpass"),
+				},
+			},
+			expectStdoutOutput: "Created new auth method auth1\n",
+		},
+		// TODO: creation of new should mirror swapping to that type.
+		// make modifications on the edit side not the create side.
+		{
+			name: "create new session auth",
+			args: []string{"auths", "-N", "auth1", "-T", "session"},
+			p:    morc.Project{},
+			expectP: morc.Project{
+				Auths: map[string]morc.Auth{
+					"auth1": {Name: "auth1", Type: morc.AuthTypeSession},
+				},
+			},
+			expectStdoutOutput: "Created new auth method auth1\n",
+		},
+		{
+			name: "create new session auth with cookie",
+			args: []string{"auths", "-N", "auth1", "-T", "session", "-c", "SESSID"},
+			p:    morc.Project{},
+			expectP: morc.Project{
+				Auths: map[string]morc.Auth{
+					"auth1": {
+						Name:    "auth1",
+						Type:    morc.AuthTypeSession,
+						Fetcher: morc.NewSessionCookieFetcher(morc.RequestSequence{}, "SESSID", false),
+					},
+				},
+			},
+			expectStdoutOutput: "Created new session auth method auth1\n",
+		},
+		{
+			name: "create new jwt auth",
+			args: []string{"auths", "-N", "auth1", "-T", "jwt"},
+			p:    morc.Project{},
+			expectP: morc.Project{
+				Auths: map[string]morc.Auth{
+					"auth1": {Name: "auth1", Type: morc.AuthTypeJWT},
+				},
+			},
+			expectStdoutOutput: "Created new jwt auth method auth1\n",
+		},
+		{
+			name: "create new token auth",
+			args: []string{"auths", "-N", "auth1", "-T", "token"},
+			p:    morc.Project{},
+			expectP: morc.Project{
+				Auths: map[string]morc.Auth{
+					"auth1": {Name: "auth1", Type: morc.AuthTypeToken},
+				},
+			},
+			expectStdoutOutput: "Created new token auth method auth1\n",
+		},
+		{
+			name:      "create new auth - already exists",
+			args:      []string{"auths", "-N", "auth1"},
+			p:         testProject_singleAuth(),
+			expectErr: "an auth method named auth1 already exists in project",
+		},
+		{
+			name: "create new basic auth - quiet mode",
+			args: []string{"auths", "-N", "auth1", "-q"},
+			p:    morc.Project{},
+			expectP: morc.Project{
+				Auths: map[string]morc.Auth{
+					"auth1": {Name: "auth1", Type: morc.AuthTypeHTTPBasic},
+				},
+			},
+			expectStdoutOutput: "",
+		},
+		{
+			name:      "create new auth with invalid type",
+			args:      []string{"auths", "-N", "auth1", "-T", "invalid"},
+			p:         morc.Project{},
+			expectErr: `invalid auth type "invalid"`,
+		},
+		{
+			name:      "create new session auth with username fails",
+			args:      []string{"auths", "-N", "auth1", "-T", "session", "-u", "testuser"},
+			p:         morc.Project{},
+			expectErr: "--username/-u is not a valid option for auth type \"session\"",
+		},
+		{
+			name:      "create new jwt auth with password fails",
+			args:      []string{"auths", "-N", "auth1", "-T", "jwt", "-p", "testpass"},
+			p:         morc.Project{},
+			expectErr: "--password/-p is not a valid option for auth type \"jwt\"",
+		},
+		{
+			name:      "create new basic auth with cookie fails",
+			args:      []string{"auths", "-N", "auth1", "-c", "SESSID"},
+			p:         morc.Project{},
+			expectErr: `--cookie/-c is not a valid option for auth type "basic"`,
+		},
+		{
+			name: "create new token auth with retrieval sequence",
+			args: []string{"auths", "-N", "auth1", "-T", "token", "-r", "R:get-token"},
+			p:    morc.Project{},
+			expectP: morc.Project{
+				Auths: map[string]morc.Auth{
+					"auth1": {
+						Name: "auth1",
+						Type: morc.AuthTypeToken,
+						Fetcher: morc.NewTokenFetcher(
+							morc.RequestSequence{Name: "get-token"},
+							morc.Scraper{
+								Type: morc.SpecBodyJSON,
+								Steps: []morc.TraversalStep{
+									{Key: "access_token"},
+								},
+							},
+							morc.ProofDestination{},
+							nil,
+							"",
+						),
+					},
+				},
+			},
+			expectStdoutOutput: "Created new token auth method auth1\n",
+		},
+		{
+			name: "create new auth in project with existing auths",
+			args: []string{"auths", "-N", "auth2"},
+			p:    testProject_singleAuth(),
+			expectP: morc.Project{
+				Auths: map[string]morc.Auth{
+					"auth1": testAuth_basic("auth1", "user", "pass"),
+					"auth2": {Name: "auth2", Type: morc.AuthTypeHTTPBasic},
+				},
+			},
+			expectStdoutOutput: "Created new basic auth method auth2\n",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := NewAssertionsForInMemoryProject(t, tc.p, &fileRWs)
+			resetAuthsFlags()
+
+			// set up the root command and run
+			output, outputErr, err := runTestCommand(authsCmd, assert.ProjFilePath, tc.args)
+
+			// assert and check stdout and stderr
+			if err != nil {
+				if tc.expectErr == "" {
+					t.Fatalf("unexpected returned error: %v", err)
+					return
+				}
+				if !strings.Contains(err.Error(), tc.expectErr) {
+					t.Fatalf("expected returned error to contain %q, got %q", tc.expectErr, err)
+				}
+				return
+			} else if tc.expectErr != "" {
+				t.Fatalf("expected error containing %q, but got none", tc.expectErr)
+				return
+			}
+
+			// assertions
+
+			assert.Equal(tc.expectStdoutOutput, output, "stdout output mismatch")
+			assert.Equal(tc.expectStderrOutput, outputErr, "stderr output mismatch")
+
+			assert.ProjectFilesInBuffersMatch(tc.expectP)
+		})
+	}
+}
+
 func resetAuthsFlags() {
 	flags.ProjectFile = ""
 	flags.New = ""

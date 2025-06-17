@@ -674,6 +674,50 @@ func testAuth_token(name, seqName, tokenVar string, expDetect expDetect, proof .
 }
 
 // TODO: testAuth_session should use the variadic proof
+func testAuth_token_withExpLayout(name, seqName, tokenVar string, expDetect expDetect, expLayout string, proof ...morc.AuthProof) morc.Auth {
+	var p morc.AuthProof
+	if len(proof) > 0 {
+		p = proof[0]
+	}
+
+	var expScraper *morc.Scraper
+	if expDetect == enableExpiration {
+		expScraper = &morc.Scraper{
+			Type: morc.SpecBodyJSON,
+			Steps: []morc.TraversalStep{
+				{Key: "expiration"},
+			},
+		}
+	}
+
+	return morc.Auth{
+		Name:  name,
+		Type:  morc.AuthTypeToken,
+		Proof: p,
+		Fetcher: morc.NewTokenFetcher(
+			morc.RequestSequence{
+				Name:   seqName,
+				IsFlow: false,
+			},
+			morc.Scraper{
+				Name: tokenVar,
+				Type: morc.SpecBodyJSON,
+				Steps: []morc.TraversalStep{
+					{Key: "access_token"},
+				},
+			},
+			morc.ProofDestination{
+				Location: morc.ProofLocationHeader,
+				Key:      "Authorization",
+				Format:   "bearer",
+			},
+			expScraper,
+			expLayout,
+		),
+	}
+}
+
+// TODO: testAuth_session should use the variadic proof
 func testAuth_token_withExpScraper(name, seqName, tokenVar string, expScraper morc.Scraper, proof ...morc.AuthProof) morc.Auth {
 	var p morc.AuthProof
 	if len(proof) > 0 {

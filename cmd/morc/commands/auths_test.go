@@ -463,7 +463,45 @@ func Test_Auths_Edit(t *testing.T) {
 			expectP:            testProject_withAuths(testAuth_token_withExpScraper("auth1", "get-sess", "SESSID", morc.Scraper{Type: morc.SpecBodyJSON, Steps: []morc.TraversalStep{{Key: "expires"}, {Key: "time"}}})),
 			expectStdoutOutput: "Set auth proof expiration scraper to .expires.time\n",
 		},
-		// TODO: new funcs for each of the kinds of scrapers
+		{
+			name:      "set basic auth expiration layout fails",
+			args:      []string{"auths", "auth1", "-L", "RFC3339"},
+			p:         testProject_withAuths(testAuth_basic("auth1", "user", "pass")),
+			expectErr: `--exp-layout/-L is not a valid option for auth type "basic"`,
+		},
+		{
+			name:      "set session auth expiration layout fails",
+			args:      []string{"auths", "auth1", "-L", "RFC3339"},
+			p:         testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", enableExpiration, nil)),
+			expectErr: `--exp-layout/-L is not a valid option for auth type "session"`,
+		},
+		{
+			name:      "set jwt auth expiration layout fails",
+			args:      []string{"auths", "auth1", "-L", "RFC3339"},
+			p:         testProject_withAuths(testAuth_jwt("auth1", "get-sess", "SESSID")),
+			expectErr: `--exp-layout/-L is not a valid option for auth type "jwt"`,
+		},
+		{
+			name:               "set token auth expiration layout",
+			args:               []string{"auths", "auth1", "-L", "RFC3339"},
+			p:                  testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", enableExpiration)),
+			expectP:            testProject_withAuths(testAuth_token_withExpLayout("auth1", "get-sess", "SESSID", enableExpiration, time.RFC3339)),
+			expectStdoutOutput: "Set auth proof expiration layout to " + time.RFC3339 + "\n",
+		},
+		{
+			name:               "set token auth expiration layout - no change",
+			args:               []string{"auths", "auth1", "-L", "RFC1123"},
+			p:                  testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", enableExpiration)),
+			expectP:            testProject_withAuths(testAuth_token_withExpLayout("auth1", "get-sess", "SESSID", enableExpiration, time.RFC1123)),
+			expectStderrOutput: "No change to auth proof expiration layout; already set to " + time.RFC1123 + "\n",
+		},
+		{
+			name:               "set token auth expiration layout - no expiration detection",
+			args:               []string{"auths", "auth1", "-L", "RFC3339"},
+			p:                  testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", disableExpiration)),
+			expectP:            testProject_withAuths(testAuth_token_withExpLayout("auth1", "get-sess", "SESSID", disableExpiration, time.RFC3339)),
+			expectStdoutOutput: "Set auth proof expiration layout to " + time.RFC3339 + "\n",
+		},
 	}
 
 	for _, tc := range testCases {

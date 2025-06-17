@@ -77,7 +77,7 @@ func init() {
 	authsCmd.PersistentFlags().StringVarP(&flags.TokenScraper, "token-scraper", "t", "", "Set the scraper to use to extract the token from the last response of auth proof retrieval. Only valid when --type is 'jwt' or 'token'.")
 	authsCmd.PersistentFlags().StringVarP(&flags.Dest, "dest", "d", "", "Set where the token should be used in the authenticated request. `LOCATION` must be either 'header:NAME-OF-HEADER' or 'cookie:NAME-OF-COOKIE'. Only valid when --type is 'token'.")
 	authsCmd.PersistentFlags().StringVarP(&flags.Format, "format", "", "", "Set the format of the token proof in the authenticated to `FORMAT`. If not set, the token's exact value is used. If set to `bearer`, it's value will be preceded by the word 'Bearer'. Only valid when --type is 'token'.")
-	authsCmd.PersistentFlags().StringVarP(&flags.ExpirationScraper, "exp-scraper", "x", "", "Set the scraper to use to extract the expiration time of the token from the last response of auth proof retrieval. Only valid when --type is 'token'.")
+	authsCmd.PersistentFlags().StringVarP(&flags.ExpirationScraper, "exp-scraper", "e", "", "Set the scraper to use to extract the expiration time of the token from the last response of auth proof retrieval. Only valid when --type is 'token'.")
 	authsCmd.PersistentFlags().StringVarP(&flags.ExpirationLayout, "exp-layout", "L", "RFC3339", "Set the layout of the expiration time of the token to `LAYOUT`. This can either be a custom string that is Go time layout format, or one of the following constants: 'RFC822', 'RFC822Z', 'RFC850', 'RFC1123', 'RFC1123Z', 'RFC3339', or 'RFC3339Nano'. Only valid when --type is 'token'.")
 	authsCmd.PersistentFlags().BoolVarP(&flags.BUnmask, "unmask", "", false, "Show passwords and other secrets in output. Only valid when getting or editing properties of an auth method.")
 	authsCmd.PersistentFlags().BoolVarP(&flags.BQuiet, "quiet", "q", false, "Suppress all unnecessary output.")
@@ -871,7 +871,7 @@ func validateAttrCombos(attrs authAttrValues, existing *morc.Auth) error {
 		} else if setType == morc.AuthTypeJWT {
 			extraTip = "; expiration is automatically extracted from JWT if present"
 		}
-		errs = append(errs, fmt.Errorf("--exp-scraper/-x is not a valid option for auth type %q%s", setType, extraTip))
+		errs = append(errs, fmt.Errorf("--exp-scraper/-e is not a valid option for auth type %q%s", setType, extraTip))
 	}
 	if attrs.expirationLayout.set && setType != morc.AuthTypeToken {
 		extraTip := ""
@@ -1143,7 +1143,7 @@ func parseAuthsSetFlags(cmd *cobra.Command, attrs *authAttrValues) error {
 	if f.Changed("exp-scraper") {
 		scraper, err := morc.ParseVarScraperSpec("expiration", flags.ExpirationScraper)
 		if err != nil {
-			return fmt.Errorf("--exp-scraper/-x: %w", err)
+			return fmt.Errorf("--exp-scraper/-e: %w", err)
 		}
 		attrs.expirationSpec = optional[morc.Scraper]{set: true, v: scraper}
 	}

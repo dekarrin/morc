@@ -438,6 +438,32 @@ func Test_Auths_Edit(t *testing.T) {
 			expectP:            testProject_withAuths(testAuth_token_withDest("auth1", "get-sess", "SESSID", enableExpiration, morc.ProofDestination{Location: morc.ProofLocationHeader, Key: "Authorization"})),
 			expectStdoutOutput: "Set auth proof value format to none\n",
 		},
+		{
+			name:      "set basic auth expiration scraper fails",
+			args:      []string{"auths", "auth1", "--exp-scraper", ".expires"},
+			p:         testProject_withAuths(testAuth_basic("auth1", "user", "pass")),
+			expectErr: `--exp-scraper/-e is not a valid option for auth type "basic"`,
+		},
+		{
+			name:      "set session auth expiration scraper fails",
+			args:      []string{"auths", "auth1", "--exp-scraper", ".expires"},
+			p:         testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", enableExpiration, nil)),
+			expectErr: `--exp-scraper/-e is not a valid option for auth type "session"`,
+		},
+		{
+			name:      "set jwt auth expiration scraper fails",
+			args:      []string{"auths", "auth1", "--exp-scraper", ".expires"},
+			p:         testProject_withAuths(testAuth_jwt("auth1", "get-sess", "SESSID")),
+			expectErr: `--exp-scraper/-e is not a valid option for auth type "jwt"`,
+		},
+		{
+			name:               "set token auth expiration scraper",
+			args:               []string{"auths", "auth1", "--exp-scraper", ".expires.time"},
+			p:                  testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", enableExpiration)),
+			expectP:            testProject_withAuths(testAuth_token_withExpScraper("auth1", "get-sess", "SESSID", morc.Scraper{Type: morc.SpecBodyJSON, Steps: []morc.TraversalStep{{Key: "expires"}, {Key: "time"}}})),
+			expectStdoutOutput: "Set auth proof expiration scraper to .expires.time\n",
+		},
+		// TODO: new funcs for each of the kinds of scrapers
 	}
 
 	for _, tc := range testCases {

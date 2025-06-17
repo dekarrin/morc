@@ -158,6 +158,47 @@ func Test_Auths_Edit(t *testing.T) {
 			expectP:            testProject_withAuths(testAuth_token("auth2", "get-sess", "SESSID", enableExpiration)),
 			expectStdoutOutput: "Set auth method name to auth2\n",
 		},
+		{
+			name:               "set basic auth type to session",
+			args:               []string{"auths", "auth1", "-T", "session"},
+			p:                  testProject_withAuths(testAuth_basic("auth1", "user", "pass")),
+			expectP:            testProject_withAuths(morc.Auth{Name: "auth1", Type: morc.AuthTypeSession}),
+			expectStdoutOutput: "Set auth method type to session\n",
+		},
+		{
+			name:               "set basic auth type to session, and set cookie",
+			args:               []string{"auths", "auth1", "-T", "session", "-c", "LOGIN_SESSION"},
+			p:                  testProject_withAuths(testAuth_basic("auth1", "user", "pass")),
+			expectP:            testProject_withAuths(morc.Auth{Name: "auth1", Type: morc.AuthTypeSession, Fetcher: morc.NewSessionCookieFetcher(morc.RequestSequence{}, "LOGIN_SESSION", false)}),
+			expectStdoutOutput: "Set auth method type to session and session cookie to LOGIN_SESSION\n",
+		},
+		{
+			name:      "set basic auth type to session, and set username fails",
+			args:      []string{"auths", "auth1", "-T", "session", "-u", "ectoBiologist"},
+			p:         testProject_withAuths(testAuth_basic("auth1", "user", "pass")),
+			expectErr: "--username/-u is not a valid option for auth type \"session\"",
+		},
+		{
+			name:               "set basic auth type to jwt",
+			args:               []string{"auths", "auth1", "-T", "jwt"},
+			p:                  testProject_withAuths(testAuth_basic("auth1", "user", "pass")),
+			expectP:            testProject_withAuths(morc.Auth{Name: "auth1", Type: morc.AuthTypeJWT}),
+			expectStdoutOutput: "Set auth method type to jwt\n",
+		},
+		{
+			name:               "set basic auth type to token",
+			args:               []string{"auths", "auth1", "-T", "token"},
+			p:                  testProject_withAuths(testAuth_basic("auth1", "user", "pass")),
+			expectP:            testProject_withAuths(morc.Auth{Name: "auth1", Type: morc.AuthTypeToken}),
+			expectStdoutOutput: "Set auth method type to token\n",
+		},
+		{
+			name:               "set token auth type to basic",
+			args:               []string{"auths", "auth1", "-T", "basic"},
+			p:                  testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", enableExpiration)),
+			expectP:            testProject_withAuths(morc.Auth{Name: "auth1", Type: morc.AuthTypeHTTPBasic}),
+			expectStdoutOutput: "Set auth method type to basic\n",
+		},
 		// TODO: add tests for setting auth types.
 		{
 			name:               "set basic auth username",

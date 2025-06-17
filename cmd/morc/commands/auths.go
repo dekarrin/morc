@@ -67,7 +67,7 @@ func init() {
 	authsCmd.PersistentFlags().StringVarP(&flags.Get, "get", "G", "", "Get the value of the given attribute `ATTR` from the auth method. ATTR must be one of: "+strings.Join(authAttrKeyNames(), ", "))
 	authsCmd.PersistentFlags().StringVarP(&flags.Clear, "clear", "C", "", "Clear any currently saved auth proof. Only applicable to auth types that use dynamically-retrieved proofs, such a cookie or a token.")
 	authsCmd.PersistentFlags().StringVarP(&flags.Name, "name", "n", "", "Change the name of an auth method to `NAME`.")
-	authsCmd.PersistentFlags().StringVarP(&flags.Type, "type", "T", "", "Set the type of auth method to `TYPE`. TYPE must be one of 'basic', 'session', 'jwt', or 'token'; the choice determined what other options are available.")
+	authsCmd.PersistentFlags().StringVarP(&flags.Type, "type", "T", "", "Set the type of auth method to `TYPE`. TYPE must be one of 'basic', 'session', 'jwt', or 'token'; the choice determines what other options are available.")
 	authsCmd.PersistentFlags().StringVarP(&flags.Username, "username", "u", "", "Set the `USERNAME` for use with HTTP basic auth. Only valid when --type is 'basic'.")
 	authsCmd.PersistentFlags().StringVarP(&flags.Password, "password", "p", "", "Set the `PASSWORD` for use with HTTP basic auth. Only valid when --type is 'basic'.")
 	authsCmd.PersistentFlags().StringVarP(&flags.Retrieval, "retrieval", "r", "", "Set the flow or request template to use to retrieve proof of authentication. This is a string of the form F:NAME for a flow or R:NAME for a request template; if no prefix is given, it is assumed to be a flow name. Only valid when --type is 'session', 'jwt', or 'token'.")
@@ -531,8 +531,6 @@ func invokeAuthsEdit(io cmdio.IO, projFile, authName string, attrs authAttrValue
 			// this invalidates all fields besides the name
 			auth.Proof = nil
 			auth.Fetcher = nil // other sets will automagically refill this
-
-			// TODO: carry over anything we can
 
 			modifiedVals[authKeyType] = attrs.authType.v
 		} else {

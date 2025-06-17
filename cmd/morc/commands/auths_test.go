@@ -413,6 +413,31 @@ func Test_Auths_Edit(t *testing.T) {
 			expectP:            testProject_withAuths(testAuth_token_withDest("auth1", "get-sess", "SESSID", enableExpiration, morc.ProofDestination{Location: morc.ProofLocationHeader, Key: "X-API-KEY", Format: morc.ProofFormatTypeBearer})),
 			expectStdoutOutput: "Set auth proof destination to header:X-API-KEY\n",
 		},
+		{
+			name:      "set basic auth format fails",
+			args:      []string{"auths", "auth1", "--format", "bearer"},
+			p:         testProject_withAuths(testAuth_basic("auth1", "user", "pass")),
+			expectErr: `--format is not a valid option for auth type "basic"`,
+		},
+		{
+			name:      "set session auth format fails",
+			args:      []string{"auths", "auth1", "--format", "bearer"},
+			p:         testProject_withAuths(testAuth_session("auth1", seqFlow, "get-sess", "SESSID", enableExpiration, nil)),
+			expectErr: `--format is not a valid option for auth type "session"`,
+		},
+		{
+			name:      "set jwt auth format fails",
+			args:      []string{"auths", "auth1", "--format", "bearer"},
+			p:         testProject_withAuths(testAuth_jwt("auth1", "get-sess", "SESSID")),
+			expectErr: `--format is not a valid option for auth type "jwt"`,
+		},
+		{
+			name:               "set token auth format",
+			args:               []string{"auths", "auth1", "--format", "none"},
+			p:                  testProject_withAuths(testAuth_token("auth1", "get-sess", "SESSID", enableExpiration)),
+			expectP:            testProject_withAuths(testAuth_token_withDest("auth1", "get-sess", "SESSID", enableExpiration, morc.ProofDestination{Location: morc.ProofLocationHeader, Key: "Authorization"})),
+			expectStdoutOutput: "Set auth proof value format to none\n",
+		},
 	}
 
 	for _, tc := range testCases {

@@ -110,19 +110,22 @@ const (
 )
 
 func (pf ProofFormat) String() string {
+	if pf == ProofFormatTypeNone {
+		return "none"
+	}
 	return string(pf)
 }
 
 func ParseProofFormat(s string) (ProofFormat, error) {
 	switch strings.ToLower(s) {
-	case "":
+	case "", "none":
 		return ProofFormatTypeNone, nil
 	case "bearer":
 		return ProofFormatTypeBearer, nil
 	case "basic":
 		return ProofFormatTypeBasic, nil
 	default:
-		return "", fmt.Errorf("unknown proof format %q", s)
+		return "", fmt.Errorf("unknown proof format %q; should be 'none', 'bearer', or 'basic'", s)
 	}
 }
 

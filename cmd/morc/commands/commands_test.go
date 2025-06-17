@@ -664,6 +664,17 @@ func testAuth_jwt_withTokenScraper(name, seqName string, tokenScraper morc.Scrap
 
 // TODO: testAuth_session should use the variadic proof
 func testAuth_token(name, seqName, tokenVar string, expDetect expDetect, proof ...morc.AuthProof) morc.Auth {
+	return testAuth_token_withTokenScraper(name, seqName, morc.Scraper{
+		Name: tokenVar,
+		Type: morc.SpecBodyJSON,
+		Steps: []morc.TraversalStep{
+			{Key: "access_token"},
+		},
+	}, expDetect, proof...)
+}
+
+// TODO: testAuth_session should use the variadic proof
+func testAuth_token_withTokenScraper(name, seqName string, tokenScraper morc.Scraper, expDetect expDetect, proof ...morc.AuthProof) morc.Auth {
 	var p morc.AuthProof
 	if len(proof) > 0 {
 		p = proof[0]
@@ -688,13 +699,7 @@ func testAuth_token(name, seqName, tokenVar string, expDetect expDetect, proof .
 				Name:   seqName,
 				IsFlow: false,
 			},
-			morc.Scraper{
-				Name: tokenVar,
-				Type: morc.SpecBodyJSON,
-				Steps: []morc.TraversalStep{
-					{Key: "access_token"},
-				},
-			},
+			tokenScraper,
 			morc.ProofDestination{
 				Location: morc.ProofLocationHeader,
 				Key:      "Authorization",

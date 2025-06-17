@@ -726,16 +726,22 @@ func (a *Auth) SetValueScraper(scraper Scraper) error {
 		panic("value var name not set; should never happen")
 	}
 
-	// find the scraper for the value var and exclude it in a copied list
-	newCaps := make([]Scraper, 0, len(a.Fetcher.Caps))
-	for _, sc := range a.Fetcher.Caps {
-		if sc.Name != valVarName {
-			newCaps = append(newCaps, sc)
+	// find the scraper for the value var and replace it
+	valIdx := -1
+	for idx, sc := range a.Fetcher.Caps {
+		if sc.Name == valVarName {
+			valIdx = idx
+			break
 		}
 	}
+
+	if valIdx < 0 {
+		panic(fmt.Sprintf("scraper for value var %q not found; should never happen", valVarName))
+	}
+
+	// overwrite the scraper with the new one
 	scraper.Name = valVarName
-	newCaps = append(newCaps, scraper)
-	a.Fetcher.Caps = newCaps
+	a.Fetcher.Caps[valIdx] = scraper
 
 	return nil
 }

@@ -377,7 +377,17 @@ func Test_Auths_Edit(t *testing.T) {
 			})),
 			expectStdoutOutput: "Set token scraper spec to header X-API-KEY[0]\n",
 		},
-		// TODO: set token auth token scraper
+		{
+			name: "set token auth token scraper to header",
+			args: []string{"auths", "auth1", "-t", "header:X-API-KEY"},
+			p:    testProject_withAuths(testAuth_token("auth1", "get-sess", "TOKEN", enableExpiration)),
+			expectP: testProject_withAuths(testAuth_token_withTokenScraper("auth1", "get-sess", morc.Scraper{
+				Name: "TOKEN",
+				Type: morc.SpecHeader,
+				Key:  "X-API-KEY",
+			}, enableExpiration)),
+			expectStdoutOutput: "Set token scraper spec to header X-API-KEY[0]\n",
+		},
 		{
 			name:      "set basic auth dest fails",
 			args:      []string{"auths", "auth1", "-d", "header:X-API-KEY"},

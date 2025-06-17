@@ -199,7 +199,6 @@ func Test_Auths_Edit(t *testing.T) {
 			expectP:            testProject_withAuths(morc.Auth{Name: "auth1", Type: morc.AuthTypeHTTPBasic}),
 			expectStdoutOutput: "Set auth method type to basic\n",
 		},
-		// TODO: add tests for setting auth types.
 		{
 			name:               "set basic auth username",
 			args:               []string{"auths", "auth1", "-u", "ectoBiologist"},
